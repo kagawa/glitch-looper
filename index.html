@@ -193,6 +193,7 @@
     <button id="recBtn" class="rec">⏺ Rec WebM</button>
     <button id="apngBtn">APNG↓</button>
     <button id="gifBtn">GIF↓</button>
+    <button id="shareBtn">𝕏 Post</button>
     <button id="resetBtn">Reset</button>
   </div>
   <div class="status" id="status">Load an image</div>
@@ -354,11 +355,11 @@ const PRESETS = {
   'Underwater':  { vhs:{on:1,aberration:6,scanline:.1,bleed:4,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.08,flicker:.05}, color:{on:1,saturate:1.2,contrast:1.0,hue:120,tint:-.2,vignette:.5}, film:{on:0}, roll:{on:0}, mosh:{on:0}, warp:{on:1,amp:8,freq:5,speed:2}, hud:{on:0} },
   // ---- Lens / FX ----
   'Peephole':    { vhs:{on:1,aberration:4,scanline:.3,bleed:2,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.18,flicker:.08}, color:{on:1,saturate:.9,contrast:1.1,hue:0,tint:.05,vignette:.2}, crt:{on:1,amount:.95,corner:.9,round:.6,frame:.15} },
-  'Trip':        { vhs:{on:1,aberration:12,scanline:.15,bleed:4,tracking:.1,wobble:3}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.03}, color:{on:1,saturate:1.6,contrast:1.05,hue:60,tint:0,vignette:.35}, feedback:{on:1,amount:.5,zoom:1.14,rotate:4} },
+  'Trip':        { vhs:{on:1,aberration:8,scanline:.1,bleed:4,tracking:.1,wobble:3}, glitch:{on:0}, noise:{on:1,grain:.05,flicker:.04}, color:{on:1,saturate:1.7,contrast:1.05,hue:90,tint:0,vignette:.35}, warp:{on:1,amp:7,freq:7,speed:3}, bloom:{on:1,amount:.5,size:8}, motion:{on:1,mode:2,depth:.6,rate:3} },
   'Newsprint':   { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.1,flicker:.05}, color:{on:1,saturate:.9,contrast:1.2,hue:0,tint:.05,vignette:.3}, halftone:{on:1,cell:6,bg:1} },
   'Dream Bloom': { vhs:{on:1,aberration:8,scanline:.1,bleed:6,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.03}, color:{on:1,saturate:1.3,contrast:.95,hue:0,tint:-.2,vignette:.4}, bloom:{on:1,amount:.6,size:10} },
   'Heat Haze':   { vhs:{on:1,aberration:5,scanline:.1,bleed:3,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.07,flicker:.05}, color:{on:1,saturate:1.15,contrast:1.05,hue:15,tint:.25,vignette:.4}, warp:{on:1,amp:6,freq:4,speed:2} },
-  'Wormhole':    { vhs:{on:1,aberration:10,scanline:.15,bleed:4,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.03}, color:{on:1,saturate:1.5,contrast:1.05,hue:-60,tint:0,vignette:.4}, feedback:{on:1,amount:.55,zoom:1.16,rotate:3,speed:1,pulse:.4} },
+  'Wormhole':    { vhs:{on:1,aberration:10,scanline:.15,bleed:4,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.03}, color:{on:1,saturate:1.5,contrast:1.05,hue:-60,tint:0,vignette:.5}, feedback:{on:1,amount:.6,zoom:1.18,rotate:2,speed:2,pulse:.5} },
   // ---- Reset ----
   'Clean':       { vhs:{on:0}, glitch:{on:0}, noise:{on:0}, color:{on:0} },
 };
@@ -1176,6 +1177,7 @@ randSeg.querySelectorAll('button').forEach(b=>{
 });
 const apngBtn = document.getElementById('apngBtn');
 const gifBtn = document.getElementById('gifBtn');
+const shareBtn = document.getElementById('shareBtn');
 const statusEl = document.getElementById('status');
 function setStatus(s){ statusEl.innerHTML = s; }
 
@@ -1188,7 +1190,8 @@ const RAND_LEVELS = { normal:{prob:.5, str:.4}, strong:{prob:1, str:1}, wild:{pr
 function randomizeFX(){
   const lv = RAND_LEVELS[randLevelVal] || RAND_LEVELS.normal;
   FX.forEach(f=>{
-    state[f.id].on = Math.random() < Math.min(0.95, (RAND_PROB[f.id] ?? 0.5) * lv.prob);
+    state[f.id].on = f.id==='motion' ? true                    // Envelope always on
+                   : Math.random() < Math.min(0.95, (RAND_PROB[f.id] ?? 0.5) * lv.prob);
     f.params.forEach(p=>{
       if (p.type==='select'){ state[f.id][p.k] = p.options[Math.floor(Math.random()*p.options.length)][0]; }
       else {
@@ -1345,42 +1348,66 @@ async function exportGIF(){
 apngBtn.onclick = ()=>{ if(!img){ setStatus('Load an image first'); return; } exportAPNG().catch(e=>setStatus('APNG failed: '+e.message)); };
 gifBtn.onclick  = ()=>{ if(!img){ setStatus('Load an image first'); return; } exportGIF().catch(e=>setStatus('GIF failed: '+e.message)); };
 
-// ---------- recording (one seamless loop) ----------
+// ---------- recording (one seamless loop) → returns a video Blob ----------
 recBtn.onclick = ()=>{
   if (!img){ setStatus('Load an image first'); return; }
-  recordLoop();
-};
-function recordLoop(){
-  const fps = 30;
-  const stream = canvas.captureStream(fps);
-  const types = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
-  const mime = types.find(t=> MediaRecorder.isTypeSupported(t)) || 'video/webm';
-  const rec = new MediaRecorder(stream, { mimeType:mime, videoBitsPerSecond: 8_000_000 });
-  const chunks = [];
-  rec.ondataavailable = e=>{ if (e.data.size) chunks.push(e.data); };
-  rec.onstop = ()=>{
-    const blob = new Blob(chunks, { type:mime });
-    const url = URL.createObjectURL(blob);
-    setStatus(`✔ Done (${(blob.size/1048576).toFixed(1)}MB) — <a class="dl" href="${url}" download="loop.webm">download loop.webm</a>`);
-    recBtn.disabled = false; recBtn.textContent = '⏺ Rec WebM';
-    playing = true;
-  };
-
-  // drive rendering deterministically across exactly one loop
   recBtn.disabled = true;
-  const wasPlaying = playing;
-  playing = false;                 // take over rAF drawing
-  const totalFrames = Math.round(LOOP_MS/1000*fps);
-  let f = 0;
-  rec.start();
-  const tick = ()=>{
-    draw(f/totalFrames);
-    setStatus(`⏺ Recording… ${f}/${totalFrames}`);
-    f++;
-    if (f <= totalFrames){ setTimeout(tick, 1000/fps); }
-    else { rec.stop(); playing = wasPlaying; startT = performance.now(); }
-  };
-  tick();
+  recordLoopBlob().then(({blob,ext})=>{
+    const url = URL.createObjectURL(blob);
+    setStatus(`✔ Done (${(blob.size/1048576).toFixed(1)}MB) — <a class="dl" href="${url}" download="loop.${ext}">download loop.${ext}</a>`);
+    recBtn.disabled = false; recBtn.textContent = '⏺ Rec WebM';
+  });
+};
+function recordLoopBlob(){
+  return new Promise(resolve=>{
+    const fps = 30;
+    const stream = canvas.captureStream(fps);
+    const types = ['video/mp4;codecs=h264','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+    const mime = types.find(t=> MediaRecorder.isTypeSupported(t)) || 'video/webm';
+    const ext = mime.startsWith('video/mp4') ? 'mp4' : 'webm';
+    const rec = new MediaRecorder(stream, { mimeType:mime, videoBitsPerSecond: 8_000_000 });
+    const chunks = [];
+    rec.ondataavailable = e=>{ if (e.data.size) chunks.push(e.data); };
+    const wasPlaying = playing;
+    rec.onstop = ()=>{ playing = wasPlaying; startT = performance.now(); resolve({ blob:new Blob(chunks,{type:mime}), ext }); };
+    // drive rendering deterministically across exactly one loop
+    playing = false;
+    const totalFrames = Math.round(LOOP_MS/1000*fps);
+    let f = 0;
+    rec.start();
+    const tick = ()=>{
+      draw(f/totalFrames);
+      setStatus(`⏺ Recording… ${f}/${totalFrames}`);
+      f++;
+      if (f <= totalFrames){ setTimeout(tick, 1000/fps); }
+      else rec.stop();
+    };
+    tick();
+  });
+}
+
+// ---------- share to X / Twitter ----------
+shareBtn.onclick = ()=>{
+  if (!img){ setStatus('Load an image first'); return; }
+  shareBtn.disabled = true;
+  shareToX().finally(()=>{ shareBtn.disabled = false; });
+};
+async function shareToX(){
+  const { blob, ext } = await recordLoopBlob();
+  const file = new File([blob], `glitch-loop.${ext}`, { type: blob.type });
+  const text = 'made with GLITCH LOOPER ↺';
+  const url = location.href;
+  // best case (mostly mobile): share the actual video file to the X app
+  if (navigator.canShare && navigator.canShare({ files:[file] })){
+    try { await navigator.share({ files:[file], text }); setStatus('Shared 🎉'); return; }
+    catch(e){ if (e.name==='AbortError'){ setStatus('Share cancelled'); return; } }
+  }
+  // fallback (desktop): download the clip + open the X composer for manual attach
+  const dlUrl = URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=dlUrl; a.download=`glitch-loop.${ext}`; a.click();
+  setTimeout(()=>URL.revokeObjectURL(dlUrl), 15000);
+  window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank', 'noopener');
+  setStatus('Clip downloaded — drag it into the X post that just opened');
 }
 
 buildUI();
