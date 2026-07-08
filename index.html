@@ -1,0 +1,1391 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VHS / Glitch Looper — mock</title>
+<style>
+  :root {
+    --bg: #0d0d10;
+    --panel: #16161c;
+    --panel2: #1e1e26;
+    --line: #2c2c38;
+    --fg: #e6e6ee;
+    --muted: #8a8a9a;
+    --accent: #6cf;
+    --accent2: #f6c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    background: var(--bg);
+    color: var(--fg);
+    font-size: 13px;
+  }
+  header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 800; letter-spacing: 4px; color: var(--fg); }
+  header h1 span { color: var(--accent); }
+  header h1 em { font-style: normal; color: var(--accent2); margin-left: 2px; }
+  .wrap {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 16px;
+    padding: 16px 18px;
+    align-items: start;
+  }
+  @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } }
+
+  .stage {
+    background:
+      linear-gradient(45deg, #101014 25%, transparent 25%) -8px 0/16px 16px,
+      linear-gradient(-45deg, #101014 25%, transparent 25%) -8px 0/16px 16px,
+      linear-gradient(45deg, transparent 75%, #101014 75%) -8px 0/16px 16px,
+      linear-gradient(-45deg, transparent 75%, #101014 75%) -8px 0/16px 16px,
+      #16161c;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    min-height: 300px;
+  }
+  #drop {
+    width: 100%;
+    min-height: 260px;
+    border: 1.5px dashed var(--line);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 8px;
+    color: var(--muted);
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, color .15s;
+  }
+  #drop.hover { border-color: var(--accent); color: var(--accent); }
+  #drop.hidden { display: none; }
+  canvas {
+    max-width: 100%;
+    border-radius: 6px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.5);
+    display: block;
+  }
+  #canvas.hidden { display: none; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .panel .grp { border-top: 1px solid var(--line); }
+  .panel .grp:first-child { border-top: none; }
+  .grp > .head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    background: var(--panel2);
+    cursor: pointer;
+    user-select: none;
+  }
+  .grp > .head .name { flex: 1; font-weight: 600; }
+  .grp > .head .name small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+  .grp .body { padding: 4px 12px 12px; display: none; }
+  .grp.open .body { display: block; }
+  .grp .caret { color: var(--muted); font-size: 10px; }
+
+  label.row {
+    display: grid;
+    grid-template-columns: 78px 1fr 38px;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    color: var(--muted);
+  }
+  label.row span.k { color: var(--fg); }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; }
+  select.fxsel { width: 100%; background: var(--panel2); color: var(--fg); border: 1px solid var(--line);
+    border-radius: 5px; padding: 3px 5px; font-family: inherit; font-size: 12px; }
+  label.row.hasenv { grid-template-columns: 78px 1fr 34px 16px; }
+  .envchk { accent-color: var(--accent2); width: 13px; height: 13px; cursor: pointer; }
+  .val { text-align: right; color: var(--accent); font-variant-numeric: tabular-nums; }
+
+  .toggle {
+    margin-left: auto;
+  }
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 10px 18px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+  }
+  .actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 12px;
+  }
+  .toolbar .actions { padding: 0; }
+  .toolbar .status { padding: 0; flex: 1; min-width: 160px; text-align: right; }
+  .toolbar .presetbar { padding: 0; border: none; }
+  .toolbar .presetsel { flex: 0 0 auto; min-width: 150px; }
+  .segsel { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+  .segsel button { border: none; border-left: 1px solid var(--line); border-radius: 0;
+    background: var(--panel2); color: var(--muted); padding: 8px 11px; font-size: 11px; }
+  .segsel button:first-child { border-left: none; }
+  .segsel button:hover { color: var(--fg); border-color: var(--line); }
+  .segsel button.active { background: var(--accent); color: #06121a; font-weight: 700; }
+  button {
+    font-family: inherit;
+    font-size: 12px;
+    background: var(--panel2);
+    color: var(--fg);
+    border: 1px solid var(--line);
+    padding: 8px 12px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background .12s, border-color .12s;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #06121a; border-color: var(--accent); font-weight: 700; }
+  button.rec { background: var(--accent2); color: #1a0610; border-color: var(--accent2); font-weight: 700; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  .status { padding: 0 12px 12px; color: var(--muted); font-size: 11px; min-height: 14px; }
+  .presetbar { display: flex; gap: 8px; align-items: center; padding: 12px; border-bottom: 1px solid var(--line); }
+  .presetlab { color: var(--muted); font-size: 11px; white-space: nowrap; }
+  .presetsel { flex: 1; background: var(--panel2); color: var(--fg); border: 1px solid var(--line);
+    border-radius: 7px; padding: 7px 8px; font-family: inherit; font-size: 12px; cursor: pointer; }
+  a.dl { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>GLITCH <span>LOOPER</span> <em>↺</em></h1>
+</header>
+
+<div class="toolbar">
+  <div class="presetbar" id="presets"></div>
+  <div class="actions">
+    <button id="openBtn">🖼 Image</button>
+    <button id="playBtn" class="primary">⏸ Pause</button>
+    <button id="rndBtn">🎲 Random</button>
+    <div id="randLevel" class="segsel" title="Random strength">
+      <button data-v="normal" class="active">Normal</button>
+      <button data-v="strong">Strong</button>
+      <button data-v="wild">Wild</button>
+    </div>
+    <button id="recBtn" class="rec">⏺ Rec WebM</button>
+    <button id="apngBtn">APNG↓</button>
+    <button id="gifBtn">GIF↓</button>
+    <button id="resetBtn">Reset</button>
+  </div>
+  <div class="status" id="status">Load an image</div>
+</div>
+
+<div class="wrap">
+  <div class="stage">
+    <div id="drop">
+      <div style="font-size:26px">⤓</div>
+      <div>Drop an image / click to choose</div>
+      <div style="font-size:11px">PNG · JPG · WEBP</div>
+    </div>
+    <canvas id="canvas" class="hidden"></canvas>
+    <input id="file" type="file" accept="image/*" hidden>
+  </div>
+
+  <div class="panel" id="controls">
+    <!-- effect groups injected by JS -->
+  </div>
+</div>
+
+<script>
+// ---------- effect parameter schema ----------
+const FX = [
+  { id:'vhs', name:'VHS', hint:'chroma shift · scanlines · bleed', on:false, open:true, params:[
+    { k:'aberration', label:'Aberration (H)', min:0, max:20, step:.5, def:6, env:1, envd:1 },
+    { k:'scanline',   label:'Scanlines', min:0, max:1,  step:.01, def:.35 },
+    { k:'bleed',      label:'Bleed', min:0, max:12, step:.5, def:3 },
+    { k:'tracking',   label:'Tracking', min:0, max:1, step:.01, def:.3, env:1 },
+    { k:'wobble',     label:'Wobble', min:0, max:20, step:.5, def:5 },
+  ]},
+  { id:'glitch', name:'Slice', hint:'horizontal slice shift + RGB split (visual, not real corruption)', on:false, open:false, params:[
+    { k:'amount',   label:'Amount', min:0, max:1, step:.01, def:.4, env:1, envd:1 },
+    { k:'slices',   label:'Slices', min:1, max:40, step:1, def:14 },
+    { k:'shift',    label:'Shift', min:0, max:120, step:1, def:40, env:1, envd:1 },
+    { k:'rgb',      label:'RGB Split (V)', min:0, max:30, step:.5, def:8, env:1, envd:1 },
+  ]},
+  { id:'noise', name:'Noise', hint:'grain', on:false, open:false, params:[
+    { k:'grain',    label:'Grain',   min:0, max:1, step:.01, def:.18, env:1, envd:1 },
+    { k:'flicker',  label:'Flicker',  min:0, max:1, step:.01, def:.1, env:1, envd:1 },
+  ]},
+  { id:'color', name:'Color', hint:'grade · fade', on:false, open:false, params:[
+    { k:'saturate', label:'Saturation',   min:0, max:2, step:.01, def:1.2 },
+    { k:'contrast', label:'Contrast', min:0, max:2, step:.01, def:1.1 },
+    { k:'hue',      label:'Hue Rotate', min:-180, max:180, step:1, def:0 },
+    { k:'tint',     label:'Tint (blue⇄orange)', min:-1, max:1, step:.01, def:0 },
+    { k:'vignette', label:'Vignette', min:0, max:1, step:.01, def:.3 },
+  ]},
+  { id:'roll', name:'Roll', hint:'scroll / vertical roll (wraps around)', on:false, open:false, params:[
+    { k:'hspeed', label:'H-Scroll', min:-2, max:2, step:.05, def:.3 },
+    { k:'hstep',  label:'Step', min:0, max:1, step:.01, def:0 },
+    { k:'vspeed', label:'V-Roll', min:-2, max:2, step:.05, def:0 },
+    { k:'band',   label:'Roll Band', min:0, max:1, step:.01, def:.4 },
+  ]},
+  { id:'film', name:'Film 8mm', hint:'old film · dust · scratches · weave', on:false, open:false, params:[
+    { k:'weave',   label:'Gate Weave', min:0, max:10, step:.25, def:3 },
+    { k:'dust',    label:'Dust', min:0, max:1, step:.01, def:.4, env:1 },
+    { k:'scratch', label:'Scratches', min:0, max:1, step:.01, def:.3, env:1 },
+    { k:'sepia',   label:'Sepia', min:0, max:1, step:.01, def:.5 },
+    { k:'burn',    label:'Burn/Flicker', min:0, max:1, step:.01, def:.3, env:1 },
+  ]},
+  { id:'mosh', name:'Datamosh (fake)', hint:'mimics gif-corruption look (not real data corruption)', on:false, open:false, params:[
+    { k:'intensity', label:'Intensity',   min:0, max:1, step:.01, def:.5, env:1, envd:1 },
+    { k:'blocks',    label:'Blocks', min:0, max:1, step:.01, def:.5 },
+    { k:'sort',      label:'Pixel Sort', min:0, max:1, step:.01, def:.3 },
+    { k:'chaos',     label:'Jitter', min:0, max:1, step:.01, def:.6 },
+    { k:'rate',      label:'Change Rate', min:1, max:30, step:1, def:10 },
+  ]},
+  { id:'jpeg', name:'JPEG databend', hint:'real byte corruption · DCT block melt', on:false, open:false, params:[
+    { k:'amount',  label:'Corruption', min:0, max:1, step:.01, def:.3 },
+    { k:'quality', label:'Quality (coarse)', min:.05, max:.95, step:.01, def:.35 },
+    { k:'frames',  label:'Frames', min:1, max:16, step:1, def:6 },
+  ]},
+  { id:'png', name:'PNG glitch', hint:'real · scanline-filter corruption (H/V/diagonal bleed + noise)', on:false, open:false, params:[
+    { k:'amount', label:'Bleed (filter)', min:0, max:1, step:.01, def:.3 },
+    { k:'noise',  label:'Random Noise', min:0, max:1, step:.01, def:.2 },
+    { k:'dir',    label:'Bleed Dir', type:'select', def:0,
+      options:[[0,'Mix'],[1,'Horizontal (Sub)'],[2,'Vertical (Up)'],[3,'Diagonal (Paeth)']] },
+    { k:'frames', label:'Frames', min:1, max:16, step:1, def:6 },
+  ]},
+  { id:'warp', name:'Warp', hint:'sine wave distortion (heat-haze / underwater / melt)', on:false, open:false, params:[
+    { k:'amp',   label:'Amplitude', min:0, max:10, step:.25, def:5, env:1 },
+    { k:'freq',  label:'Frequency', min:1, max:20, step:1, def:6 },
+    { k:'speed', label:'Speed', min:0, max:6, step:1, def:2 },
+  ]},
+  { id:'pixelate', name:'Pixelate', hint:'mosaic / retro blocks (Envelope can pulse block size)', on:false, open:false, params:[
+    { k:'size', label:'Block Size', min:1, max:48, step:1, def:8, env:1 },
+  ]},
+  { id:'hud', name:'HUD / Text', hint:'REC ● · timestamp · camcorder overlay', on:false, open:false, params:[
+    { k:'layout',  label:'Layout', type:'select', def:3,
+      options:[[0,'REC ●'],[1,'▶ PLAY'],[2,'Timestamp'],[3,'Camcorder'],[4,'Security Cam']] },
+    { k:'color',   label:'Text Color', type:'select', def:0,
+      options:[[0,'White'],[1,'Amber'],[2,'Green'],[3,'Red'],[4,'Cyan'],[5,'Black']] },
+    { k:'size',    label:'Size', min:.5, max:2.5, step:.1, def:1 },
+    { k:'opacity', label:'Opacity', min:0, max:1, step:.01, def:.9 },
+  ]},
+  { id:'bloom', name:'Bloom', hint:'glow / light bleed on highlights', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
+    { k:'size',   label:'Radius', min:1, max:30, step:1, def:8 },
+  ]},
+  { id:'halftone', name:'Halftone', hint:'dot-matrix / newsprint dots', on:false, open:false, params:[
+    { k:'cell', label:'Cell Size', min:3, max:20, step:1, def:6 },
+    { k:'bg',   label:'Background', type:'select', def:0, options:[[0,'Dark (LED)'],[1,'Light (print)']] },
+  ]},
+  { id:'crt', name:'CRT Curve', hint:'barrel bulge + rounded bezel (strong = peephole)', on:false, open:false, params:[
+    { k:'amount', label:'Curvature', min:0, max:1, step:.01, def:.3 },
+    { k:'corner', label:'Corner Dark', min:0, max:1, step:.01, def:.5 },
+    { k:'round',  label:'Screen Bulge', min:0, max:1, step:.01, def:0 },
+    { k:'frame',  label:'Bezel', min:0, max:1, step:.01, def:0 },
+  ]},
+  { id:'feedback', name:'Feedback Zoom', hint:'droste tunnel · spins/pulses over the loop', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5 },
+    { k:'zoom',   label:'Zoom', min:1.01, max:1.4, step:.01, def:1.12 },
+    { k:'rotate', label:'Twist', min:-15, max:15, step:.5, def:0 },
+    { k:'speed',  label:'Spin/loop', min:-4, max:4, step:1, def:0 },
+    { k:'pulse',  label:'Zoom Pulse', min:0, max:1, step:.01, def:0 },
+  ]},
+  { id:'melt', name:'Melt', hint:'pixel drip (breathes over the loop)', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.4, env:1 },
+  ]},
+  { id:'motion', name:'Envelope', hint:'makes destruction breathe over the loop (pick targets via ⓔ)', on:false, open:true, params:[
+    { k:'mode', label:'Curve', type:'select', def:1,
+      options:[[0,'Constant'],[1,'Peak (crash mid)'],[2,'Pulse'],[3,'Build → Drop'],[4,'Stutter']] },
+    { k:'depth', label:'Depth', min:0, max:1, step:.01, def:.7 },
+    { k:'rate',  label:'Rate / Count', min:1, max:12, step:1, def:3 },
+  ]},
+];
+
+const PRESETS = {
+  // ---- Classic ----
+  'VHS Tape':    { vhs:{on:1,aberration:8,scanline:.45,bleed:4,tracking:.4,wobble:7}, glitch:{on:0}, noise:{on:1,grain:.22,flicker:.15}, color:{on:1,saturate:1.1,contrast:1.05,hue:0,tint:.15,vignette:.4} },
+  '8mm Film':    { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.14,flicker:.2}, color:{on:1,saturate:.8,contrast:1.1,hue:0,tint:.1,vignette:.5}, film:{on:1,weave:1,dust:.6,scratch:.5,sepia:.6,burn:.4}, roll:{on:0}, mosh:{on:0} },
+  'Dreamy':      { vhs:{on:1,aberration:12,scanline:.1,bleed:8,tracking:.1,wobble:3}, glitch:{on:0}, noise:{on:1,grain:.08,flicker:.03}, color:{on:1,saturate:1.4,contrast:.95,hue:0,tint:-.3,vignette:.5} },
+  'CRT':         { vhs:{on:1,aberration:5,scanline:.7,bleed:2,tracking:.1,wobble:1}, glitch:{on:0}, noise:{on:1,grain:.1,flicker:.08}, color:{on:1,saturate:1.2,contrast:1.1,hue:0,tint:.05,vignette:.55} },
+  'Backrooms':   { vhs:{on:1,aberration:4,scanline:.28,bleed:2,tracking:.22,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.2,flicker:.14}, color:{on:1,saturate:.85,contrast:1.12,hue:12,tint:.4,vignette:.55}, film:{on:0}, roll:{on:0}, mosh:{on:0} },
+  // ---- Glitch ----
+  'Digital Decay':{ vhs:{on:1,aberration:4,scanline:.15,bleed:1,tracking:.2,wobble:2}, glitch:{on:1,amount:.45,slices:22,shift:30,rgb:10}, noise:{on:1,grain:.1,flicker:.05}, color:{on:0} },
+  'Datamosh':    { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.08,flicker:0}, color:{on:1,saturate:1.3,contrast:1.1,hue:0,tint:0,vignette:.2}, roll:{on:0}, film:{on:0}, mosh:{on:1,intensity:.75,blocks:.65,sort:.55,chaos:.85,rate:12} },
+  'JPEG Databend':{ vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.05}, color:{on:0}, roll:{on:0}, film:{on:0}, mosh:{on:0}, jpeg:{on:1,amount:.35,quality:.3,frames:8}, png:{on:0} },
+  'PNG Glitch':  { vhs:{on:0}, glitch:{on:0}, noise:{on:0}, color:{on:0}, roll:{on:0}, film:{on:0}, mosh:{on:0}, jpeg:{on:0}, png:{on:1,amount:.3,noise:.15,dir:0,frames:8} },
+  'Roll Break':  { vhs:{on:1,aberration:6,scanline:.3,bleed:2,tracking:.5,wobble:4}, glitch:{on:1,amount:.22,slices:16,shift:18,rgb:6}, noise:{on:1,grain:.15,flicker:.1}, color:{on:0}, roll:{on:1,hspeed:1.5,hstep:.4,vspeed:.5,band:.5}, film:{on:0}, mosh:{on:0} },
+  // ---- Horror ----
+  'Cursed Tape': { vhs:{on:1,aberration:10,scanline:.5,bleed:3,tracking:.85,wobble:9}, glitch:{on:1,amount:.18,slices:20,shift:18,rgb:6}, noise:{on:1,grain:.4,flicker:.45}, color:{on:1,saturate:.55,contrast:1.35,hue:-25,tint:-.2,vignette:.75}, film:{on:1,weave:1.5,dust:.35,scratch:.35,sepia:0,burn:.35}, roll:{on:1,hspeed:0,hstep:0,vspeed:.15,band:.4}, mosh:{on:0}, motion:{on:1,mode:4,depth:.7,rate:5} },
+  'Haunted Film':{ vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.35,flicker:.5}, color:{on:1,saturate:.4,contrast:1.3,hue:15,tint:.15,vignette:.8}, film:{on:1,weave:3,dust:.8,scratch:.7,sepia:.55,burn:.7}, roll:{on:0}, mosh:{on:0}, motion:{on:1,mode:2,depth:.6,rate:4} },
+  'Corruption':  { vhs:{on:1,aberration:6,scanline:.2,bleed:1,tracking:.3,wobble:2}, glitch:{on:1,amount:.28,slices:24,shift:25,rgb:10}, noise:{on:1,grain:.2,flicker:.2}, color:{on:1,saturate:.7,contrast:1.2,hue:-40,tint:-.1,vignette:.7}, film:{on:0}, mosh:{on:1,intensity:.6,blocks:.7,sort:.4,chaos:.9,rate:14}, png:{on:1,amount:.25,noise:.15,dir:2,frames:8}, motion:{on:1,mode:3,depth:.8,rate:2} },
+  'Red Room':    { vhs:{on:1,aberration:7,scanline:.35,bleed:2,tracking:.4,wobble:3}, glitch:{on:1,amount:.15,slices:14,shift:16,rgb:8}, noise:{on:1,grain:.25,flicker:.55}, color:{on:1,saturate:1.3,contrast:1.4,hue:-120,tint:.1,vignette:.7}, film:{on:0}, mosh:{on:0}, motion:{on:1,mode:2,depth:.7,rate:6} },
+  'Meltdown':    { vhs:{on:1,aberration:6,scanline:.2,bleed:2,tracking:.25,wobble:3}, glitch:{on:0}, noise:{on:1,grain:.15,flicker:.15}, color:{on:1,saturate:.7,contrast:1.2,hue:-30,tint:-.1,vignette:.6}, film:{on:0}, mosh:{on:0}, warp:{on:1,amp:4,freq:5,speed:1}, melt:{on:1,amount:.55}, motion:{on:1,mode:1,depth:.6,rate:2} },
+  // ---- Vivid ----
+  'Y2K':         { vhs:{on:1,aberration:14,scanline:.2,bleed:5,tracking:.15,wobble:4}, glitch:{on:1,amount:.2,slices:20,shift:18,rgb:12}, noise:{on:1,grain:.12,flicker:.06}, color:{on:1,saturate:1.6,contrast:1.05,hue:0,tint:0,vignette:.25} },
+  'Neon':        { vhs:{on:1,aberration:16,scanline:.3,bleed:4,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.1,flicker:.05}, color:{on:1,saturate:1.8,contrast:1.15,hue:60,tint:-.2,vignette:.5} },
+  'Vaporwave':   { vhs:{on:1,aberration:11,scanline:.18,bleed:5,tracking:.1,wobble:3}, glitch:{on:0}, noise:{on:1,grain:.07,flicker:.04}, color:{on:1,saturate:1.7,contrast:1.0,hue:-35,tint:-.15,vignette:.4}, film:{on:0}, roll:{on:0}, mosh:{on:0} },
+  'LED Board':   { vhs:{on:0}, glitch:{on:0}, noise:{on:0}, color:{on:1,saturate:1.6,contrast:1.1,hue:0,tint:0,vignette:.25}, halftone:{on:1,cell:7,bg:0}, bloom:{on:1,amount:.5,size:6} },
+  // ---- Camera / Scene ----
+  'Security Cam':{ vhs:{on:1,aberration:3,scanline:.35,bleed:1,tracking:.15,wobble:1}, glitch:{on:0}, noise:{on:1,grain:.28,flicker:.1}, color:{on:1,saturate:.5,contrast:1.15,hue:-15,tint:-.05,vignette:.6}, film:{on:0}, roll:{on:0}, mosh:{on:0}, hud:{on:1,layout:4,size:1,opacity:.85} },
+  'Camcorder':   { vhs:{on:1,aberration:5,scanline:.25,bleed:3,tracking:.3,wobble:5}, glitch:{on:0}, noise:{on:1,grain:.2,flicker:.12}, color:{on:1,saturate:1.1,contrast:1.05,hue:0,tint:.1,vignette:.4}, film:{on:0}, roll:{on:0}, mosh:{on:0}, hud:{on:1,layout:3,size:1,opacity:.9} },
+  'Broadcast':   { vhs:{on:1,aberration:8,scanline:.4,bleed:3,tracking:.6,wobble:6}, glitch:{on:0}, noise:{on:1,grain:.2,flicker:.2}, color:{on:1,saturate:1.05,contrast:1.05,hue:0,tint:.05,vignette:.4}, film:{on:0}, roll:{on:1,hspeed:0,hstep:0,vspeed:.2,band:.5}, mosh:{on:0}, hud:{on:1,layout:0,color:0,size:1,opacity:.9} },
+  'Fisheye Cam': { vhs:{on:1,aberration:3,scanline:.3,bleed:1,tracking:.15,wobble:1}, glitch:{on:0}, noise:{on:1,grain:.22,flicker:.1}, color:{on:1,saturate:.6,contrast:1.15,hue:-10,tint:-.05,vignette:.4}, film:{on:0}, roll:{on:0}, mosh:{on:0}, crt:{on:1,amount:.5,corner:.6,round:.4,frame:.1}, hud:{on:1,layout:4,color:2,size:.9,opacity:.85} },
+  'Retro Game':  { vhs:{on:1,aberration:3,scanline:.4,bleed:0,tracking:0,wobble:0}, glitch:{on:0}, noise:{on:1,grain:.04,flicker:.16}, color:{on:1,saturate:1.5,contrast:1.15,hue:0,tint:0,vignette:.3}, film:{on:0}, roll:{on:0}, mosh:{on:0}, pixelate:{on:1,size:7}, hud:{on:0}, motion:{on:1,mode:2,depth:.5,rate:3} },
+  'Underwater':  { vhs:{on:1,aberration:6,scanline:.1,bleed:4,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.08,flicker:.05}, color:{on:1,saturate:1.2,contrast:1.0,hue:120,tint:-.2,vignette:.5}, film:{on:0}, roll:{on:0}, mosh:{on:0}, warp:{on:1,amp:8,freq:5,speed:2}, hud:{on:0} },
+  // ---- Lens / FX ----
+  'Peephole':    { vhs:{on:1,aberration:4,scanline:.3,bleed:2,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.18,flicker:.08}, color:{on:1,saturate:.9,contrast:1.1,hue:0,tint:.05,vignette:.2}, crt:{on:1,amount:.95,corner:.9,round:.6,frame:.15} },
+  'Trip':        { vhs:{on:1,aberration:12,scanline:.15,bleed:4,tracking:.1,wobble:3}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.03}, color:{on:1,saturate:1.6,contrast:1.05,hue:60,tint:0,vignette:.35}, feedback:{on:1,amount:.5,zoom:1.14,rotate:4} },
+  'Newsprint':   { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.1,flicker:.05}, color:{on:1,saturate:.9,contrast:1.2,hue:0,tint:.05,vignette:.3}, halftone:{on:1,cell:6,bg:1} },
+  'Dream Bloom': { vhs:{on:1,aberration:8,scanline:.1,bleed:6,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.03}, color:{on:1,saturate:1.3,contrast:.95,hue:0,tint:-.2,vignette:.4}, bloom:{on:1,amount:.6,size:10} },
+  'Heat Haze':   { vhs:{on:1,aberration:5,scanline:.1,bleed:3,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.07,flicker:.05}, color:{on:1,saturate:1.15,contrast:1.05,hue:15,tint:.25,vignette:.4}, warp:{on:1,amp:6,freq:4,speed:2} },
+  'Wormhole':    { vhs:{on:1,aberration:10,scanline:.15,bleed:4,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.03}, color:{on:1,saturate:1.5,contrast:1.05,hue:-60,tint:0,vignette:.4}, feedback:{on:1,amount:.55,zoom:1.16,rotate:3,speed:1,pulse:.4} },
+  // ---- Reset ----
+  'Clean':       { vhs:{on:0}, glitch:{on:0}, noise:{on:0}, color:{on:0} },
+};
+// select layout (group label → preset names)
+const PRESET_GROUPS = [
+  ['Classic', ['VHS Tape','8mm Film','Dreamy','CRT','Backrooms']],
+  ['Glitch',  ['Digital Decay','Datamosh','JPEG Databend','PNG Glitch','Roll Break']],
+  ['Horror',  ['Cursed Tape','Haunted Film','Corruption','Red Room','Meltdown']],
+  ['Vivid',   ['Y2K','Neon','Vaporwave','LED Board']],
+  ['Camera',  ['Security Cam','Camcorder','Broadcast','Fisheye Cam','Retro Game','Underwater']],
+  ['Lens/FX', ['Peephole','Trip','Newsprint','Dream Bloom','Heat Haze','Wormhole']],
+];
+
+// ---------- state ----------
+const state = {};
+FX.forEach(f => { state[f.id] = { on:f.on };
+  f.params.forEach(p => { state[f.id][p.k] = p.def; if (p.env) state[f.id][p.k+'_env'] = !!p.envd; }); });
+
+const LOOP_MS = 3000;   // 1 loop period
+let img = null, playing = true, startT = performance.now();
+
+// real JPEG databend: pool of genuinely-corrupted decoded frames, cycled for animation
+let jpegFrames = [], jpegReady = false, jpegTimer = null;
+const jsrc = document.createElement('canvas');
+const jctx = jsrc.getContext('2d');
+
+// real PNG glitch (pnglitch-style): corrupt scanline filter bytes + pixel bytes, re-deflate
+let pngFrames = [], pngReady = false, pngTimer = null;
+const psrc = document.createElement('canvas');
+const pctx = psrc.getContext('2d', { willReadFrequently:true });
+
+// ---------- build UI ----------
+const controls = document.getElementById('controls');
+const presetsEl = document.getElementById('presets');
+let presetSel;
+function buildUI(){
+  FX.forEach(f => {
+    const g = document.createElement('div');
+    g.className = 'grp' + (f.open ? ' open':'');
+    g.innerHTML = `
+      <div class="head">
+        <input type="checkbox" ${state[f.id].on?'checked':''} data-fx="${f.id}" class="fxtoggle">
+        <span class="name">${f.name}<small>${f.hint}</small></span>
+        <span class="caret">▶</span>
+      </div>
+      <div class="body">
+        ${f.params.map(p=> p.type==='select'
+          ? `<label class="row">
+               <span class="k">${p.label}</span>
+               <select class="fxsel" data-fx="${f.id}" data-k="${p.k}">
+                 ${p.options.map(o=>`<option value="${o[0]}" ${state[f.id][p.k]==o[0]?'selected':''}>${o[1]}</option>`).join('')}
+               </select>
+               <span class="val"></span>
+             </label>`
+          : `<label class="row${p.env?' hasenv':''}">
+               <span class="k">${p.label}</span>
+               <input type="range" min="${p.min}" max="${p.max}" step="${p.step}"
+                      value="${state[f.id][p.k]}" data-fx="${f.id}" data-k="${p.k}">
+               <span class="val" id="v-${f.id}-${p.k}">${state[f.id][p.k]}</span>
+               ${p.env?`<input type="checkbox" class="envchk" data-fx="${f.id}" data-k="${p.k}" title="Apply Envelope" ${state[f.id][p.k+'_env']?'checked':''}>`:''}
+             </label>`
+        ).join('')}
+      </div>`;
+    controls.appendChild(g);
+
+    g.querySelector('.head .caret').closest('.head').addEventListener('click', e=>{
+      if (e.target.classList.contains('fxtoggle')) return;
+      g.classList.toggle('open');
+      g.querySelector('.caret').textContent = g.classList.contains('open') ? '▼':'▶';
+    });
+    g.querySelector('.caret').textContent = f.open ? '▼':'▶';
+  });
+
+  controls.querySelectorAll('input[type=range]').forEach(r=>{
+    r.addEventListener('input', ()=>{
+      state[r.dataset.fx][r.dataset.k] = parseFloat(r.value);
+      document.getElementById(`v-${r.dataset.fx}-${r.dataset.k}`).textContent = r.value;
+      if (r.dataset.fx==='jpeg') scheduleJpeg();
+      if (r.dataset.fx==='png')  schedulePng();
+    });
+  });
+  controls.querySelectorAll('.fxtoggle').forEach(c=>{
+    c.addEventListener('change', ()=>{
+      state[c.dataset.fx].on = c.checked;
+      if (c.dataset.fx==='jpeg'){ if (c.checked) scheduleJpeg(); else if (state.png.on) schedulePng(); }
+      if (c.dataset.fx==='png'  && c.checked) schedulePng();
+    });
+  });
+  controls.querySelectorAll('.fxsel').forEach(s=>{
+    s.addEventListener('change', ()=>{
+      state[s.dataset.fx][s.dataset.k] = parseInt(s.value, 10);
+      if (s.dataset.fx==='png') schedulePng();
+    });
+  });
+  controls.querySelectorAll('.envchk').forEach(c=>{
+    c.addEventListener('change', ()=>{ state[c.dataset.fx][c.dataset.k+'_env'] = c.checked; });
+  });
+
+  const lab = document.createElement('span'); lab.className='presetlab'; lab.textContent='Preset';
+  presetSel = document.createElement('select'); presetSel.className='presetsel';
+  presetSel.innerHTML = `<option value="">Select…</option>` +
+    PRESET_GROUPS.map(([g,names])=>`<optgroup label="${g}">`+
+      names.map(n=>`<option value="${n}">${n}</option>`).join('')+`</optgroup>`).join('');
+  presetSel.addEventListener('change', ()=>{ if (presetSel.value) applyPreset(presetSel.value); });
+  presetsEl.appendChild(lab); presetsEl.appendChild(presetSel);
+}
+function applyPreset(name){
+  const p = PRESETS[name];
+  FX.forEach(f=>{
+    const pp = p[f.id] || {};
+    state[f.id].on = !!pp.on;
+    f.params.forEach(par=>{ if (pp[par.k] !== undefined) state[f.id][par.k] = pp[par.k]; });
+  });
+  syncUI();
+}
+function syncUI(){
+  controls.querySelectorAll('.fxtoggle').forEach(c=> c.checked = state[c.dataset.fx].on);
+  controls.querySelectorAll('input[type=range]').forEach(r=>{
+    r.value = state[r.dataset.fx][r.dataset.k];
+    document.getElementById(`v-${r.dataset.fx}-${r.dataset.k}`).textContent = r.value;
+  });
+  controls.querySelectorAll('.fxsel').forEach(s=> s.value = state[s.dataset.fx][s.dataset.k]);
+  controls.querySelectorAll('.envchk').forEach(c=> c.checked = !!state[c.dataset.fx][c.dataset.k+'_env']);
+  if (state.jpeg.on) scheduleJpeg(); else jpegReady = false;
+  if (state.png.on)  schedulePng();  else pngReady  = false;
+}
+
+// ---------- canvas / rendering ----------
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d', { willReadFrequently:true });
+const tmp = document.createElement('canvas');
+const tctx = tmp.getContext('2d', { willReadFrequently:true });
+const sc = document.createElement('canvas');                 // scratch for warp/pixelate
+const sctx = sc.getContext('2d', { willReadFrequently:true });
+
+// deterministic pseudo-random keyed on loop phase so recordings are seamless
+function rand(seed){ const x = Math.sin(seed*12.9898)*43758.5453; return x - Math.floor(x); }
+
+// draw an image tiled so any offset wraps around (right edge re-enters from left)
+function drawWrap(src, ox, oy, w, h){
+  ox = ((ox % w) + w) % w;
+  oy = ((oy % h) + h) % h;
+  ctx.drawImage(src, ox-w, oy-h, w, h);
+  ctx.drawImage(src, ox,   oy-h, w, h);
+  ctx.drawImage(src, ox-w, oy,   w, h);
+  ctx.drawImage(src, ox,   oy,   w, h);
+}
+
+// ---- real JPEG databending ----
+// re-encode current image as JPEG, corrupt bytes in the entropy-coded region
+// (after the SOS marker, leaving headers/EOI intact), then decode the broken bytes.
+// Produces a pool of frames we cycle through so the glitch animates seamlessly.
+async function buildJpegFrames(){
+  if (!img) return;
+  const j = state.jpeg, w = canvas.width, h = canvas.height;
+  jsrc.width = w; jsrc.height = h;
+  jctx.clearRect(0,0,w,h);
+  jctx.drawImage(img, 0, 0, w, h);
+  const blob = await new Promise(r=> jsrc.toBlob(r, 'image/jpeg', j.quality));
+  const buf = new Uint8Array(await blob.arrayBuffer());
+
+  // find where entropy-coded scan data begins (skip all headers)
+  let start = 2;
+  for (let i=2;i<buf.length-3;i++){
+    if (buf[i]===0xFF && buf[i+1]===0xDA){ start = i + 2 + ((buf[i+2]<<8)|buf[i+3]); break; }
+  }
+  const end = buf.length - 2;                 // keep the EOI marker
+  const span = Math.max(1, end - start);
+  const nFrames = Math.max(1, Math.round(j.frames));
+  const out = [];
+  for (let f=0; f<nFrames; f++){
+    const copy = buf.slice();
+    const hits = 1 + Math.floor(j.amount * 40);
+    for (let k=0;k<hits;k++){
+      const pos = start + Math.floor(Math.random()*span);
+      if (copy[pos]===0xFF || copy[pos-1]===0xFF) continue;  // don't fake a marker
+      let v = Math.floor(Math.random()*255);
+      copy[pos] = v===0xFF ? 0xFE : v;
+    }
+    try { out.push(await createImageBitmap(new Blob([copy], {type:'image/jpeg'}))); }
+    catch(e){ /* some corruptions are undecodable — just drop that frame */ }
+  }
+  if (out.length){ jpegFrames = out; jpegReady = true; }
+  else { jpegReady = false; }
+  if (state.png.on) schedulePng();   // restack PNG glitch on the fresh JPEG result
+}
+function scheduleJpeg(){
+  jpegReady = false;
+  clearTimeout(jpegTimer);
+  jpegTimer = setTimeout(()=> buildJpegFrames().catch(()=>{}), 120);  // debounce
+}
+
+// ---- real PNG glitch (inspired by ucnv/pnglitch) ----
+// PNG is structurally valid (re-deflated, correct CRCs); the glitch lives in the
+// filtered scanline data. Corrupting each row's filter-type byte makes the decoder
+// un-filter with the wrong predictor -> Sub=horizontal, Up=vertical, Avg/Paeth=diagonal
+// colour bleed. Flipping pixel bytes adds pure random noise.
+const CRC_TABLE = (()=>{ const t=new Uint32Array(256);
+  for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c = c&1 ? 0xEDB88320^(c>>>1) : c>>>1; t[n]=c>>>0; }
+  return t; })();
+function crc32(bytes){ let c=0xFFFFFFFF;
+  for(let i=0;i<bytes.length;i++) c = CRC_TABLE[(c^bytes[i])&255] ^ (c>>>8);
+  return (c^0xFFFFFFFF)>>>0; }
+function u32(n){ return new Uint8Array([(n>>>24)&255,(n>>>16)&255,(n>>>8)&255,n&255]); }
+function concat(arrays){ let len=0; for(const a of arrays) len+=a.length;
+  const out=new Uint8Array(len); let o=0; for(const a of arrays){ out.set(a,o); o+=a.length; } return out; }
+function pngChunk(type, data){
+  const tb=new Uint8Array([type.charCodeAt(0),type.charCodeAt(1),type.charCodeAt(2),type.charCodeAt(3)]);
+  const body=concat([tb, data]);
+  return concat([u32(data.length), body, u32(crc32(body))]);
+}
+async function deflate(bytes){
+  const cs=new CompressionStream('deflate');           // zlib wrapper = PNG IDAT format
+  const wr=cs.writable.getWriter(); wr.write(bytes); wr.close();
+  return new Uint8Array(await new Response(cs.readable).arrayBuffer());
+}
+function paeth(a,b,c){ const p=a+b-c, pa=Math.abs(p-a), pb=Math.abs(p-b), pc=Math.abs(p-c);
+  return (pa<=pb && pa<=pc) ? a : (pb<=pc) ? b : c; }
+async function buildPngFrames(){
+  if (!img) return;
+  const p=state.png, w=canvas.width, h=canvas.height, stride=w*4, bpp=4;
+  // if JPEG databend is also on, glitch its output -> both effects stack (orig→JPEG→PNG)
+  const srcImg = (state.jpeg.on && jpegReady && jpegFrames.length) ? jpegFrames[0] : img;
+  psrc.width=w; psrc.height=h; pctx.clearRect(0,0,w,h); pctx.drawImage(srcImg,0,0,w,h);
+  const px=pctx.getImageData(0,0,w,h).data;
+
+  const sig=new Uint8Array([137,80,78,71,13,10,26,10]);
+  const ihdr=concat([u32(w),u32(h),new Uint8Array([8,6,0,0,0])]);   // 8-bit, RGBA
+  const rawLen=h*(1+stride);
+  const nFrames=Math.max(1,Math.round(p.frames));
+  const out=[];
+  for(let f=0;f<nFrames;f++){
+    const g=new Uint8Array(rawLen);
+    // encode scanlines with a filter chosen per horizontal band (run of rows).
+    // Sub=horizontal / Up=vertical / Average・Paeth=diagonal — corruption bleeds in mixed directions.
+    const dir=p.dir|0;   // 0=mix 1=horizontal(Sub) 2=vertical(Up) 3=diagonal(Paeth/Avg)
+    let y=0;
+    while(y<h){
+      const ft = dir===1 ? (Math.random()<0.85?1:0)
+               : dir===2 ? (Math.random()<0.85?2:0)
+               : dir===3 ? (Math.random()<0.5?4:3)
+               :           Math.floor(Math.random()*5);
+      const run=4+Math.floor(Math.random()*Math.max(1,h*0.25));
+      for(let r=0;r<run && y<h; r++,y++){
+        const o=y*(1+stride), rb=y*stride, ab=(y-1)*stride;
+        g[o]=ft;
+        for(let i=0;i<stride;i++){
+          const cur=px[rb+i];
+          const a=i>=bpp?px[rb+i-bpp]:0;                          // left
+          const b=y>0?px[ab+i]:0;                                 // up
+          const c=(y>0&&i>=bpp)?px[ab+i-bpp]:0;                   // upper-left
+          let v;
+          switch(ft){ case 0:v=cur;break; case 1:v=cur-a;break; case 2:v=cur-b;break;
+                      case 3:v=cur-((a+b)>>1);break; default:v=cur-paeth(a,b,c); }
+          g[o+1+i]=v&255;
+        }
+      }
+    }
+    // corrupt filtered pixel data -> propagates along each band's filter direction
+    const dhits=Math.floor(p.amount*rawLen*0.012);
+    for(let k=0;k<dhits;k++){
+      const ry=Math.floor(Math.random()*h), ri=Math.floor(Math.random()*stride);
+      g[ry*(1+stride)+1+ri]=Math.floor(Math.random()*256);
+    }
+    // extra chaos: scramble filter bytes + heavier random noise
+    const fhits=Math.floor(p.noise*h*0.4);
+    for(let k=0;k<fhits;k++) g[Math.floor(Math.random()*h)*(1+stride)]=Math.floor(Math.random()*5);
+    const nhits=Math.floor(p.noise*rawLen*0.02);
+    for(let k=0;k<nhits;k++) g[Math.floor(Math.random()*rawLen)]=Math.floor(Math.random()*256);
+
+    const idat=await deflate(g);
+    const png=concat([sig, pngChunk('IHDR',ihdr), pngChunk('IDAT',idat), pngChunk('IEND',new Uint8Array(0))]);
+    try { out.push(await createImageBitmap(new Blob([png],{type:'image/png'}))); } catch(e){}
+  }
+  if(out.length){ pngFrames=out; pngReady=true; } else pngReady=false;
+}
+function schedulePng(){
+  pngReady=false; clearTimeout(pngTimer);
+  pngTimer=setTimeout(()=> buildPngFrames().catch(()=>{}), 120);
+}
+
+// envelope multiplier for destructive effects — makes the glitch "breathe" over the loop
+function motionMul(phase){
+  const mo = state.motion; if (!mo.on) return 1;
+  let e;
+  switch(mo.mode){
+    case 0: e = 1; break;                                        // constant
+    case 1: e = Math.sin(Math.PI*phase); break;                 // peak (crash mid, ends=0 → seamless loop)
+    case 2: e = 0.5+0.5*Math.sin(2*Math.PI*phase*mo.rate); break; // pulse
+    case 3: e = phase; break;                                   // build → drop (sawtooth)
+    case 4: e = rand(Math.floor(phase*mo.rate*4)+0.5); break;   // stutter
+    default: e = 1;
+  }
+  return (1-mo.depth) + mo.depth*e*2;   // trough → clean, peak → ~2x
+}
+// per-parameter envelope: only params whose ⓔ checkbox is on get modulated
+let ENV = 1;
+function envF(fx,k){ return (state.motion.on && state[fx][k+'_env']) ? ENV : 1; }
+function P(fx,k){ return state[fx][k] * envF(fx,k); }
+
+function draw(phase){         // phase in [0,1)
+  if (!img) return;
+  const w = canvas.width, h = canvas.height;
+  const t = phase * Math.PI * 2;
+
+  const c = state.color, v = state.vhs, rl = state.roll, fm = state.film;
+  const fr = Math.round(LOOP_MS/1000*30);      // frames per loop
+  const fseed = Math.floor(phase*fr);          // per-frame seed (seamless)
+  ENV = motionMul(phase);                      // destruction envelope (used by P/envF)
+
+  // ---- base image into scratch canvas, with color/sepia filter ----
+  let fp = [];
+  if (c.on){ fp.push(`saturate(${c.saturate})`, `contrast(${c.contrast})`); if (c.hue) fp.push(`hue-rotate(${c.hue}deg)`); }
+  if (fm.on && fm.sepia>0){ fp.push(`sepia(${fm.sepia})`); }
+  // pick base image: real PNG glitch > real JPEG databend > original
+  let base = img;
+  if (state.png.on && pngReady && pngFrames.length)
+    base = pngFrames[Math.floor(phase*pngFrames.length) % pngFrames.length];
+  else if (state.jpeg.on && jpegReady && jpegFrames.length)
+    base = jpegFrames[Math.floor(phase*jpegFrames.length) % jpegFrames.length];
+  tctx.clearRect(0,0,w,h);
+  tctx.filter = fp.length ? fp.join(' ') : 'none';
+  tctx.drawImage(base, 0, 0, w, h);
+  tctx.filter = 'none';
+
+  // ---- displacement: VHS wobble + film gate-weave ----
+  let ox = Math.sin(t)*(v.on?v.wobble:0);
+  let oy = Math.cos(t*2)*(v.on?v.wobble:0)*0.3;
+  if (fm.on && fm.weave>0){
+    ox += (rand(fseed*1.3)-0.5)*2*fm.weave;
+    oy += (rand(fseed*2.7)-0.5)*2*fm.weave;
+  }
+
+  // ---- roll: wrap-around scroll (slides off one edge, back in the other) ----
+  let rollX = 0, rollY = 0;
+  if (rl.on){
+    let hx = phase * rl.hspeed;
+    if (rl.hstep>0){ const q = Math.max(1, Math.round(24*(1-rl.hstep))); hx = Math.round(hx*q)/q; }
+    rollX = hx * w;
+    rollY = phase * rl.vspeed * h;
+  }
+
+  ctx.clearRect(0,0,w,h);
+
+  // ---- VHS horizontal bleed ----
+  if (v.on && v.bleed>0){
+    ctx.globalCompositeOperation = 'lighter';
+    const steps = Math.ceil(v.bleed);
+    for (let i=1;i<=steps;i++){
+      ctx.globalAlpha = 0.25*(1 - i/steps);
+      drawWrap(tmp, ox+rollX+i, oy+rollY, w, h);
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  drawWrap(tmp, ox+rollX, oy+rollY, w, h);
+
+  // ---- roll seam band (dark tear where the frame wraps) ----
+  if (rl.on && rl.band>0 && rl.vspeed!==0){
+    const seamY = ((rollY % h)+h)%h;
+    const bh = Math.max(3, h*0.05*rl.band);
+    ctx.save();
+    ctx.globalCompositeOperation='overlay';
+    ctx.globalAlpha = 0.5*rl.band;
+    for (let y=0;y<bh;y++){ ctx.fillStyle = rand(y+fseed)>.5?'#fff':'#000'; ctx.fillRect(0,(seamY-bh+y),w,1); }
+    ctx.restore();
+    ctx.fillStyle = `rgba(0,0,0,${0.35*rl.band})`;
+    ctx.fillRect(0, seamY-bh, w, bh);
+  }
+
+  // ---- warp: per-row sine displacement (wraps at edges) ----
+  const wp = state.warp;
+  if (wp.on && wp.amp>0){
+    const amp = P('warp','amp'), fq = wp.freq*0.05, sp = phase*Math.PI*2*wp.speed;
+    sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h); sctx.drawImage(canvas,0,0);
+    ctx.clearRect(0,0,w,h);
+    for (let y=0;y<h;y++){
+      const dx = Math.sin(y*fq + sp)*amp;
+      ctx.drawImage(sc, 0,y,w,1, dx-w,y,w,1);
+      ctx.drawImage(sc, 0,y,w,1, dx,  y,w,1);
+      ctx.drawImage(sc, 0,y,w,1, dx+w,y,w,1);
+    }
+  }
+
+  // RGB channel shift — VHS aberration = horizontal, Slice RGB = vertical (distinct axes)
+  const gl = state.glitch;
+  const hAb  = v.on ? P('vhs','aberration')*(0.7+0.3*Math.sin(t)) : 0;   // horizontal shift (VHS)
+  const vRGB = gl.on ? P('glitch','rgb') : 0;                            // vertical shift (Slice)
+  if (hAb > 0.5 || vRGB > 0.5){
+    const base = ctx.getImageData(0,0,w,h);
+    const out = ctx.createImageData(w,h);
+    const bd = base.data, od = out.data;
+    const hs = Math.round(hAb), vs = Math.round(vRGB);
+    for (let y=0;y<h;y++){
+      for (let x=0;x<w;x++){
+        const i=(y*w+x)*4;
+        const rx = Math.min(w-1, x+hs), bx = Math.max(0, x-hs);   // R right / B left
+        const ry = Math.min(h-1, y+vs), by = Math.max(0, y-vs);   // R down  / B up
+        od[i]   = bd[(ry*w+rx)*4];      // R: horizontal + vertical
+        od[i+1] = bd[i+1];             // G stays
+        od[i+2] = bd[(by*w+bx)*4+2];   // B: opposite on both axes
+        od[i+3] = 255;
+      }
+    }
+    ctx.putImageData(out,0,0);
+  }
+
+  // ---- glitch: horizontal slice displacement ----
+  if (gl.on && gl.amount>0){
+    const slices = gl.slices;
+    for (let i=0;i<slices;i++){
+      // loop-seamless randomness: seed by slice + quantized phase steps
+      const step = Math.floor(phase*slices*2);           // changes over loop, wraps
+      const r = rand(i*7.1 + step);
+      if (r > 1-Math.min(1, P('glitch','amount'))){
+        const sy = Math.floor(h*i/slices);
+        const sh = Math.ceil(h/slices)+1;
+        const off = (rand(i*3.3+step)-0.5)*2*P('glitch','shift');
+        const slice = ctx.getImageData(0,sy,w,sh);
+        ctx.clearRect(0,sy,w,sh);
+        ctx.putImageData(slice, off, sy);
+      }
+    }
+  }
+
+  // ---- datamosh: modern per-frame corruption ----
+  if (state.mosh.on && state.mosh.intensity>0){
+    const moshFrame = Math.floor(phase*state.mosh.rate);   // change rate: distinct states per loop
+    applyMosh(w,h,moshFrame, envF('mosh','intensity'));
+  }
+
+  // ---- pixelate: downscale then nearest-neighbour upscale (Envelope can drive block size) ----
+  const px2 = state.pixelate;
+  if (px2.on && px2.size>1){
+    const s=Math.max(1, Math.round(P('pixelate','size')));
+    if (s>1){
+      const pw=Math.max(1,Math.round(w/s)), ph=Math.max(1,Math.round(h/s));
+      sc.width=pw; sc.height=ph; sctx.imageSmoothingEnabled=false;
+      sctx.clearRect(0,0,pw,ph); sctx.drawImage(canvas,0,0,w,h,0,0,pw,ph);
+      ctx.imageSmoothingEnabled=false; ctx.clearRect(0,0,w,h);
+      ctx.drawImage(sc,0,0,pw,ph,0,0,w,h);
+      ctx.imageSmoothingEnabled=true;
+    }
+  }
+
+  // ---- feedback zoom: composite scaled copies of the current frame (droste tunnel) ----
+  const fb = state.feedback;
+  if (fb.on && fb.amount>0){
+    sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h); sctx.drawImage(canvas,0,0);
+    const spin = fb.speed*360*phase;                          // whole tunnel rotation (integer → seamless)
+    const pulse = 1 + fb.pulse*0.12*Math.sin(phase*Math.PI*2); // breathing zoom (seamless)
+    for (let i=1;i<=5;i++){
+      ctx.save();
+      ctx.globalAlpha = fb.amount*Math.pow(0.75,i-1);
+      ctx.translate(w/2,h/2); ctx.rotate((fb.rotate*i + spin)*Math.PI/180);
+      const z=Math.pow(fb.zoom,i)*pulse; ctx.scale(z,z); ctx.translate(-w/2,-h/2);
+      ctx.drawImage(sc,0,0);
+      ctx.restore();
+    }
+  }
+
+  // ---- melt: per-column pixel drip, breathes 0→max→0 over the loop (seamless) ----
+  const ml = state.melt;
+  if (ml.on && ml.amount>0){
+    const amt=P('melt','amount'), breathe=0.5-0.5*Math.cos(phase*Math.PI*2);
+    const src=ctx.getImageData(0,0,w,h), out=ctx.createImageData(w,h), sd=src.data, od=out.data;
+    for (let x=0;x<w;x++){
+      const off=Math.floor(rand(x*0.13)*amt*h*0.6*breathe);
+      for (let y=0;y<h;y++){
+        const sy=y-off>=0?y-off:0, si=(sy*w+x)*4, di=(y*w+x)*4;
+        od[di]=sd[si]; od[di+1]=sd[si+1]; od[di+2]=sd[si+2]; od[di+3]=255;
+      }
+    }
+    ctx.putImageData(out,0,0);
+  }
+
+  // ---- halftone: dot-matrix (dark=LED colour dots / light=newsprint black dots) ----
+  const ht = state.halftone;
+  if (ht.on){
+    const cell=ht.cell, dark=ht.bg===0, src=ctx.getImageData(0,0,w,h).data;
+    ctx.fillStyle = dark ? '#0a0a0a' : '#f0ede6'; ctx.fillRect(0,0,w,h);
+    for (let cy=0;cy<h;cy+=cell){
+      for (let cx=0;cx<w;cx+=cell){
+        let r=0,g=0,b=0,n=0;
+        for (let y=cy;y<Math.min(h,cy+cell);y++) for (let x=cx;x<Math.min(w,cx+cell);x++){ const i=(y*w+x)*4; r+=src[i];g+=src[i+1];b+=src[i+2];n++; }
+        r/=n; g/=n; b/=n;
+        const lum=(r*0.3+g*0.59+b*0.11)/255;
+        const rad=(dark?Math.sqrt(lum):Math.sqrt(1-lum))*cell*0.62;
+        if (rad<0.35) continue;
+        ctx.fillStyle = dark ? `rgb(${r|0},${g|0},${b|0})` : '#111';
+        ctx.beginPath(); ctx.arc(cx+cell/2, cy+cell/2, rad, 0, 7); ctx.fill();
+      }
+    }
+  }
+
+  // ---- tracking noise band (VHS) ----
+  if (v.on && v.tracking>0){
+    const trk = P('vhs','tracking');
+    const bandY = ((phase* -1.5) % 1 + 1)%1 * h;   // scrolls upward, loops
+    const bh = h*0.06*trk + 4;
+    ctx.save();
+    ctx.globalCompositeOperation='overlay';
+    ctx.globalAlpha = 0.5*trk;
+    for (let y=0;y<bh;y++){
+      ctx.fillStyle = rand(y+phase*100) > .5 ? '#fff' : '#000';
+      ctx.fillRect(0, (bandY+y)%h, w, 1);
+    }
+    ctx.restore();
+  }
+
+  // ---- noise grain + flicker ----
+  const n = state.noise;
+  if (n.on && (n.grain>0 || n.flicker>0)){
+    if (n.grain>0){
+      const g = ctx.getImageData(0,0,w,h);
+      const d = g.data;
+      const amp = P('noise','grain')*90;
+      const seed = Math.floor(phase*30);   // 30 grain frames per loop
+      for (let i=0;i<d.length;i+=4){
+        const nz = (rand(i*0.01+seed)-0.5)*amp;
+        d[i]+=nz; d[i+1]+=nz; d[i+2]+=nz;
+      }
+      ctx.putImageData(g,0,0);
+    }
+    if (n.flicker>0){
+      ctx.save();
+      ctx.globalCompositeOperation='overlay';
+      const f = (rand(Math.floor(phase*24))-0.5)*P('noise','flicker');
+      ctx.fillStyle = f>0 ? `rgba(255,255,255,${f})` : `rgba(0,0,0,${-f})`;
+      ctx.fillRect(0,0,w,h);
+      ctx.restore();
+    }
+  }
+
+  // ---- film 8mm overlays: burn/flicker, scratches, dust ----
+  if (fm.on){
+    if (fm.burn>0){
+      const burn=P('film','burn');
+      ctx.save(); ctx.globalCompositeOperation='overlay';
+      const fl=(rand(fseed*1.9)-0.5)*burn;
+      ctx.fillStyle = fl>0?`rgba(255,240,210,${fl})`:`rgba(40,20,0,${-fl})`;
+      ctx.fillRect(0,0,w,h); ctx.restore();
+      if (rand(fseed*0.7) < burn*0.25){                    // occasional burn blotch
+        const bx=rand(fseed*11)*w, by=rand(fseed*13)*h, br=(0.1+0.2*rand(fseed*17))*w;
+        const g=ctx.createRadialGradient(bx,by,0,bx,by,br);
+        g.addColorStop(0,`rgba(255,230,180,${0.5*burn})`); g.addColorStop(1,'rgba(255,230,180,0)');
+        ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
+      }
+    }
+    if (fm.scratch>0){                                     // flickering vertical scratches
+      const scr=P('film','scratch'); const ns=Math.floor(scr*5)+1;
+      for (let k=0;k<ns;k++){
+        if (rand(fseed*3.3+k*17) > 0.45) continue;
+        const x=Math.floor(rand(fseed*7.1+k*13)*w);
+        ctx.fillStyle = rand(k)>.5?`rgba(255,255,255,${0.15+0.3*scr})`:`rgba(0,0,0,${0.2+0.3*scr})`;
+        ctx.fillRect(x,0,1,h);
+      }
+    }
+    if (fm.dust>0){                                        // dust specks
+      const dst=P('film','dust'); const nd=Math.floor(dst*45);
+      for (let k=0;k<nd;k++){
+        const x=rand(fseed*5.1+k*2.1)*w, y=rand(fseed*9.7+k*3.3)*h;
+        const s=1+Math.floor(rand(k+fseed)*2);
+        ctx.fillStyle = rand(k*1.7)>.4?`rgba(20,15,10,${0.5*dst})`:`rgba(255,250,240,${0.6*dst})`;
+        ctx.fillRect(x,y,s,s);
+      }
+    }
+  }
+
+  // ---- bloom: blurred bright pass screened back over ----
+  const bl = state.bloom;
+  if (bl.on && bl.amount>0){
+    sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h);
+    sctx.filter=`blur(${bl.size}px) brightness(1.5) contrast(1.8)`;
+    sctx.drawImage(canvas,0,0); sctx.filter='none';
+    ctx.save(); ctx.globalCompositeOperation='screen'; ctx.globalAlpha=P('bloom','amount'); ctx.drawImage(sc,0,0); ctx.restore();
+  }
+
+  // ---- scanlines (VHS) ----
+  if (v.on && v.scanline>0){
+    ctx.save();
+    ctx.globalCompositeOperation='multiply';
+    ctx.globalAlpha = v.scanline;
+    for (let y=0;y<h;y+=2){ ctx.fillStyle='#000'; ctx.fillRect(0,y,w,1); }
+    ctx.restore();
+  }
+
+  // ---- color tint + vignette ----
+  if (c.on){
+    if (c.tint !== 0){
+      ctx.save();
+      ctx.globalCompositeOperation='overlay';
+      ctx.globalAlpha = Math.abs(c.tint)*0.6;
+      ctx.fillStyle = c.tint>0 ? '#ff8a3d' : '#3d7bff';
+      ctx.fillRect(0,0,w,h);
+      ctx.restore();
+    }
+    if (c.vignette>0){
+      const g = ctx.createRadialGradient(w/2,h/2,Math.min(w,h)*0.3, w/2,h/2,Math.max(w,h)*0.75);
+      g.addColorStop(0,'rgba(0,0,0,0)');
+      g.addColorStop(1,`rgba(0,0,0,${c.vignette})`);
+      ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
+    }
+  }
+
+  // ---- CRT barrel curvature (strong = peephole / fisheye) ----
+  const cr = state.crt;
+  if (cr.on && cr.amount>0){
+    const k=cr.amount*1.8, corner=cr.corner;
+    const src=ctx.getImageData(0,0,w,h), out=ctx.createImageData(w,h), sd=src.data, od=out.data;
+    for (let y=0;y<h;y++){
+      const cy=y/h-0.5;
+      for (let x=0;x<w;x++){
+        const cx=x/w-0.5, r2=cx*cx+cy*cy, f=1-k*r2;
+        const sx=(cx*f+0.5)*w, sy=(cy*f+0.5)*h, di=(y*w+x)*4;
+        if (sx<0||sx>=w||sy<0||sy>=h){ od[di]=od[di+1]=od[di+2]=0; od[di+3]=255; continue; }
+        const si=((sy|0)*w+(sx|0))*4;
+        let d=1-corner*r2*2.2; if(d<0)d=0;
+        od[di]=sd[si]*d; od[di+1]=sd[si+1]*d; od[di+2]=sd[si+2]*d; od[di+3]=255;
+      }
+    }
+    ctx.putImageData(out,0,0);
+  }
+
+  // ---- HUD / text overlay (drawn last so it stays crisp) ----
+  if (state.hud.on) drawHUD(w,h,phase);
+
+  // ---- CRT screen bezel: bulged-rectangle (barrel) silhouette, not a plain round-rect ----
+  if (cr.on && (cr.round>0 || cr.frame>0)){
+    const inset = cr.frame * Math.min(w,h) * 0.14;
+    ctx.save();
+    ctx.fillStyle='#000';
+    ctx.beginPath();
+    ctx.rect(0,0,w,h);                                   // outer (full frame)
+    crtScreenPath(ctx, inset, inset, w-2*inset, h-2*inset, cr.round);
+    ctx.fill('evenodd');                                 // fill the gap → black bezel around the CRT screen
+    ctx.restore();
+  }
+}
+// CRT glass silhouette: big rounded corners + edges that bulge slightly outward.
+// k=0 → plain rectangle, k=1 → full barrel "puffed rectangle".
+function crtScreenPath(ctx, rx, ry, rw, rh, k){
+  const em=0.03*k, cc=0.14*k;
+  const X=u=>rx+u*rw, Y=v=>ry+v*rh;
+  ctx.moveTo(X(cc), Y(em));
+  ctx.quadraticCurveTo(X(0.5),  Y(-em),   X(1-cc), Y(em));    // top edge (bulges up)
+  ctx.quadraticCurveTo(X(1-em), Y(em),    X(1-em), Y(cc));    // top-right corner
+  ctx.quadraticCurveTo(X(1+em), Y(0.5),   X(1-em), Y(1-cc));  // right edge (bulges right)
+  ctx.quadraticCurveTo(X(1-em), Y(1-em),  X(1-cc), Y(1-em));  // bottom-right corner
+  ctx.quadraticCurveTo(X(0.5),  Y(1+em),  X(cc),   Y(1-em));  // bottom edge (bulges down)
+  ctx.quadraticCurveTo(X(em),   Y(1-em),  X(em),   Y(1-cc));  // bottom-left corner
+  ctx.quadraticCurveTo(X(-em),  Y(0.5),   X(em),   Y(cc));    // left edge (bulges left)
+  ctx.quadraticCurveTo(X(em),   Y(em),    X(cc),   Y(em));    // top-left corner
+  ctx.closePath();
+}
+
+// camcorder / security-cam style overlay
+function drawHUD(w,h,phase){
+  const hd=state.hud, base=Math.max(11, Math.round(h*0.035*hd.size));
+  const pad=Math.round(base*0.8);
+  const now=new Date(), p2=n=>String(n).padStart(2,'0');   // real-time clock
+  const date=`${now.getFullYear()}-${p2(now.getMonth()+1)}-${p2(now.getDate())}`;
+  const time=`${p2(now.getHours())}:${p2(now.getMinutes())}:${p2(now.getSeconds())}`;
+  const recOn = Math.floor(phase*6)%2===0;                 // ~3 blinks per loop
+  const col=['#ffffff','#ffb000','#33ff66','#ff3b30','#33e0ff','#000000'][hd.color]||'#fff';
+  ctx.save();
+  ctx.globalAlpha=hd.opacity;
+  ctx.font=`${base}px ui-monospace, Menlo, monospace`;
+  ctx.textBaseline='top'; ctx.textAlign='left';
+  ctx.shadowColor='rgba(0,0,0,.85)'; ctx.shadowBlur=3; ctx.shadowOffsetY=1;
+  const rec=(x,y)=>{ if(recOn){ ctx.fillStyle='#ff3b30'; ctx.beginPath(); ctx.arc(x+base*0.35,y+base*0.55,base*0.32,0,7); ctx.fill(); } ctx.fillStyle=col; ctx.fillText('REC', x+base, y); };
+  ctx.fillStyle=col;
+  switch(hd.layout){
+    case 0: rec(pad,pad); break;
+    case 1: ctx.fillText('▶ PLAY', pad, pad); break;
+    case 2: ctx.textAlign='right'; ctx.fillText(`${date}  ${time}`, w-pad, h-pad-base); break;
+    case 3:                                                 // Camcorder
+      rec(pad,pad);
+      ctx.textAlign='right';
+      ctx.fillText(time, w-pad, pad);
+      ctx.fillText('SP', w-pad, pad+base*1.25);
+      ctx.fillText(`${date}`, w-pad, h-pad-base);
+      ctx.textAlign='left'; ctx.fillText('▶', pad, h-pad-base);
+      break;
+    case 4:                                                 // Security cam
+      ctx.fillText('CAM 01', pad, pad);
+      rec(w-pad-base*3.2, pad);
+      ctx.textAlign='right'; ctx.fillText(`${date} ${time}`, w-pad, h-pad-base);
+      break;
+  }
+  ctx.restore();
+}
+
+// ---------- datamosh: block smear + pixel sort + channel corruption ----------
+// seed varies per frame; higher chaos = seed jumps more => different breakage each frame
+function applyMosh(w,h,fseed,em=1){
+  const m = state.mosh;
+  const intensity = m.intensity*em;
+  const seed = Math.floor(fseed*(1+m.chaos*4)) + 1;
+  const id = ctx.getImageData(0,0,w,h);
+  const d = id.data;
+  const src = new Uint8ClampedArray(d);        // snapshot to read from
+
+  // 1) block displacement (datamosh smear)
+  if (m.blocks>0){
+    const n = Math.floor(1 + m.blocks*10*intensity);
+    for (let k=0;k<n;k++){
+      const bw = Math.max(4, Math.floor((0.08+0.35*rand(seed*3.1+k))*w));
+      const bh = Math.max(2, Math.floor((0.02+0.14*rand(seed*5.7+k))*h));
+      const sx = Math.floor(rand(seed*9.3+k)*(w-bw));
+      const sy = Math.floor(rand(seed*1.7+k)*(h-bh));
+      const dxo = Math.floor((rand(seed*2.2+k)-0.5)*w*intensity);
+      for (let y=0;y<bh;y++){
+        for (let x=0;x<bw;x++){
+          const tx = sx+x+dxo;
+          if (tx<0||tx>=w) continue;
+          const si=((sy+y)*w+sx+x)*4, ti=((sy+y)*w+tx)*4;
+          d[ti]=src[si]; d[ti+1]=src[si+1]; d[ti+2]=src[si+2];
+        }
+      }
+    }
+  }
+
+  // 2) pixel sort (random horizontal bands sorted by luminance)
+  if (m.sort>0){
+    const segs = Math.floor(1 + m.sort*7*intensity);
+    for (let k=0;k<segs;k++){
+      const y0 = Math.floor(rand(seed*4.4+k)*h);
+      const band = 2 + Math.floor(rand(seed*6.1+k)*4);
+      const x0 = Math.floor(rand(seed*6.6+k)*w*0.6);
+      const x1 = Math.min(w, x0 + Math.floor((0.2+0.5*rand(seed*8.8+k))*w));
+      for (let yy=y0; yy<Math.min(h,y0+band); yy++){
+        const arr=[];
+        for (let x=x0;x<x1;x++){ const i=(yy*w+x)*4; arr.push([d[i],d[i+1],d[i+2], d[i]*0.3+d[i+1]*0.59+d[i+2]*0.11]); }
+        arr.sort((a,b)=>a[3]-b[3]);
+        for (let x=x0;x<x1;x++){ const i=(yy*w+x)*4,p=arr[x-x0]; d[i]=p[0]; d[i+1]=p[1]; d[i+2]=p[2]; }
+      }
+    }
+  }
+
+  // 3) channel corruption (shift a single RGB channel on random rows)
+  const bands = Math.floor(m.chaos*6*intensity);
+  for (let k=0;k<bands;k++){
+    const y0 = Math.floor(rand(seed*7.7+k)*h);
+    const bh = Math.floor((0.01+0.05*rand(seed*3.9+k))*h)+1;
+    const ch = Math.floor(rand(seed*5.5+k)*3);
+    const sh = Math.floor((rand(seed*2.1+k)-0.5)*80);
+    for (let y=y0;y<Math.min(h,y0+bh);y++){
+      for (let x=0;x<w;x++){
+        const sx=Math.max(0,Math.min(w-1,x+sh));
+        d[(y*w+x)*4+ch]=src[(y*w+sx)*4+ch];
+      }
+    }
+  }
+
+  ctx.putImageData(id,0,0);
+}
+
+// ---------- animation loop ----------
+function frame(now){
+  if (playing && img){
+    const phase = ((now - startT) % LOOP_MS) / LOOP_MS;
+    draw(phase);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ---------- image loading ----------
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('file');
+drop.onclick = ()=> fileInput.click();
+fileInput.onchange = e => { if (e.target.files[0]) loadImage(e.target.files[0]); };
+['dragover','dragenter'].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.add('hover'); }));
+['dragleave','drop'].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.remove('hover'); }));
+drop.addEventListener('drop', e=>{ const f=e.dataTransfer.files[0]; if (f) loadImage(f); });
+// allow changing the image after one is loaded: toolbar button + drop onto the stage
+document.getElementById('openBtn').onclick = ()=> fileInput.click();
+const stageEl = document.querySelector('.stage');
+['dragover','dragenter'].forEach(ev=> stageEl.addEventListener(ev, e=> e.preventDefault()));
+stageEl.addEventListener('drop', e=>{ e.preventDefault(); const f=e.dataTransfer.files[0]; if (f) loadImage(f); });
+
+function loadImage(file){
+  const url = URL.createObjectURL(file);
+  const im = new Image();
+  im.onload = ()=>{
+    img = im;
+    // cap size for perf
+    const maxW = 720;
+    const scale = Math.min(1, maxW/im.width);
+    const w = Math.round(im.width*scale), h = Math.round(im.height*scale);
+    canvas.width = tmp.width = w;
+    canvas.height = tmp.height = h;
+    drop.classList.add('hidden');
+    canvas.classList.remove('hidden');
+    startT = performance.now();
+    setStatus(`${im.width}×${im.height} → ${w}×${h}, processing`);
+    if (state.jpeg.on) scheduleJpeg();
+    if (state.png.on)  schedulePng();
+    URL.revokeObjectURL(url);
+  };
+  im.src = url;
+}
+
+// ---------- controls ----------
+const playBtn = document.getElementById('playBtn');
+const recBtn = document.getElementById('recBtn');
+const resetBtn = document.getElementById('resetBtn');
+const rndBtn = document.getElementById('rndBtn');
+const randSeg = document.getElementById('randLevel');
+let randLevelVal = 'normal';                                  // default = weakest tier
+randSeg.querySelectorAll('button').forEach(b=>{
+  b.onclick = ()=>{ randLevelVal = b.dataset.v;
+    randSeg.querySelectorAll('button').forEach(x=> x.classList.toggle('active', x===b)); };
+});
+const apngBtn = document.getElementById('apngBtn');
+const gifBtn = document.getElementById('gifBtn');
+const statusEl = document.getElementById('status');
+function setStatus(s){ statusEl.innerHTML = s; }
+
+// randomize every effect's on/off + params for instant new looks
+// per-effect on-probability for Random — keep the heavy/destructive ones rare
+const RAND_PROB = { png:.12, jpeg:.15, warp:.18, halftone:.12, feedback:.12, melt:.12,
+                    mosh:.25, crt:.2, pixelate:.3, hud:.3, motion:.4 };
+// three strength levels: prob = on-probability scale, str = how far params stray from their default
+const RAND_LEVELS = { normal:{prob:.5, str:.4}, strong:{prob:1, str:1}, wild:{prob:1.7, str:1} };
+function randomizeFX(){
+  const lv = RAND_LEVELS[randLevelVal] || RAND_LEVELS.normal;
+  FX.forEach(f=>{
+    state[f.id].on = Math.random() < Math.min(0.95, (RAND_PROB[f.id] ?? 0.5) * lv.prob);
+    f.params.forEach(p=>{
+      if (p.type==='select'){ state[f.id][p.k] = p.options[Math.floor(Math.random()*p.options.length)][0]; }
+      else {
+        const rnd = p.min + Math.random()*(p.max-p.min);
+        let val = p.def + (rnd - p.def)*lv.str;                 // blend toward default → gentler at low levels
+        val = Math.max(p.min, Math.min(p.max, val));
+        state[f.id][p.k] = parseFloat((Math.round(val/p.step)*p.step).toFixed(4));
+      }
+    });
+  });
+  if (!FX.some(f=>state[f.id].on)) state[FX[0].id].on = true;  // never fully clean
+  syncUI();
+  if (presetSel) presetSel.value = '';
+  setStatus('🎲 Randomized — export if you like it');
+}
+rndBtn.onclick = randomizeFX;
+
+playBtn.onclick = ()=>{
+  playing = !playing;
+  playBtn.textContent = playing ? '⏸ Pause' : '▶ Play';
+  if (playing) startT = performance.now();
+};
+resetBtn.onclick = ()=>{ applyPreset('Clean'); if (presetSel) presetSel.value=''; };
+
+// ---------- frame capture (deterministic single loop) ----------
+function u16(n){ return new Uint8Array([(n>>8)&255, n&255]); }
+function download(blob, name){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 15000);
+  return url;
+}
+function captureFrames(N){
+  const wasPlaying=playing; playing=false;          // take over rAF
+  const w=canvas.width, h=canvas.height, frames=[];
+  for(let f=0; f<N; f++){ draw(f/N); frames.push(ctx.getImageData(0,0,w,h)); }
+  playing=wasPlaying; startT=performance.now();
+  return frames;
+}
+const EXPORT_FPS = 20;                                // for APNG/GIF
+const EXPORT_N = Math.max(2, Math.round(LOOP_MS/1000*EXPORT_FPS));
+
+// ---------- APNG export (native, reuses PNG helpers, loops infinitely) ----------
+async function exportAPNG(){
+  setStatus('Generating APNG…');
+  const frames=captureFrames(EXPORT_N), w=canvas.width, h=canvas.height, stride=w*4;
+  const sig=new Uint8Array([137,80,78,71,13,10,26,10]);
+  const ihdr=concat([u32(w),u32(h),new Uint8Array([8,6,0,0,0])]);
+  const delayNum=Math.round(LOOP_MS/EXPORT_N), delayDen=1000;
+  const chunks=[sig, pngChunk('IHDR',ihdr), pngChunk('acTL', concat([u32(EXPORT_N),u32(0)]))];  // num_plays=0 → infinite
+  let seq=0;
+  for(let f=0; f<EXPORT_N; f++){
+    const px=frames[f].data, raw=new Uint8Array(h*(1+stride));
+    for(let y=0;y<h;y++){ const o=y*(1+stride); raw[o]=0; raw.set(px.subarray(y*stride,(y+1)*stride), o+1); }
+    const idat=await deflate(raw);
+    const fctl=concat([u32(seq++), u32(w),u32(h), u32(0),u32(0), u16(delayNum),u16(delayDen), new Uint8Array([0,0])]);
+    chunks.push(pngChunk('fcTL', fctl));
+    chunks.push(f===0 ? pngChunk('IDAT', idat) : pngChunk('fdAT', concat([u32(seq++), idat])));
+  }
+  chunks.push(pngChunk('IEND', new Uint8Array(0)));
+  const blob=new Blob([concat(chunks)], {type:'image/png'});
+  download(blob, 'loop.png');
+  setStatus(`✔ APNG done (${(blob.size/1048576).toFixed(1)}MB) — saved loop.png`);
+}
+
+// ---------- GIF export (median-cut palette + LZW, animated + looping) ----------
+function medianCut(colors, maxColors){
+  let boxes=[colors];
+  while(boxes.length<maxColors){
+    let bi=-1, best=-1, bestCh=0;
+    for(let i=0;i<boxes.length;i++){
+      const bx=boxes[i]; if(bx.length<2) continue;
+      const lo=[255,255,255], hi=[0,0,0];
+      for(const c of bx) for(let ch=0;ch<3;ch++){ if(c[ch]<lo[ch])lo[ch]=c[ch]; if(c[ch]>hi[ch])hi[ch]=c[ch]; }
+      for(let ch=0;ch<3;ch++){ const r=hi[ch]-lo[ch]; if(r>best){best=r;bi=i;bestCh=ch;} }
+    }
+    if(bi<0) break;
+    const bx=boxes[bi]; bx.sort((p,q)=>p[bestCh]-q[bestCh]);
+    const mid=bx.length>>1;
+    boxes.splice(bi,1,bx.slice(0,mid),bx.slice(mid));
+  }
+  return boxes.map(bx=>{ let r=0,g=0,b=0; for(const c of bx){r+=c[0];g+=c[1];b+=c[2];}
+    const n=bx.length||1; return [Math.round(r/n),Math.round(g/n),Math.round(b/n)]; });
+}
+function makeMapper(pal){
+  const cache=new Map();
+  return (r,g,b)=>{
+    const key=((r>>2)<<12)|((g>>2)<<6)|(b>>2);
+    let idx=cache.get(key); if(idx!==undefined) return idx;
+    let bi=0, bd=1e9;
+    for(let i=0;i<pal.length;i++){ const p=pal[i], dr=r-p[0],dg=g-p[1],db=b-p[2], d=dr*dr+dg*dg+db*db; if(d<bd){bd=d;bi=i;} }
+    cache.set(key,bi); return bi;
+  };
+}
+// LZW (omggif algorithm: codes are ints, singleton code == its index)
+function gifLZW(indices, minCodeSize){
+  const clearCode=1<<minCodeSize, eoiCode=clearCode+1, codeMask=clearCode-1;
+  let codeSize=minCodeSize+1, next=eoiCode+1, cur=0, shift=0, table={};
+  const out=[];
+  const emit=(c)=>{ cur|=c<<shift; shift+=codeSize; while(shift>=8){ out.push(cur&0xFF); cur>>=8; shift-=8; } };
+  emit(clearCode);
+  let buf=indices[0]&codeMask;
+  for(let i=1;i<indices.length;i++){
+    const k=indices[i]&codeMask, key=(buf<<8)|k, code=table[key];
+    if(code!==undefined){ buf=code; }
+    else{
+      emit(buf);
+      if(next===4096){ emit(clearCode); next=eoiCode+1; codeSize=minCodeSize+1; table={}; }
+      else{ if(next>=(1<<codeSize)) codeSize++; table[key]=next++; }
+      buf=k;
+    }
+  }
+  emit(buf); emit(eoiCode);
+  if(shift>0) out.push(cur&0xFF);
+  return out;
+}
+function packSubBlocks(bytes){
+  const out=[];
+  for(let i=0;i<bytes.length;i+=255){ const end=Math.min(i+255,bytes.length); out.push(end-i); for(let j=i;j<end;j++) out.push(bytes[j]); }
+  out.push(0);
+  return out;
+}
+async function exportGIF(){
+  setStatus('Building GIF palette…');
+  await new Promise(r=>setTimeout(r,0));
+  const frames=captureFrames(EXPORT_N), w=canvas.width, h=canvas.height;
+  // sample colours across all frames for a shared palette
+  const sample=[];
+  for(const fr of frames){ const d=fr.data; for(let i=0;i<d.length;i+=4*7) sample.push([d[i],d[i+1],d[i+2]]); }
+  let pal=medianCut(sample,256); while(pal.length<256) pal.push([0,0,0]);
+  const map=makeMapper(pal);
+  const bytes=[]; const put=(...a)=>{ for(const x of a) bytes.push(x&0xFF); };
+  const puts=(s)=>{ for(const ch of s) bytes.push(ch.charCodeAt(0)); };
+  puts('GIF89a'); put(w&255,(w>>8)&255, h&255,(h>>8)&255, 0xF7, 0, 0);   // 256-colour global table
+  for(const p of pal) put(p[0],p[1],p[2]);
+  put(0x21,0xFF,0x0B); puts('NETSCAPE2.0'); put(0x03,0x01,0x00,0x00,0x00); // loop forever
+  const delayCs=Math.max(2, Math.round(LOOP_MS/EXPORT_N/10));
+  for(let f=0; f<EXPORT_N; f++){
+    put(0x21,0xF9,0x04, 0x00, delayCs&255,(delayCs>>8)&255, 0x00, 0x00);   // graphic control
+    put(0x2C, 0,0,0,0, w&255,(w>>8)&255, h&255,(h>>8)&255, 0x00);          // image descriptor
+    const d=frames[f].data, idx=new Uint8Array(w*h);
+    for(let i=0,pi=0;i<d.length;i+=4,pi++) idx[pi]=map(d[i],d[i+1],d[i+2]);
+    put(8);                                                                // LZW min code size
+    for(const b of packSubBlocks(gifLZW(idx,8))) bytes.push(b);
+    setStatus(`Encoding GIF… ${f+1}/${EXPORT_N}`);
+    await new Promise(r=>setTimeout(r));                                    // yield so UI/status updates
+  }
+  put(0x3B);
+  const blob=new Blob([new Uint8Array(bytes)], {type:'image/gif'});
+  download(blob, 'loop.gif');
+  setStatus(`✔ GIF done (${(blob.size/1048576).toFixed(1)}MB, 256 colors) — saved loop.gif`);
+}
+
+apngBtn.onclick = ()=>{ if(!img){ setStatus('Load an image first'); return; } exportAPNG().catch(e=>setStatus('APNG failed: '+e.message)); };
+gifBtn.onclick  = ()=>{ if(!img){ setStatus('Load an image first'); return; } exportGIF().catch(e=>setStatus('GIF failed: '+e.message)); };
+
+// ---------- recording (one seamless loop) ----------
+recBtn.onclick = ()=>{
+  if (!img){ setStatus('Load an image first'); return; }
+  recordLoop();
+};
+function recordLoop(){
+  const fps = 30;
+  const stream = canvas.captureStream(fps);
+  const types = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+  const mime = types.find(t=> MediaRecorder.isTypeSupported(t)) || 'video/webm';
+  const rec = new MediaRecorder(stream, { mimeType:mime, videoBitsPerSecond: 8_000_000 });
+  const chunks = [];
+  rec.ondataavailable = e=>{ if (e.data.size) chunks.push(e.data); };
+  rec.onstop = ()=>{
+    const blob = new Blob(chunks, { type:mime });
+    const url = URL.createObjectURL(blob);
+    setStatus(`✔ Done (${(blob.size/1048576).toFixed(1)}MB) — <a class="dl" href="${url}" download="loop.webm">download loop.webm</a>`);
+    recBtn.disabled = false; recBtn.textContent = '⏺ Rec WebM';
+    playing = true;
+  };
+
+  // drive rendering deterministically across exactly one loop
+  recBtn.disabled = true;
+  const wasPlaying = playing;
+  playing = false;                 // take over rAF drawing
+  const totalFrames = Math.round(LOOP_MS/1000*fps);
+  let f = 0;
+  rec.start();
+  const tick = ()=>{
+    draw(f/totalFrames);
+    setStatus(`⏺ Recording… ${f}/${totalFrames}`);
+    f++;
+    if (f <= totalFrames){ setTimeout(tick, 1000/fps); }
+    else { rec.stop(); playing = wasPlaying; startT = performance.now(); }
+  };
+  tick();
+}
+
+buildUI();
+randomizeFX();                          // open with a gentle random look already dialed in
+setStatus('Load an image · random effects ready (🎲 to reroll)');
+</script>
+</body>
+</html>
