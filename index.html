@@ -172,6 +172,29 @@
   .presetsel { flex: 1; background: var(--panel2); color: var(--fg); border: 1px solid var(--line);
     border-radius: 7px; padding: 7px 8px; font-family: inherit; font-size: 12px; cursor: pointer; }
   a.dl { color: var(--accent); }
+
+  footer { display: flex; align-items: center; gap: 14px; padding: 11px 18px;
+    border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+  footer .fbrand { letter-spacing: 2px; font-weight: 700; color: var(--fg); }
+  footer .fspacer { flex: 1; }
+  footer .fnote { color: var(--muted); }
+  button.linklike { background: none; border: none; padding: 0; font: inherit;
+    color: var(--muted); text-decoration: underline; cursor: pointer; }
+  button.linklike:hover { color: var(--accent); border: none; }
+  .modal-bg { position: fixed; inset: 0; z-index: 100; padding: 20px; display: none;
+    align-items: center; justify-content: center; background: rgba(0,0,0,.65); }
+  .modal-bg.open { display: flex; }
+  .modal { position: relative; width: 100%; max-width: 520px; max-height: 85vh; overflow: auto;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 24px 26px; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+  .modal h2 { margin: 0 0 6px; font-size: 16px; letter-spacing: 2px; }
+  .modal h2 em { font-style: normal; color: var(--accent2); }
+  .modal h3 { margin: 18px 0 6px; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--accent); }
+  .modal p { margin: 0; font-size: 12.5px; line-height: 1.65; color: var(--fg); }
+  .modal a { color: var(--accent); }
+  .modal .mclose { position: absolute; top: 12px; right: 14px; background: none; border: none;
+    color: var(--muted); font-size: 15px; cursor: pointer; padding: 4px; }
+  .modal .mclose:hover { color: var(--fg); border: none; }
 </style>
 </head>
 <body>
@@ -211,6 +234,34 @@
 
   <div class="panel" id="controls">
     <!-- effect groups injected by JS -->
+  </div>
+</div>
+
+<footer>
+  <span class="fbrand">GLITCH LOOPER ↺</span>
+  <button class="linklike" id="aboutBtn">About · Privacy</button>
+  <span class="fspacer"></span>
+  <span class="fnote">processed locally in your browser</span>
+</footer>
+
+<div class="modal-bg" id="aboutModal">
+  <div class="modal">
+    <button class="mclose" id="aboutClose" aria-label="Close">✕</button>
+    <h2>GLITCH LOOPER <em>↺</em></h2>
+    <p>Turn any image into a seamless looping glitch — VHS, datamosh, and real JPEG/PNG databending, all rendered right in your browser.</p>
+
+    <h3>Privacy</h3>
+    <p>Everything runs locally in your browser. Your images are <b>never uploaded</b> — nothing leaves your device.</p>
+
+    <h3>Usage</h3>
+    <p>Free to use, personal or commercial. Whatever you make is yours. Provided <b>as-is with no warranty</b> — you are responsible for the images you use, so please respect others' copyright.</p>
+
+    <h3>Export</h3>
+    <p><b>Rec</b> saves an MP4 loop (falls back to WebM on some browsers). Hidden shortcuts: press <b>G</b> for an animated GIF, <b>P</b> for APNG. <b>🔗 Link</b> copies a URL that restores the exact settings.</p>
+
+    <h3>Credits</h3>
+    <p>Real PNG glitch technique inspired by <a href="https://ucnv.github.io/pnglitch/" target="_blank" rel="noopener">pnglitch by ucnv</a>.<br>
+    Built with vanilla JS + Canvas — no dependencies, no AI. <a href="https://github.com/kagawa/glitch-looper" target="_blank" rel="noopener">Source</a>.</p>
   </div>
 </div>
 
@@ -1343,8 +1394,16 @@ async function exportGIF(){
   setStatus(`✔ GIF done (${(blob.size/1048576).toFixed(1)}MB, 256 colors) — saved loop.gif`);
 }
 
+// about / privacy modal
+const aboutModal = document.getElementById('aboutModal');
+document.getElementById('aboutBtn').onclick = ()=> aboutModal.classList.add('open');
+document.getElementById('aboutClose').onclick = ()=> aboutModal.classList.remove('open');
+aboutModal.onclick = e=>{ if (e.target===aboutModal) aboutModal.classList.remove('open'); };
+
 // hidden exports (WebM is the Rec fallback): press G for GIF, P for APNG
 window.addEventListener('keydown', e=>{
+  if (e.key==='Escape'){ aboutModal.classList.remove('open'); return; }
+  if (aboutModal.classList.contains('open')) return;
   if (!img || e.metaKey||e.ctrlKey||e.altKey) return;
   const tag=e.target.tagName;
   if (tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA') return;
