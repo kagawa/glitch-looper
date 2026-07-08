@@ -190,9 +190,8 @@
       <button data-v="strong">Strong</button>
       <button data-v="wild">Wild</button>
     </div>
-    <button id="recBtn" class="rec">⏺ Rec WebM</button>
-    <button id="apngBtn">APNG↓</button>
-    <button id="gifBtn">GIF↓</button>
+    <button id="recBtn" class="rec">⏺ Rec</button>
+    <button id="linkBtn">🔗 Link</button>
     <button id="shareBtn">𝕏 Post</button>
     <button id="resetBtn">Reset</button>
   </div>
@@ -1175,8 +1174,7 @@ randSeg.querySelectorAll('button').forEach(b=>{
   b.onclick = ()=>{ randLevelVal = b.dataset.v;
     randSeg.querySelectorAll('button').forEach(x=> x.classList.toggle('active', x===b)); };
 });
-const apngBtn = document.getElementById('apngBtn');
-const gifBtn = document.getElementById('gifBtn');
+const linkBtn = document.getElementById('linkBtn');
 const shareBtn = document.getElementById('shareBtn');
 const statusEl = document.getElementById('status');
 function setStatus(s){ statusEl.innerHTML = s; }
@@ -1345,8 +1343,15 @@ async function exportGIF(){
   setStatus(`✔ GIF done (${(blob.size/1048576).toFixed(1)}MB, 256 colors) — saved loop.gif`);
 }
 
-apngBtn.onclick = ()=>{ if(!img){ setStatus('Load an image first'); return; } exportAPNG().catch(e=>setStatus('APNG failed: '+e.message)); };
-gifBtn.onclick  = ()=>{ if(!img){ setStatus('Load an image first'); return; } exportGIF().catch(e=>setStatus('GIF failed: '+e.message)); };
+// hidden exports (WebM is the Rec fallback): press G for GIF, P for APNG
+window.addEventListener('keydown', e=>{
+  if (!img || e.metaKey||e.ctrlKey||e.altKey) return;
+  const tag=e.target.tagName;
+  if (tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA') return;
+  const k=e.key.toLowerCase();
+  if (k==='g') exportGIF().catch(err=>setStatus('GIF failed: '+err.message));
+  else if (k==='p') exportAPNG().catch(err=>setStatus('APNG failed: '+err.message));
+});
 
 // ---------- recording (one seamless loop) → returns a video Blob ----------
 recBtn.onclick = ()=>{
@@ -1355,7 +1360,7 @@ recBtn.onclick = ()=>{
   recordLoopBlob().then(({blob,ext})=>{
     const url = URL.createObjectURL(blob);
     setStatus(`✔ Done (${(blob.size/1048576).toFixed(1)}MB) — <a class="dl" href="${url}" download="loop.${ext}">download loop.${ext}</a>`);
-    recBtn.disabled = false; recBtn.textContent = '⏺ Rec WebM';
+    recBtn.disabled = false; recBtn.textContent = '⏺ Rec';
   });
 };
 function recordLoopBlob(){
@@ -1386,33 +1391,66 @@ function recordLoopBlob(){
   });
 }
 
-// ---------- share to X / Twitter ----------
+// ---------- shareable state in the URL (restores the exact look) ----------
+function encodeState(){
+  const o={};
+  FX.forEach(f=>{ if(!state[f.id].on) return; const e={};
+    f.params.forEach(p=>{ e[p.k]=state[f.id][p.k]; if(p.env && state[f.id][p.k+'_env']) e[p.k+'_env']=1; });
+    o[f.id]=e;
+  });
+  return btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function applyState(str){
+  let o; try{
+    let b=str.replace(/-/g,'+').replace(/_/g,'/'); b+='==='.slice((b.length+3)%4);
+    o=JSON.parse(decodeURIComponent(escape(atob(b))));
+  }catch(e){ return false; }
+  FX.forEach(f=>{ state[f.id].on=false; });
+  Object.keys(o).forEach(id=>{ if(!state[id]) return; state[id].on=true;
+    const e=o[id]; Object.keys(e).forEach(k=>{
+      if(k.endsWith('_env')) state[id][k]=!!e[k];
+      else if(state[id][k]!==undefined) state[id][k]=e[k];
+    });
+  });
+  syncUI();
+  return true;
+}
+function shareURL(){ return location.origin+location.pathname+'#s='+encodeState(); }
+
+linkBtn.onclick = async ()=>{
+  const url=shareURL();
+  try { await navigator.clipboard.writeText(url); setStatus('🔗 Link copied — opens with these exact settings'); }
+  catch(e){ prompt('Copy this link:', url); }
+};
+
+// ---------- share to X / Twitter: still image + params-encoded link ----------
 shareBtn.onclick = ()=>{
   if (!img){ setStatus('Load an image first'); return; }
   shareBtn.disabled = true;
   shareToX().finally(()=>{ shareBtn.disabled = false; });
 };
 async function shareToX(){
-  const { blob, ext } = await recordLoopBlob();
-  const file = new File([blob], `glitch-loop.${ext}`, { type: blob.type });
-  const text = 'made with GLITCH LOOPER ↺';
-  const url = location.href;
-  // best case (mostly mobile): share the actual video file to the X app
+  const url = shareURL(), text = 'made with GLITCH LOOPER ↺';
+  const blob = await new Promise(r=> canvas.toBlob(r, 'image/png'));
+  const file = new File([blob], 'glitch.png', { type:'image/png' });
+  // best case (mostly mobile): share the still image + link straight to the X app
   if (navigator.canShare && navigator.canShare({ files:[file] })){
-    try { await navigator.share({ files:[file], text }); setStatus('Shared 🎉'); return; }
+    try { await navigator.share({ files:[file], text, url }); setStatus('Shared 🎉'); return; }
     catch(e){ if (e.name==='AbortError'){ setStatus('Share cancelled'); return; } }
   }
-  // fallback (desktop): download the clip + open the X composer for manual attach
-  const dlUrl = URL.createObjectURL(blob);
-  const a=document.createElement('a'); a.href=dlUrl; a.download=`glitch-loop.${ext}`; a.click();
-  setTimeout(()=>URL.revokeObjectURL(dlUrl), 15000);
+  // fallback (desktop): download the still + open the X composer (link restores the look)
+  const dl=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=dl; a.download='glitch.png'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(dl), 15000);
   window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank', 'noopener');
-  setStatus('Clip downloaded — drag it into the X post that just opened');
+  setStatus('Image downloaded — attach it to the X post (the link restores the exact look)');
 }
 
 buildUI();
-randomizeFX();                          // open with a gentle random look already dialed in
-setStatus('Load an image · random effects ready (🎲 to reroll)');
+// restore from a shared link if present, otherwise open with a gentle random look
+const sm = location.hash.match(/[#&]s=([^&]+)/);
+if (sm && applyState(sm[1])) setStatus('Loaded settings from link 🎛️ · load an image');
+else { randomizeFX(); setStatus('Load an image · random effects ready (🎲 to reroll)'); }
 </script>
 </body>
 </html>
