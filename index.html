@@ -384,8 +384,9 @@ const PRESETS = {
   'VHS Tape':    { vhs:{on:1,aberration:8,scanline:.45,bleed:4,tracking:.4,wobble:7}, glitch:{on:0}, noise:{on:1,grain:.22,flicker:.15}, color:{on:1,saturate:1.1,contrast:1.05,hue:0,tint:.15,vignette:.4} },
   '8mm Film':    { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.14,flicker:.2}, color:{on:1,saturate:.8,contrast:1.1,hue:0,tint:.1,vignette:.5}, film:{on:1,weave:1,dust:.6,scratch:.5,sepia:.6,burn:.4}, roll:{on:0}, mosh:{on:0} },
   'Dreamy':      { vhs:{on:1,aberration:12,scanline:.1,bleed:8,tracking:.1,wobble:3}, glitch:{on:0}, noise:{on:1,grain:.08,flicker:.03}, color:{on:1,saturate:1.4,contrast:.95,hue:0,tint:-.3,vignette:.5} },
-  'CRT':         { vhs:{on:1,aberration:5,scanline:.7,bleed:2,tracking:.1,wobble:1}, glitch:{on:0}, noise:{on:1,grain:.1,flicker:.08}, color:{on:1,saturate:1.2,contrast:1.1,hue:0,tint:.05,vignette:.55} },
+  'CRT':         { vhs:{on:1,aberration:5,scanline:.6,bleed:2,tracking:.1,wobble:1}, glitch:{on:0}, noise:{on:1,grain:.1,flicker:.08}, color:{on:1,saturate:1.2,contrast:1.1,hue:0,tint:.05,vignette:.4}, crt:{on:1,amount:.35,corner:.5,round:.5,frame:.08} },
   'Backrooms':   { vhs:{on:1,aberration:4,scanline:.28,bleed:2,tracking:.22,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.2,flicker:.14}, color:{on:1,saturate:.85,contrast:1.12,hue:12,tint:.4,vignette:.55}, film:{on:0}, roll:{on:0}, mosh:{on:0} },
+  'Broken TV':   { vhs:{on:1,aberration:6,scanline:.45,bleed:2,tracking:.9,wobble:8}, glitch:{on:1,amount:.2,slices:18,shift:20,rgb:5}, noise:{on:1,grain:.35,flicker:.3}, color:{on:1,saturate:.7,contrast:1.15,hue:0,tint:0,vignette:.45}, roll:{on:1,hspeed:0,hstep:0,vspeed:.35,band:.6}, crt:{on:1,amount:.3,corner:.5,round:.45,frame:.07}, motion:{on:1,mode:4,depth:.6,rate:6} },
   // ---- Glitch ----
   'Digital Decay':{ vhs:{on:1,aberration:4,scanline:.15,bleed:1,tracking:.2,wobble:2}, glitch:{on:1,amount:.45,slices:22,shift:30,rgb:10}, noise:{on:1,grain:.1,flicker:.05}, color:{on:0} },
   'Datamosh':    { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.08,flicker:0}, color:{on:1,saturate:1.3,contrast:1.1,hue:0,tint:0,vignette:.2}, roll:{on:0}, film:{on:0}, mosh:{on:1,intensity:.75,blocks:.65,sort:.55,chaos:.85,rate:12} },
@@ -403,6 +404,7 @@ const PRESETS = {
   'Neon':        { vhs:{on:1,aberration:16,scanline:.3,bleed:4,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.1,flicker:.05}, color:{on:1,saturate:1.8,contrast:1.15,hue:60,tint:-.2,vignette:.5} },
   'Vaporwave':   { vhs:{on:1,aberration:11,scanline:.18,bleed:5,tracking:.1,wobble:3}, glitch:{on:0}, noise:{on:1,grain:.07,flicker:.04}, color:{on:1,saturate:1.7,contrast:1.0,hue:-35,tint:-.15,vignette:.4}, film:{on:0}, roll:{on:0}, mosh:{on:0} },
   'LED Board':   { vhs:{on:0}, glitch:{on:0}, noise:{on:0}, color:{on:1,saturate:1.6,contrast:1.1,hue:0,tint:0,vignette:.25}, halftone:{on:1,cell:7,bg:0}, bloom:{on:1,amount:.5,size:6} },
+  'Arcade':      { vhs:{on:1,aberration:3,scanline:.55,bleed:1,tracking:.05,wobble:0}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.06}, color:{on:1,saturate:1.6,contrast:1.15,hue:0,tint:0,vignette:.35}, pixelate:{on:1,size:4}, bloom:{on:1,amount:.4,size:5}, crt:{on:1,amount:.4,corner:.55,round:.55,frame:.1} },
   // ---- Camera / Scene ----
   'Security Cam':{ vhs:{on:1,aberration:3,scanline:.35,bleed:1,tracking:.15,wobble:1}, glitch:{on:0}, noise:{on:1,grain:.28,flicker:.1}, color:{on:1,saturate:.5,contrast:1.15,hue:-15,tint:-.05,vignette:.6}, film:{on:0}, roll:{on:0}, mosh:{on:0}, hud:{on:1,layout:4,size:1,opacity:.85} },
   'Camcorder':   { vhs:{on:1,aberration:5,scanline:.25,bleed:3,tracking:.3,wobble:5}, glitch:{on:0}, noise:{on:1,grain:.2,flicker:.12}, color:{on:1,saturate:1.1,contrast:1.05,hue:0,tint:.1,vignette:.4}, film:{on:0}, roll:{on:0}, mosh:{on:0}, hud:{on:1,layout:3,size:1,opacity:.9} },
@@ -422,10 +424,10 @@ const PRESETS = {
 };
 // select layout (group label → preset names)
 const PRESET_GROUPS = [
-  ['Classic', ['VHS Tape','8mm Film','Dreamy','CRT','Backrooms']],
+  ['Classic', ['VHS Tape','8mm Film','Dreamy','CRT','Broken TV','Backrooms']],
   ['Glitch',  ['Digital Decay','Datamosh','JPEG Databend','PNG Glitch','Roll Break']],
   ['Horror',  ['Cursed Tape','Haunted Film','Corruption','Red Room','Meltdown']],
-  ['Vivid',   ['Y2K','Neon','Vaporwave','LED Board']],
+  ['Vivid',   ['Y2K','Neon','Vaporwave','LED Board','Arcade']],
   ['Camera',  ['Security Cam','Camcorder','Broadcast','Fisheye Cam','Retro Game','Underwater']],
   ['Lens/FX', ['Peephole','Trip','Newsprint','Dream Bloom','Heat Haze','Wormhole']],
 ];
