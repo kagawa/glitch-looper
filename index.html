@@ -1367,7 +1367,8 @@ function recordLoopBlob(){
   return new Promise(resolve=>{
     const fps = 30;
     const stream = canvas.captureStream(fps);
-    const types = ['video/mp4;codecs=h264','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+    const types = ['video/mp4;codecs=avc1.42E01E','video/mp4;codecs=avc1','video/mp4;codecs=h264','video/mp4',
+                   'video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
     const mime = types.find(t=> MediaRecorder.isTypeSupported(t)) || 'video/webm';
     const ext = mime.startsWith('video/mp4') ? 'mp4' : 'webm';
     const rec = new MediaRecorder(stream, { mimeType:mime, videoBitsPerSecond: 8_000_000 });
@@ -1433,16 +1434,24 @@ async function shareToX(){
   const url = shareURL(), text = 'made with GLITCH LOOPER ↺';
   const blob = await new Promise(r=> canvas.toBlob(r, 'image/png'));
   const file = new File([blob], 'glitch.png', { type:'image/png' });
-  // best case (mostly mobile): share the still image + link straight to the X app
+  const intent = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+  // 1) mobile / supported desktop: OS share sheet with the image already attached
   if (navigator.canShare && navigator.canShare({ files:[file] })){
     try { await navigator.share({ files:[file], text, url }); setStatus('Shared 🎉'); return; }
     catch(e){ if (e.name==='AbortError'){ setStatus('Share cancelled'); return; } }
   }
-  // fallback (desktop): download the still + open the X composer (link restores the look)
+  // 2) desktop: copy the still to the clipboard, open the composer → just paste (⌘/Ctrl+V)
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    window.open(intent, '_blank', 'noopener');
+    setStatus('📋 Image copied — paste (⌘/Ctrl+V) into the X post that just opened');
+    return;
+  } catch(e){ /* clipboard image not supported → fall through to download */ }
+  // 3) last resort: download the still + open the composer for manual attach
   const dl=URL.createObjectURL(blob);
   const a=document.createElement('a'); a.href=dl; a.download='glitch.png'; a.click();
   setTimeout(()=>URL.revokeObjectURL(dl), 15000);
-  window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank', 'noopener');
+  window.open(intent, '_blank', 'noopener');
   setStatus('Image downloaded — attach it to the X post (the link restores the exact look)');
 }
 
