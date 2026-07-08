@@ -1425,18 +1425,21 @@ window.addEventListener('keydown', e=>{
 recBtn.onclick = ()=>{
   if (!img){ setStatus('Load an image first'); return; }
   recBtn.disabled = true;
-  recordLoopBlob().then(async ({blob,ext})=>{
+  recordLoopBlob().then(({blob,ext})=>{
+    recBtn.disabled = false; recBtn.textContent = '⏺ Rec';
     const file = new File([blob], `glitch-loop.${ext}`, { type: blob.type });
     const coarse = matchMedia('(pointer:coarse)').matches;      // phone/tablet
-    // mobile: open the OS share sheet (Save Video to Photos / share to an app).
-    // desktop: plain download link (share sheets there rarely help).
+    // mobile: navigator.share() needs a FRESH tap (recording used up the original one),
+    // so show a button — tapping it opens the share sheet within a valid user gesture.
     if (coarse && navigator.canShare && navigator.canShare({ files:[file] })){
-      try { await navigator.share({ files:[file] }); setStatus('Saved / shared 🎉'); }
-      catch(e){ if (e.name==='AbortError') setStatus('Cancelled'); else downloadRec(blob,ext); }
+      setStatus(`✔ Ready (${(blob.size/1048576).toFixed(1)}MB) — <button id="doShare" class="rec">📤 Save / Share</button>`);
+      document.getElementById('doShare').onclick = async ()=>{
+        try { await navigator.share({ files:[file] }); setStatus('Saved / shared 🎉'); }
+        catch(e){ if (e.name!=='AbortError') downloadRec(blob,ext); }
+      };
     } else {
-      downloadRec(blob,ext);
+      downloadRec(blob,ext);   // desktop: plain download link
     }
-    recBtn.disabled = false; recBtn.textContent = '⏺ Rec';
   });
 };
 function downloadRec(blob, ext){
