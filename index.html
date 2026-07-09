@@ -977,6 +977,8 @@ function draw(phase){         // phase in [0,1)
   const emb = state.emboss;
   if (emb.on && emb.amount>0){
     const a=P('emboss','amount')*2.5, mix=emb.mix, rad=emb.angle*Math.PI/180;
+    // Keep-colour: ease-out curve so colour ramps in sooner (linear left it near-grey at low values)
+    const mixC = mix>0 ? Math.pow(mix, 0.55) : 0;
     let ox=Math.round(Math.cos(rad)), oy=Math.round(Math.sin(rad));
     if (ox===0&&oy===0) ox=1;
     const src=ctx.getImageData(0,0,w,h), out=ctx.createImageData(w,h), sd=src.data, od=out.data;
@@ -988,9 +990,9 @@ function draw(phase){         // phase in [0,1)
         let vv=128+(lh-ln)*a; vv=vv<0?0:vv>255?255:vv;
         if (mix<=0){ od[i]=od[i+1]=od[i+2]=vv; }
         else { const sh=vv/128;
-          od[i]  =vv+(sd[i]  *sh-vv)*mix;
-          od[i+1]=vv+(sd[i+1]*sh-vv)*mix;
-          od[i+2]=vv+(sd[i+2]*sh-vv)*mix; }
+          od[i]  =vv+(sd[i]  *sh-vv)*mixC;
+          od[i+1]=vv+(sd[i+1]*sh-vv)*mixC;
+          od[i+2]=vv+(sd[i+2]*sh-vv)*mixC; }
         od[i+3]=255;
       }
     }
@@ -1200,7 +1202,13 @@ function crtScreenPath(ctx, rx, ry, rw, rh, k){
 // camcorder / security-cam style overlay
 function drawHUD(w,h,phase){
   const hd=state.hud, base=Math.max(11, Math.round(h*0.035*hd.size));
-  const pad=Math.round(base*0.8);
+  let pad=Math.round(base*0.8);
+  // when the CRT bezel/curve is active, pull the HUD inside the screen so it isn't hidden under the bezel
+  const cr=state.crt;
+  if (cr.on){
+    const bez = (cr.frame>0||cr.round>0) ? cr.frame*Math.min(w,h)*0.14 : 0;
+    pad += Math.round(bez + cr.round*Math.min(w,h)*0.05);
+  }
   const now=new Date(), p2=n=>String(n).padStart(2,'0');   // real-time clock
   const date=`${now.getFullYear()}-${p2(now.getMonth()+1)}-${p2(now.getDate())}`;
   const time=`${p2(now.getHours())}:${p2(now.getMinutes())}:${p2(now.getSeconds())}`;
@@ -1364,7 +1372,9 @@ function setStatus(s){ statusEl.innerHTML = s; }
 // randomize every effect's on/off + params for instant new looks
 // per-effect on-probability for Random — keep the heavy/destructive ones rare
 const RAND_PROB = { png:.12, jpeg:.15, warp:.18, halftone:.12, feedback:.12, melt:.12,
-                    mosh:.25, crt:.2, pixelate:.3, hud:.3, motion:.4 };
+                    mosh:.25, crt:.2, pixelate:.3, hud:.3, motion:.4,
+                    // colour-mapping / stylise effects: keep them occasional, emboss rarest
+                    duotone:.14, solarize:.14, posterize:.14, emboss:.07 };
 // three strength levels: prob = on-probability scale, str = how far params stray from their default
 const RAND_LEVELS = { normal:{prob:.5, str:.4}, strong:{prob:1, str:1}, wild:{prob:1.7, str:1} };
 function randomizeFX(){
@@ -1382,6 +1392,14 @@ function randomizeFX(){
       }
     });
   });
+  // keep the heavy colour-mapping effects from stacking into mush — cap how many run at once
+  const TONE = ['duotone','solarize','posterize','emboss'];
+  const toneCap = randLevelVal==='wild' ? 2 : 1;
+  let onTone = TONE.filter(id=>state[id].on);
+  while (onTone.length > toneCap){
+    const drop = onTone[Math.floor(Math.random()*onTone.length)];
+    state[drop].on = false; onTone = onTone.filter(id=>id!==drop);
+  }
   // Envelope alone renders nothing — guarantee at least one visible effect is on
   if (!FX.some(f=> f.id!=='motion' && state[f.id].on)){
     const pick = ['vhs','glitch','noise','color'][Math.floor(Math.random()*4)];
