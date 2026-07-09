@@ -377,6 +377,15 @@ const FX = [
   { id:'melt', name:'Melt', hint:'pixel drip (breathes over the loop)', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.4, env:1 },
   ]},
+  { id:'emboss', name:'Emboss', hint:'directional relief — carved / raised metal look', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.7, env:1 },
+    { k:'angle',  label:'Light angle', min:0, max:360, step:15, def:135 },
+    { k:'mix',    label:'Keep colour', min:0, max:1, step:.01, def:0 },
+  ]},
+  { id:'posterize', name:'Posterize', hint:'reduce colours — banding / retro (optional dither)', on:false, open:false, params:[
+    { k:'levels', label:'Levels', min:2, max:12, step:1, def:5 },
+    { k:'dither', label:'Dither', min:0, max:1, step:.01, def:0 },
+  ]},
   { id:'motion', name:'Envelope', hint:'makes destruction breathe over the loop (pick targets via ⓔ)', on:false, open:true, params:[
     { k:'mode', label:'Curve', type:'select', def:1,
       options:[[0,'Constant'],[1,'Peak (crash mid)'],[2,'Pulse'],[3,'Build → Drop'],[4,'Stutter']] },
@@ -918,6 +927,45 @@ function draw(phase){         // phase in [0,1)
         ctx.beginPath(); ctx.arc(cx+cell/2, cy+cell/2, rad, 0, 7); ctx.fill();
       }
     }
+  }
+
+  // ---- emboss: directional-gradient relief ----
+  const emb = state.emboss;
+  if (emb.on && emb.amount>0){
+    const a=P('emboss','amount')*2.5, mix=emb.mix, rad=emb.angle*Math.PI/180;
+    let ox=Math.round(Math.cos(rad)), oy=Math.round(Math.sin(rad));
+    if (ox===0&&oy===0) ox=1;
+    const src=ctx.getImageData(0,0,w,h), out=ctx.createImageData(w,h), sd=src.data, od=out.data;
+    for (let y=0;y<h;y++){
+      const ny=Math.max(0,Math.min(h-1,y+oy));
+      for (let x=0;x<w;x++){
+        const i=(y*w+x)*4, nx=Math.max(0,Math.min(w-1,x+ox)), j=(ny*w+nx)*4;
+        const lh=sd[i]*0.3+sd[i+1]*0.59+sd[i+2]*0.11, ln=sd[j]*0.3+sd[j+1]*0.59+sd[j+2]*0.11;
+        let vv=128+(lh-ln)*a; vv=vv<0?0:vv>255?255:vv;
+        if (mix<=0){ od[i]=od[i+1]=od[i+2]=vv; }
+        else { const sh=vv/128;
+          od[i]  =vv+(sd[i]  *sh-vv)*mix;
+          od[i+1]=vv+(sd[i+1]*sh-vv)*mix;
+          od[i+2]=vv+(sd[i+2]*sh-vv)*mix; }
+        od[i+3]=255;
+      }
+    }
+    ctx.putImageData(out,0,0);
+  }
+
+  // ---- posterize: quantise channels to N levels, optional ordered (Bayer) dither ----
+  const pz = state.posterize;
+  if (pz.on){
+    const L=Math.max(2,Math.round(pz.levels)), step=255/(L-1), dith=pz.dither;
+    const bayer=[0,8,2,10, 12,4,14,6, 3,11,1,9, 15,7,13,5];
+    const id=ctx.getImageData(0,0,w,h), d=id.data;
+    for (let y=0;y<h;y++){ const brow=(y&3)*4;
+      for (let x=0;x<w;x++){ const i=(y*w+x)*4;
+        const dofs = dith>0 ? (bayer[brow+(x&3)]/16-0.5)*step*dith : 0;
+        for (let c=0;c<3;c++){ let v=d[i+c]+dofs; v=v<0?0:v>255?255:v; d[i+c]=Math.round(v/step)*step; }
+      }
+    }
+    ctx.putImageData(id,0,0);
   }
 
   // ---- tracking noise band (VHS) ----
