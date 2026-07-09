@@ -386,6 +386,15 @@ const FX = [
     { k:'levels', label:'Levels', min:2, max:12, step:1, def:5 },
     { k:'dither', label:'Dither', min:0, max:1, step:.01, def:0 },
   ]},
+  { id:'duotone', name:'Duotone', hint:'map brightness to a 2-colour gradient', on:false, open:false, params:[
+    { k:'preset', label:'Palette', type:'select', def:0,
+      options:[[0,'Teal / Peach'],[1,'Blue / Orange'],[2,'Purple / Yellow'],[3,'Magenta / Cyan'],[4,'Green / Pink'],[5,'Mono']] },
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.85, env:1 },
+  ]},
+  { id:'solarize', name:'Solarize', hint:'invert tones past a threshold (Sabattier)', on:false, open:false, params:[
+    { k:'threshold', label:'Threshold', min:0, max:1, step:.01, def:.55 },
+    { k:'amount',    label:'Amount', min:0, max:1, step:.01, def:.8, env:1 },
+  ]},
   { id:'motion', name:'Envelope', hint:'makes destruction breathe over the loop (pick targets via ⓔ)', on:false, open:true, params:[
     { k:'mode', label:'Curve', type:'select', def:1,
       options:[[0,'Constant'],[1,'Peak (crash mid)'],[2,'Pulse'],[3,'Build → Drop'],[4,'Stutter']] },
@@ -445,6 +454,16 @@ const PRESET_GROUPS = [
   ['Vivid',   ['Y2K','Neon','Vaporwave','LED Board','Arcade']],
   ['Camera',  ['Security Cam','Camcorder','Broadcast','Fisheye Cam','Retro Game','Underwater']],
   ['Lens/FX', ['Peephole','Trip','Newsprint','Dream Bloom','Heat Haze','Wormhole']],
+];
+
+// duotone palettes: [shadow rgb, highlight rgb]
+const DUO_PAIRS = [
+  [[6,42,58],   [255,217,160]],   // Teal / Peach
+  [[4,20,58],   [255,154,61]],    // Blue / Orange
+  [[26,10,58],  [255,225,77]],    // Purple / Yellow
+  [[42,10,42],  [77,240,255]],    // Magenta / Cyan
+  [[4,34,15],   [255,143,208]],   // Green / Pink
+  [[0,0,0],     [255,255,255]],   // Mono
 ];
 
 // ---------- state ----------
@@ -964,6 +983,30 @@ function draw(phase){         // phase in [0,1)
         const dofs = dith>0 ? (bayer[brow+(x&3)]/16-0.5)*step*dith : 0;
         for (let c=0;c<3;c++){ let v=d[i+c]+dofs; v=v<0?0:v>255?255:v; d[i+c]=Math.round(v/step)*step; }
       }
+    }
+    ctx.putImageData(id,0,0);
+  }
+
+  // ---- solarize: per-channel invert above a threshold (Sabattier) ----
+  const sol = state.solarize;
+  if (sol.on && sol.amount>0){
+    const t=sol.threshold*255, a=P('solarize','amount');
+    const id=ctx.getImageData(0,0,w,h), d=id.data;
+    for (let i=0;i<d.length;i+=4){
+      for (let c=0;c<3;c++){ const vv=d[i+c]; const sv=vv>t?255-vv:vv; d[i+c]=vv+(sv-vv)*a; }
+    }
+    ctx.putImageData(id,0,0);
+  }
+
+  // ---- duotone: map luminance onto a two-colour gradient ----
+  const duo = state.duotone;
+  if (duo.on && duo.amount>0){
+    const pr=DUO_PAIRS[duo.preset]||DUO_PAIRS[0], s=pr[0], hi=pr[1], a=P('duotone','amount');
+    const id=ctx.getImageData(0,0,w,h), d=id.data;
+    for (let i=0;i<d.length;i+=4){
+      const lum=(d[i]*0.3+d[i+1]*0.59+d[i+2]*0.11)/255;
+      const r=s[0]+(hi[0]-s[0])*lum, g=s[1]+(hi[1]-s[1])*lum, b=s[2]+(hi[2]-s[2])*lum;
+      d[i]=d[i]+(r-d[i])*a; d[i+1]=d[i+1]+(g-d[i+1])*a; d[i+2]=d[i+2]+(b-d[i+2])*a;
     }
     ctx.putImageData(id,0,0);
   }
