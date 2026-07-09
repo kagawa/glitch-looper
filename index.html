@@ -195,6 +195,12 @@
   .modal .mclose { position: absolute; top: 12px; right: 14px; background: none; border: none;
     color: var(--muted); font-size: 15px; cursor: pointer; padding: 4px; }
   .modal .mclose:hover { color: var(--fg); border: none; }
+
+  /* zen / fullscreen: just the image */
+  body.zen header, body.zen .toolbar, body.zen #controls, body.zen footer { display: none; }
+  body.zen .wrap { grid-template-columns: 1fr; padding: 0; gap: 0; }
+  body.zen .stage { border: none; border-radius: 0; padding: 0; min-height: 100vh; background: #000; justify-content: center; }
+  body.zen #canvas { width: 100vw; height: 100vh; object-fit: contain; border-radius: 0; box-shadow: none; }
 </style>
 </head>
 <body>
@@ -260,8 +266,8 @@
     <p style="margin-top:8px; color:var(--muted)">個人・商用を問わず自由に使ってOK。作ったものはあなたのものです。ただし<b>現状のまま無保証</b>で提供しており、ご利用にあたっては<b>法令および他者の権利（著作権・肖像権など）を尊重</b>し、ご自身の責任でご利用ください。</p>
 
     <h3>Export</h3>
-    <p><b>Rec</b> saves an MP4 loop — on phones it opens the share sheet (Save Video, or share straight to an app). Hidden shortcuts: <b>G</b> for an animated GIF, <b>P</b> for APNG. <b>🔗 Link</b> copies a URL that restores the exact settings.</p>
-    <p style="margin-top:8px; color:var(--muted)"><b>Rec</b> は MP4 ループを保存。スマホでは共有シートが開きます（「ビデオを保存」やアプリへ直接共有）。隠しショートカット: <b>G</b> でアニメ GIF、<b>P</b> で APNG。<b>🔗 Link</b> は設定を復元できる URL をコピーします。</p>
+    <p><b>Rec</b> saves an MP4 loop — on phones it opens the share sheet (Save Video, or share straight to an app). Hidden shortcuts: <b>R</b> auto-reroll, <b>D</b> slow param drift, <b>F</b> fullscreen, <b>G</b> GIF, <b>P</b> APNG. <b>🔗 Link</b> copies a URL that restores the exact settings.</p>
+    <p style="margin-top:8px; color:var(--muted)"><b>Rec</b> は MP4 ループを保存。スマホでは共有シートが開きます（「ビデオを保存」やアプリへ直接共有）。隠しショートカット: <b>R</b> 自動リロール、<b>D</b> パラメータをゆっくり変化、<b>F</b> 全画面、<b>G</b> GIF、<b>P</b> APNG。<b>🔗 Link</b> は設定を復元できる URL をコピーします。</p>
 
     <h3>References</h3>
     <p>The real PNG glitch technique is based on <a href="https://ucnv.github.io/pnglitch/" target="_blank" rel="noopener">pnglitch by ucnv</a>.</p>
@@ -1260,12 +1266,66 @@ function randomizeFX(){
       }
     });
   });
-  if (!FX.some(f=>state[f.id].on)) state[FX[0].id].on = true;  // never fully clean
+  // Envelope alone renders nothing — guarantee at least one visible effect is on
+  if (!FX.some(f=> f.id!=='motion' && state[f.id].on)){
+    const pick = ['vhs','glitch','noise','color'][Math.floor(Math.random()*4)];
+    state[pick].on = true;
+  }
   syncUI();
   if (presetSel) presetSel.value = '';
-  setStatus('🎲 Randomized — export if you like it');
+  if (!autoTimer) setStatus('🎲 Randomized — export if you like it');
 }
 rndBtn.onclick = randomizeFX;
+
+// lightweight slider refresh (no jpeg/png rebuild) — used by param drift
+function syncSlidersLight(){
+  controls.querySelectorAll('input[type=range]').forEach(r=>{
+    r.value = state[r.dataset.fx][r.dataset.k];
+    const el = document.getElementById(`v-${r.dataset.fx}-${r.dataset.k}`);
+    if (el) el.textContent = r.value;
+  });
+}
+
+// hidden: slowly drift every enabled effect's params for organic, always-changing motion (toggle D)
+let driftTimer = null; const driftTgt = {};
+function driftTick(){
+  FX.forEach(f=>{
+    if (!state[f.id].on || f.id==='jpeg' || f.id==='png') return;   // skip the heavy real-glitch pools
+    f.params.forEach(p=>{
+      if (p.type==='select') return;
+      const key=f.id+'.'+p.k, cur=state[f.id][p.k], span=p.max-p.min;
+      let t=driftTgt[key];
+      if (t===undefined || Math.abs(cur-t) < span*0.03)              // reached target → pick a new nearby one
+        t = driftTgt[key] = Math.max(p.min, Math.min(p.max, cur+(Math.random()-0.5)*span*0.5));
+      state[f.id][p.k] = parseFloat((cur+(t-cur)*0.05).toFixed(4));  // slow ease
+    });
+  });
+  syncSlidersLight();
+}
+
+// hidden: auto-reroll random (toggle R); slower when drift is also running
+let autoTimer = null;
+function autoDelay(){ return driftTimer ? 12000 : 4000; }
+function autoTick(){ randomizeFX(); setStatus(driftTimer ? '🎲🌊 auto + drift · R / D to stop' : '🎲 auto-reroll on · press R to stop'); }
+function restartAuto(){ if (autoTimer){ clearInterval(autoTimer); autoTimer=setInterval(autoTick, autoDelay()); } }
+function toggleAuto(){
+  if (autoTimer){ clearInterval(autoTimer); autoTimer=null; setStatus('⏹ auto-reroll off'); return; }
+  autoTick(); autoTimer=setInterval(autoTick, autoDelay());
+}
+function toggleDrift(){
+  if (driftTimer){ clearInterval(driftTimer); driftTimer=null; setStatus('⏹ param drift off'); }
+  else { driftTimer=setInterval(driftTick, 120); setStatus('🌊 param drift on · press D to stop'); }
+  restartAuto();                                                    // rebalance reroll cadence
+}
+
+// hidden: fullscreen "zen" mode — just the image, for leaving it running (toggle F)
+function toggleZen(){
+  const on = !document.body.classList.contains('zen');
+  document.body.classList.toggle('zen', on);
+  if (on) document.documentElement.requestFullscreen?.().catch(()=>{});
+  else if (document.fullscreenElement) document.exitFullscreen?.();
+}
+document.addEventListener('fullscreenchange', ()=>{ if (!document.fullscreenElement) document.body.classList.remove('zen'); });
 
 playBtn.onclick = ()=>{
   playing = !playing;
@@ -1409,14 +1469,18 @@ document.getElementById('aboutBtn').onclick = ()=> aboutModal.classList.add('ope
 document.getElementById('aboutClose').onclick = ()=> aboutModal.classList.remove('open');
 aboutModal.onclick = e=>{ if (e.target===aboutModal) aboutModal.classList.remove('open'); };
 
-// hidden exports (WebM is the Rec fallback): press G for GIF, P for APNG
+// hidden shortcuts: R = auto-reroll, G = GIF, P = APNG (WebM is the Rec fallback)
 window.addEventListener('keydown', e=>{
-  if (e.key==='Escape'){ aboutModal.classList.remove('open'); return; }
+  if (e.key==='Escape'){ aboutModal.classList.remove('open');
+    document.body.classList.remove('zen'); if (document.fullscreenElement) document.exitFullscreen?.(); return; }
   if (aboutModal.classList.contains('open')) return;
-  if (!img || e.metaKey||e.ctrlKey||e.altKey) return;
   const tag=e.target.tagName;
-  if (tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA') return;
+  if (tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA'||e.metaKey||e.ctrlKey||e.altKey) return;
   const k=e.key.toLowerCase();
+  if (k==='r'){ toggleAuto(); return; }             // these work with or without an image
+  if (k==='d'){ toggleDrift(); return; }
+  if (k==='f'){ toggleZen(); return; }
+  if (!img) return;
   if (k==='g') exportGIF().catch(err=>setStatus('GIF failed: '+err.message));
   else if (k==='p') exportAPNG().catch(err=>setStatus('APNG failed: '+err.message));
 });
