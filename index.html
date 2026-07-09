@@ -957,7 +957,8 @@ function draw(phase){         // phase in [0,1)
   // ---- halftone: dot-matrix (dark=LED colour dots / light=newsprint black dots) ----
   const ht = state.halftone;
   if (ht.on){
-    const cell=ht.cell, dark=ht.bg===0, src=ctx.getImageData(0,0,w,h).data;
+    const cell=Math.max(3,Math.round(ht.cell)), dark=ht.bg===0, src=ctx.getImageData(0,0,w,h).data;
+    // ^ round: param drift (D) can hand us a fractional cell → fractional pixel indices → NaN → black frame
     ctx.fillStyle = dark ? '#0a0a0a' : '#f0ede6'; ctx.fillRect(0,0,w,h);
     for (let cy=0;cy<h;cy+=cell){
       for (let cx=0;cx<w;cx+=cell){
