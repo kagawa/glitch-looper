@@ -1,2 +1,8 @@
 wrangler.jsonc
 .assetsignore
+.wrangler
+.git
+node_modules
+package.json
+package-lock.json
+ogp_gen.cjs
