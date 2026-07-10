@@ -187,6 +187,34 @@
   button:disabled { opacity: .4; cursor: not-allowed; }
   .status { padding: 0 12px 12px; color: var(--muted); font-size: 11px; min-height: 14px; }
   .presetbar { display: flex; gap: 8px; align-items: center; padding: 12px; border-bottom: 1px solid var(--line); }
+
+  /* --- redesigned toolbar: primary row (preset + random) + popovers --- */
+  .primaryrow { display: flex; align-items: center; gap: 10px; flex: 1 1 340px; min-width: 0; }
+  .toolbar .primaryrow .presetbar { flex: 1 1 auto; min-width: 0; }
+  .toolbar .presetsel { min-width: 110px; max-width: 260px; width: 100%; }
+  .randwrap, .sharewrap { position: relative; display: inline-flex; gap: 4px; flex: 0 0 auto; }
+  .iconbtn { padding: 8px 11px; font-size: 14px; line-height: 1; }
+  .popover { position: absolute; top: calc(100% + 6px); left: 0; z-index: 30;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px; display: flex; flex-direction: column; gap: 10px;
+    min-width: 200px; max-width: calc(100vw - 24px); box-shadow: 0 10px 30px rgba(0,0,0,.55); }
+  .sharewrap .popover { left: auto; right: 0; min-width: 170px; }
+  .popover[hidden] { display: none; }
+  .pop-sec { display: flex; flex-direction: column; gap: 6px; }
+  .pop-lab { font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); }
+  .popbtn { display: flex; align-items: center; gap: 8px; text-align: left; width: 100%; }
+  .popbtn.active { border-color: var(--accent); color: var(--accent); }
+  .popover .segsel button { flex: 1; }
+  .kbd { margin-left: auto; font-size: 10px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; }
+  #canvas { cursor: pointer; }              /* click the image to change it */
+  @media (max-width: 560px) {
+    .primaryrow { flex: 1 1 100%; }
+    .actions { flex: 1 1 100%; }
+    .toolbar .status { flex: 1 1 100%; text-align: left; min-width: 0; }
+    /* keep popovers inside the viewport: anchor each toward the side its toggle sits on */
+    .randwrap .popover { left: auto; right: 0; }
+    .sharewrap .popover { left: 0; right: auto; }
+  }
   .presetlab { color: var(--muted); font-size: 11px; white-space: nowrap; }
   .presetsel { flex: 1; background: var(--panel2); color: var(--fg); border: 1px solid var(--line);
     border-radius: 7px; padding: 7px 8px; font-family: inherit; font-size: 12px; cursor: pointer; }
@@ -228,22 +256,39 @@
 </header>
 
 <div class="toolbar">
-  <div class="presetbar" id="presets"></div>
-  <div class="actions">
-    <button id="openBtn">🖼 Image</button>
-    <button id="playBtn" class="primary">⏸ Pause</button>
-    <button id="rndBtn">🎲 Random</button>
-    <div id="randLevel" class="segsel" title="Random strength">
-      <button data-v="normal" class="active">Normal</button>
-      <button data-v="strong">Strong</button>
-      <button data-v="wild">Wild</button>
+  <div class="primaryrow">
+    <div class="presetbar" id="presets"></div>
+    <div class="randwrap">
+      <button id="rndBtn">🎲 Random</button>
+      <button id="rndCfgBtn" class="iconbtn" title="Random settings" aria-label="Random settings" aria-haspopup="true">⋯</button>
+      <div class="popover" id="rndPop" hidden>
+        <div class="pop-sec">
+          <span class="pop-lab">Strength</span>
+          <div id="randLevel" class="segsel" title="Random strength">
+            <button data-v="normal" class="active">Normal</button>
+            <button data-v="strong">Strong</button>
+            <button data-v="wild">Wild</button>
+          </div>
+        </div>
+        <div class="pop-sec">
+          <button id="autoBtn" class="popbtn">🎲 Auto-reroll<span class="kbd">R</span></button>
+          <button id="driftBtn" class="popbtn">🌊 Param drift<span class="kbd">D</span></button>
+        </div>
+      </div>
     </div>
+  </div>
+  <div class="actions">
     <button id="recBtn" class="rec">⏺ Rec</button>
-    <button id="linkBtn">🔗 Link</button>
-    <button id="shareBtn">𝕏 Post</button>
+    <div class="sharewrap">
+      <button id="shareToggle" class="iconbtn" title="Share" aria-label="Share" aria-haspopup="true">⤴</button>
+      <div class="popover" id="sharePop" hidden>
+        <button id="linkBtn" class="popbtn">🔗 Copy link</button>
+        <button id="shareBtn" class="popbtn">𝕏 Post</button>
+      </div>
+    </div>
     <button id="resetBtn">Reset</button>
   </div>
-  <div class="status" id="status">Load an image</div>
+  <div class="status" id="status">Load an image · tap the image to change it</div>
 </div>
 
 <div class="wrap">
@@ -253,7 +298,7 @@
       <div>Drop an image / click to choose</div>
       <div style="font-size:11px">PNG · JPG · WEBP</div>
     </div>
-    <canvas id="canvas" class="hidden"></canvas>
+    <canvas id="canvas" class="hidden" title="Click / tap to change the image"></canvas>
     <input id="file" type="file" accept="image/*" hidden>
   </div>
 
@@ -1327,7 +1372,7 @@ fileInput.onchange = e => { if (e.target.files[0]) loadImage(e.target.files[0]);
 ['dragleave','drop'].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.remove('hover'); }));
 drop.addEventListener('drop', e=>{ const f=e.dataTransfer.files[0]; if (f) loadImage(f); });
 // allow changing the image after one is loaded: toolbar button + drop onto the stage
-document.getElementById('openBtn').onclick = ()=> fileInput.click();
+canvas.addEventListener('click', ()=> fileInput.click());   // click the image itself to change it
 const stageEl = document.querySelector('.stage');
 ['dragover','dragenter'].forEach(ev=> stageEl.addEventListener(ev, e=> e.preventDefault()));
 stageEl.addEventListener('drop', e=>{ e.preventDefault(); const f=e.dataTransfer.files[0]; if (f) loadImage(f); });
@@ -1355,7 +1400,6 @@ function loadImage(file){
 }
 
 // ---------- controls ----------
-const playBtn = document.getElementById('playBtn');
 const recBtn = document.getElementById('recBtn');
 const resetBtn = document.getElementById('resetBtn');
 const rndBtn = document.getElementById('rndBtn');
@@ -1367,6 +1411,23 @@ randSeg.querySelectorAll('button').forEach(b=>{
 });
 const linkBtn = document.getElementById('linkBtn');
 const shareBtn = document.getElementById('shareBtn');
+// popovers: random settings (strength + auto/drift) and share (link / X)
+const rndCfgBtn = document.getElementById('rndCfgBtn');
+const rndPop = document.getElementById('rndPop');
+const shareToggle = document.getElementById('shareToggle');
+const sharePop = document.getElementById('sharePop');
+const autoBtn = document.getElementById('autoBtn');
+const driftBtn = document.getElementById('driftBtn');
+function closeAllPops(){ document.querySelectorAll('.popover').forEach(p=> p.setAttribute('hidden','')); }
+function wirePop(btn, pop){
+  btn.addEventListener('click', e=>{ e.stopPropagation();
+    const willOpen = pop.hasAttribute('hidden'); closeAllPops(); if (willOpen) pop.removeAttribute('hidden'); });
+  pop.addEventListener('click', e=> e.stopPropagation());
+}
+wirePop(rndCfgBtn, rndPop); wirePop(shareToggle, sharePop);
+document.addEventListener('click', closeAllPops);
+autoBtn.onclick = ()=> toggleAuto();
+driftBtn.onclick = ()=> toggleDrift();
 const statusEl = document.getElementById('status');
 function setStatus(s){ statusEl.innerHTML = s; }
 
@@ -1444,13 +1505,15 @@ function autoDelay(){ return driftTimer ? 12000 : 4000; }
 function autoTick(){ randomizeFX(); setStatus(driftTimer ? '🎲🌊 auto + drift · R / D to stop' : '🎲 auto-reroll on · press R to stop'); }
 function restartAuto(){ if (autoTimer){ clearInterval(autoTimer); autoTimer=setInterval(autoTick, autoDelay()); } }
 function toggleAuto(){
-  if (autoTimer){ clearInterval(autoTimer); autoTimer=null; setStatus('⏹ auto-reroll off'); return; }
-  autoTick(); autoTimer=setInterval(autoTick, autoDelay());
+  if (autoTimer){ clearInterval(autoTimer); autoTimer=null; setStatus('⏹ auto-reroll off'); }
+  else { autoTick(); autoTimer=setInterval(autoTick, autoDelay()); }
+  autoBtn?.classList.toggle('active', !!autoTimer);
 }
 function toggleDrift(){
   if (driftTimer){ clearInterval(driftTimer); driftTimer=null; setStatus('⏹ param drift off'); }
   else { driftTimer=setInterval(driftTick, 120); setStatus('🌊 param drift on · press D to stop'); }
   restartAuto();                                                    // rebalance reroll cadence
+  driftBtn?.classList.toggle('active', !!driftTimer);
 }
 
 // hidden: fullscreen "zen" mode — just the image, for leaving it running (toggle F)
@@ -1462,11 +1525,6 @@ function toggleZen(){
 }
 document.addEventListener('fullscreenchange', ()=>{ if (!document.fullscreenElement) document.body.classList.remove('zen'); });
 
-playBtn.onclick = ()=>{
-  playing = !playing;
-  playBtn.textContent = playing ? '⏸ Pause' : '▶ Play';
-  if (playing) startT = performance.now();
-};
 resetBtn.onclick = ()=>{ applyPreset('Clean'); if (presetSel) presetSel.value=''; };
 
 // ---------- frame capture (deterministic single loop) ----------
@@ -1606,7 +1664,7 @@ aboutModal.onclick = e=>{ if (e.target===aboutModal) aboutModal.classList.remove
 
 // hidden shortcuts: R = auto-reroll, G = GIF, P = APNG (WebM is the Rec fallback)
 window.addEventListener('keydown', e=>{
-  if (e.key==='Escape'){ aboutModal.classList.remove('open');
+  if (e.key==='Escape'){ closeAllPops(); aboutModal.classList.remove('open');
     document.body.classList.remove('zen'); if (document.fullscreenElement) document.exitFullscreen?.(); return; }
   if (aboutModal.classList.contains('open')) return;
   const tag=e.target.tagName;
