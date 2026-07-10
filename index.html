@@ -1375,7 +1375,7 @@ function setStatus(s){ statusEl.innerHTML = s; }
 const RAND_PROB = { png:.12, jpeg:.15, warp:.18, halftone:.12, feedback:.12, melt:.12,
                     mosh:.25, crt:.2, pixelate:.3, hud:.3, motion:.4,
                     // colour-mapping / stylise effects: keep them occasional, emboss rarest
-                    duotone:.14, solarize:.14, posterize:.14, emboss:.07 };
+                    duotone:.14, solarize:.14, posterize:.14, emboss:.04 };
 // three strength levels: prob = on-probability scale, str = how far params stray from their default
 const RAND_LEVELS = { normal:{prob:.5, str:.4}, strong:{prob:1, str:1}, wild:{prob:1.7, str:1} };
 function randomizeFX(){
