@@ -205,6 +205,10 @@
   .popbtn { display: flex; align-items: center; gap: 8px; text-align: left; width: 100%; }
   .popbtn.active { border-color: var(--accent); color: var(--accent); }
   .popover .segsel button { flex: 1; }
+  .popslider { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); padding: 0 2px 2px 4px; }
+  .popslider > span:first-child { flex: 0 0 52px; }
+  .popslider input[type=range] { flex: 1; min-width: 80px; }
+  .popslider .popval { flex: 0 0 40px; text-align: right; color: var(--fg); font-variant-numeric: tabular-nums; }
   .kbd { margin-left: auto; font-size: 10px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; }
   #canvas { cursor: pointer; }              /* click the image to change it */
   @media (max-width: 560px) {
@@ -272,7 +276,13 @@
         </div>
         <div class="pop-sec">
           <button id="autoBtn" class="popbtn">🎲 Auto-reroll<span class="kbd">R</span></button>
+          <label class="popslider"><span>Interval</span>
+            <input type="range" id="autoMsRange" min="0.5" max="15" step="0.5" value="4">
+            <span class="popval" id="autoMsVal">4.0s</span></label>
           <button id="driftBtn" class="popbtn">🌊 Param drift<span class="kbd">D</span></button>
+          <label class="popslider"><span>Amount</span>
+            <input type="range" id="driftAmtRange" min="5" max="100" step="5" value="50">
+            <span class="popval" id="driftAmtVal">50%</span></label>
         </div>
       </div>
     </div>
@@ -1428,6 +1438,16 @@ wirePop(rndCfgBtn, rndPop); wirePop(shareToggle, sharePop);
 document.addEventListener('click', closeAllPops);
 autoBtn.onclick = ()=> toggleAuto();
 driftBtn.onclick = ()=> toggleDrift();
+// sliders: auto-reroll interval + param-drift amount
+const autoMsRange = document.getElementById('autoMsRange'), autoMsVal = document.getElementById('autoMsVal');
+const driftAmtRange = document.getElementById('driftAmtRange'), driftAmtVal = document.getElementById('driftAmtVal');
+autoMsRange.addEventListener('input', ()=>{
+  const s = parseFloat(autoMsRange.value); autoMs = Math.round(s*1000);
+  autoMsVal.textContent = s.toFixed(1)+'s'; restartAuto();          // apply live if auto is running
+});
+driftAmtRange.addEventListener('input', ()=>{
+  driftAmt = parseInt(driftAmtRange.value)/100; driftAmtVal.textContent = driftAmtRange.value+'%';
+});
 const statusEl = document.getElementById('status');
 function setStatus(s){ statusEl.innerHTML = s; }
 
@@ -1484,6 +1504,8 @@ function syncSlidersLight(){
 
 // hidden: slowly drift every enabled effect's params for organic, always-changing motion (toggle D)
 let driftTimer = null; const driftTgt = {};
+let autoMs = 4000;      // auto-reroll interval (ms), slider-controlled
+let driftAmt = 0.5;     // drift wander range as a fraction of each param's span, slider-controlled
 function driftTick(){
   FX.forEach(f=>{
     if (!state[f.id].on || f.id==='jpeg' || f.id==='png') return;   // skip the heavy real-glitch pools
@@ -1492,7 +1514,7 @@ function driftTick(){
       const key=f.id+'.'+p.k, cur=state[f.id][p.k], span=p.max-p.min;
       let t=driftTgt[key];
       if (t===undefined || Math.abs(cur-t) < span*0.03)              // reached target → pick a new nearby one
-        t = driftTgt[key] = Math.max(p.min, Math.min(p.max, cur+(Math.random()-0.5)*span*0.5));
+        t = driftTgt[key] = Math.max(p.min, Math.min(p.max, cur+(Math.random()-0.5)*span*driftAmt));
       state[f.id][p.k] = parseFloat((cur+(t-cur)*0.05).toFixed(4));  // slow ease
     });
   });
@@ -1501,7 +1523,7 @@ function driftTick(){
 
 // hidden: auto-reroll random (toggle R); slower when drift is also running
 let autoTimer = null;
-function autoDelay(){ return driftTimer ? 12000 : 4000; }
+function autoDelay(){ return autoMs; }
 function autoTick(){ randomizeFX(); setStatus(driftTimer ? '🎲🌊 auto + drift · R / D to stop' : '🎲 auto-reroll on · press R to stop'); }
 function restartAuto(){ if (autoTimer){ clearInterval(autoTimer); autoTimer=setInterval(autoTick, autoDelay()); } }
 function toggleAuto(){
