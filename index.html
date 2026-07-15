@@ -988,14 +988,20 @@ async function buildGifgFrames(){
   const lzwPos=[]; let p=lzwStart;
   while (p<base.length-1){ const len=base[p]; if(len===0) break; for(let q=p+1;q<=p+len && q<base.length;q++) lzwPos.push(q); p+=len+1; }
   const nFrames=Math.max(1, Math.round(gg.frames)), out=[];
-  for (let f=0; f<nFrames; f++){
+  // palette corruption ALWAYS decodes (colour table = plain RGB) and reliably wrecks the colours.
+  // LZW corruption gives index streaks but heavy amounts make the whole GIF undecodable — keep it few.
+  const makeFrame = async (withLZW)=>{
     const copy=base.slice();
-    const chits=Math.floor(gg.amount*ctLen*0.06);                 // palette corruption (always decodes)
+    const chits=Math.max(1, Math.round(gg.amount*ctLen*0.5));     // up to ~half the colour table
     for (let k=0;k<chits;k++) copy[ctStart+Math.floor(Math.random()*ctLen)]=Math.floor(Math.random()*256);
-    const lhits=Math.floor(gg.amount*lzwPos.length*0.02);         // LZW index streaks (structure kept)
-    for (let k=0;k<lhits;k++) copy[lzwPos[Math.floor(Math.random()*lzwPos.length)]]=Math.floor(Math.random()*256);
-    try { out.push(await createImageBitmap(new Blob([copy], {type:'image/gif'}))); } catch(e){}
-  }
+    if (withLZW && lzwPos.length){
+      const lhits=Math.round(gg.amount*gg.amount*40);             // squared → gentle (≤40), keeps it decodable
+      for (let k=0;k<lhits;k++) copy[lzwPos[Math.floor(Math.random()*lzwPos.length)]]=Math.floor(Math.random()*256);
+    }
+    try { return await createImageBitmap(new Blob([copy], {type:'image/gif'})); } catch(e){ return null; }
+  };
+  for (let f=0; f<nFrames; f++){ const b=await makeFrame(true); if(b) out.push(b); }
+  if (!out.length){ for (let f=0; f<nFrames; f++){ const b=await makeFrame(false); if(b) out.push(b); } }  // fallback: palette-only (always decodes)
   if (myToken!==gifgToken) return;
   if (out.length){ gifgFrames=out; gifgReady=true; } else gifgReady=false;
 }
