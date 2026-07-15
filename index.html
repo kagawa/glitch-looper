@@ -481,8 +481,7 @@ const FX = [
     { k:'frames', label:'Frames', min:1, max:12, step:1, def:6 },
   ]},
   { id:'gifg', name:'GIF Databend', hint:'real GIF encode + LZW byte corruption (image tears from the bottom)', on:false, open:false, params:[
-    { k:'amount', label:'Corruption', min:0, max:1, step:.01, def:.4 },
-    { k:'colors', label:'Colours', min:2, max:128, step:1, def:32 },
+    { k:'amount', label:'Corruption', min:0, max:1, step:.01, def:.5 },
     { k:'frames', label:'Frames', min:1, max:12, step:1, def:6 },
   ]},
   { id:'degauss', name:'Degauss', hint:'magnetised CRT — rainbow colour-purity patches (breaks colour, not geometry)', on:false, open:false, params:[
@@ -503,7 +502,7 @@ const FX = [
   { id:'hud', name:'HUD / Text', hint:'REC ● · camcorder · TV / VCR on-screen text', on:false, open:false, params:[
     { k:'layout',  label:'Layout', type:'select', def:3,
       options:[[0,'REC ●'],[1,'▶ PLAY'],[2,'Timestamp'],[3,'Camcorder'],[4,'Security Cam'],
-               [5,'TV Channel'],[6,'VCR Play'],[7,'ON AIR'],[8,'音声多重 / Stereo'],[9,'No Signal']] },
+               [5,'TV Channel'],[6,'VCR Play'],[7,'ON AIR']] },
     { k:'color',   label:'Text Color', type:'select', def:0,
       options:[[0,'White'],[1,'Amber'],[2,'Green'],[3,'Red'],[4,'Cyan'],[5,'Black']] },
     { k:'size',    label:'Size', min:.5, max:2.5, step:.1, def:1 },
@@ -806,7 +805,7 @@ function buildUI(){
       if (c.dataset.fx==='png'  && c.checked) schedulePng();
       if (c.dataset.fx==='webp' && c.checked) scheduleWebp();
       if (c.dataset.fx==='gifg' && c.checked) scheduleGifg();
-      if (c.dataset.fx==='gifpal' && c.checked) scheduleGifpal();
+      if (c.dataset.fx==='gifpal'){ if (c.checked) scheduleGifpal(); else if (state.gifg.on) scheduleGifg(); }
       updateCatCounts();
     });
   });
@@ -1003,36 +1002,41 @@ async function buildGifpalFrames(){
   const { base, ctStart, ctLen } = gifEncodeBase(gp.colors);
   const nFrames=Math.max(1, Math.round(gp.frames)), out=[];
   for (let f=0; f<nFrames; f++){
-    const copy=base.slice(); const chits=Math.max(1, Math.round(gp.amount*ctLen*0.5));
+    const copy=base.slice(); const chits=Math.max(1, Math.round(gp.amount*ctLen*0.7));
     for (let k=0;k<chits;k++) copy[ctStart+Math.floor(Math.random()*ctLen)]=Math.floor(Math.random()*256);
     const b=await gifDecode(copy); if(b) out.push(b);
   }
   if (myToken!==gifpalToken) return;
   if (out.length){ gifpalFrames=out; gifpalReady=true; } else gifpalReady=false;
 }
-function scheduleGifpal(){ gifpalReady=false; clearTimeout(gifpalTimer); gifpalTimer=setTimeout(()=> buildGifpalFrames().catch(()=>{}), 120); }
+// when the palette changes, rebuild GIF Databend too (it folds the palette in when both are on)
+function scheduleGifpal(){ gifpalReady=false; clearTimeout(gifpalTimer); gifpalTimer=setTimeout(()=>{ buildGifpalFrames().catch(()=>{}); if (state.gifg.on) buildGifgFrames().catch(()=>{}); }, 120); }
 
 // GIF Databend: corrupt only the LZW image bytes. Browsers reject heavily-broken LZW, so keep as much
 // as still decodes — hits are biased to the later stream (top decodes, lower part tears = classic
 // databend), backing off on failure down to the clean re-encoded GIF.
 async function buildGifgFrames(){
   if (!img) return;
-  const myToken=++gifgToken; const gg=state.gifg;
-  const { base, lzwPos } = gifEncodeBase(gg.colors);
-  const lateStart=Math.floor(lzwPos.length*0.35);
+  const myToken=++gifgToken; const gg=state.gifg, gp=state.gifpal;
+  const { base, ctStart, ctLen, lzwPos } = gifEncodeBase(64);   // fixed palette (Colours isn't a param here)
+  const lateStart=Math.floor(lzwPos.length*0.25);               // corrupt the later ~75% of the stream
   const nFrames=Math.max(1, Math.round(gg.frames)), out=[];
   const makeFrame = async ()=>{
-    let hits=Math.round(1 + gg.amount*30);
-    for (let attempt=0; attempt<5; attempt++){
+    const palHits = gp.on ? Math.max(1, Math.round(gp.amount*ctLen*0.7)) : 0;   // combine GIF Palette when it's also on
+    let hits=Math.round(3 + gg.amount*120);                     // much heavier LZW corruption
+    for (let attempt=0; attempt<8; attempt++){
       const copy=base.slice();
+      for (let k=0;k<palHits;k++) copy[ctStart+Math.floor(Math.random()*ctLen)]=Math.floor(Math.random()*256);
       if (hits>0 && lzwPos.length>lateStart){
         for (let k=0;k<hits;k++){ const pos=lzwPos[lateStart+Math.floor(Math.random()*(lzwPos.length-lateStart))]; copy[pos]=Math.floor(Math.random()*256); }
       }
       const bmp=await gifDecode(copy);
       if (bmp) return bmp;
-      hits=Math.floor(hits/2);                       // back off: fewer LZW hits, retry
+      hits=Math.floor(hits*0.6);                     // back off gently → keep as much tear as still decodes
     }
-    return await gifDecode(base.slice());            // fallback: clean re-encode (quantised, no tear)
+    const copy=base.slice();
+    for (let k=0;k<palHits;k++) copy[ctStart+Math.floor(Math.random()*ctLen)]=Math.floor(Math.random()*256);
+    return await gifDecode(copy);                    // fallback: palette-only / clean re-encode
   };
   for (let f=0; f<nFrames; f++){ const b=await makeFrame(); if(b) out.push(b); }
   if (myToken!==gifgToken) return;
@@ -2176,22 +2180,6 @@ function drawHUD(w,h,phase){
       ctx.fillText(time, w-pad, pad);
       ctx.fillText('CH 4', w-pad, h-pad-base);
       break;
-    case 8:                                                  // 音声多重 / Stereo (analog JP TV)
-      ctx.fillText('4ch', pad, pad);
-      ctx.textAlign='right';
-      ctx.fillText('ステレオ', w-pad, pad);
-      ctx.fillText('音声多重', w-pad, pad+base*1.3);
-      ctx.textAlign='left'; ctx.fillText(time, pad, h-pad-base);
-      break;
-    case 9:{                                                 // No Signal / stand by
-      ctx.textAlign='center';
-      const big=Math.round(base*1.5);
-      setFont(big); ctx.fillText('NO SIGNAL', w/2, h/2-big);
-      setFont(base);
-      ctx.fillText('PLEASE STAND BY', w/2, h/2+base*0.4);
-      ctx.fillText('しばらくお待ちください', w/2, h/2+base*1.7);
-      break;
-    }
   }
   ctx.restore();
 }
