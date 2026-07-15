@@ -361,6 +361,8 @@ const FX = [
     { k:'bleed',      label:'Bleed', min:0, max:12, step:.5, def:3 },
     { k:'tracking',   label:'Tracking', min:0, max:1, step:.01, def:.3, env:1 },
     { k:'wobble',     label:'Wobble', min:0, max:20, step:.5, def:5 },
+    { k:'wobmode',    label:'Wobble Pattern', type:'select', def:0,
+      options:[[0,'Wave'],[1,'Pulse'],[2,'Jitter'],[3,'Step'],[4,'Drift']] },
   ]},
   { id:'glitch', name:'Slice', hint:'horizontal slice shift + RGB split (visual, not real corruption)', on:false, open:false, params:[
     { k:'amount',   label:'Amount', min:0, max:1, step:.01, def:.4, env:1, envd:1 },
@@ -411,17 +413,42 @@ const FX = [
       options:[[0,'Mix'],[1,'Horizontal (Sub)'],[2,'Vertical (Up)'],[3,'Diagonal (Paeth)']] },
     { k:'frames', label:'Frames', min:1, max:16, step:1, def:6 },
   ]},
-  { id:'warp', name:'Warp', hint:'sine wave distortion (heat-haze / underwater / melt)', on:false, open:false, params:[
+  { id:'compress', name:'Compression', hint:'heavy-JPEG look — blocky DCT · chroma bleed · banding', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.6, env:1 },
+    { k:'chroma', label:'Chroma Bleed', min:0, max:1, step:.01, def:.5 },
+    { k:'block',  label:'Block', min:4, max:16, step:2, def:8 },
+  ]},
+  { id:'pixsort', name:'Pixel Sort', hint:'sort pixels by brightness past a threshold (glitch-art staple)', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.85, env:1 },
+    { k:'thresh', label:'Threshold', min:0, max:1, step:.01, def:.5 },
+    { k:'dir',    label:'Direction', type:'select', def:0, options:[[0,'Rows →'],[1,'Columns ↓'],[2,'Both']] },
+    { k:'len',    label:'Max Length', min:0, max:1, step:.01, def:.6 },
+  ]},
+  { id:'databend', name:'Databend Shift', hint:'raw-byte / stride error — diagonal shear + rainbow', on:false, open:false, params:[
+    { k:'amount',   label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
+    { k:'skew',     label:'Skew', min:0, max:1, step:.01, def:.4 },
+    { k:'scramble', label:'Scramble', min:0, max:1, step:.01, def:.4 },
+    { k:'speed',    label:'Speed', min:0, max:8, step:1, def:2 },
+  ]},
+  { id:'degauss', name:'Degauss', hint:'magnetised CRT — rainbow colour-purity patches (breaks colour, not geometry)', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.6, env:1 },
+    { k:'freq',   label:'Shimmer', min:1, max:8, step:1, def:4 },
+    { k:'color',  label:'Rainbow', min:0, max:1, step:.01, def:.7 },
+  ]},
+  { id:'warp', name:'Warp', hint:'horizontal displacement — heat-haze / underwater / shear', on:false, open:false, params:[
     { k:'amp',   label:'Amplitude', min:0, max:10, step:.25, def:5, env:1 },
     { k:'freq',  label:'Frequency', min:1, max:20, step:1, def:6 },
     { k:'speed', label:'Speed', min:0, max:6, step:1, def:2 },
+    { k:'warpmode', label:'Pattern', type:'select', def:0,
+      options:[[0,'Wave'],[1,'Pulse'],[2,'Jitter'],[3,'Step'],[4,'Drift'],[5,'Twist'],[6,'Beat'],[7,'Zigzag']] },
   ]},
   { id:'pixelate', name:'Pixelate', hint:'mosaic / retro blocks (Envelope can pulse block size)', on:false, open:false, params:[
     { k:'size', label:'Block Size', min:1, max:48, step:1, def:8, env:1 },
   ]},
-  { id:'hud', name:'HUD / Text', hint:'REC ● · timestamp · camcorder overlay', on:false, open:false, params:[
+  { id:'hud', name:'HUD / Text', hint:'REC ● · camcorder · TV / VCR on-screen text', on:false, open:false, params:[
     { k:'layout',  label:'Layout', type:'select', def:3,
-      options:[[0,'REC ●'],[1,'▶ PLAY'],[2,'Timestamp'],[3,'Camcorder'],[4,'Security Cam']] },
+      options:[[0,'REC ●'],[1,'▶ PLAY'],[2,'Timestamp'],[3,'Camcorder'],[4,'Security Cam'],
+               [5,'TV Channel'],[6,'VCR Play'],[7,'ON AIR'],[8,'音声多重 / Stereo'],[9,'No Signal']] },
     { k:'color',   label:'Text Color', type:'select', def:0,
       options:[[0,'White'],[1,'Amber'],[2,'Green'],[3,'Red'],[4,'Cyan'],[5,'Black']] },
     { k:'size',    label:'Size', min:.5, max:2.5, step:.1, def:1 },
@@ -435,11 +462,46 @@ const FX = [
     { k:'cell', label:'Cell Size', min:3, max:20, step:1, def:6 },
     { k:'bg',   label:'Background', type:'select', def:0, options:[[0,'Dark (LED)'],[1,'Light (print)']] },
   ]},
-  { id:'crt', name:'CRT Curve', hint:'barrel bulge + rounded bezel (strong = peephole)', on:false, open:false, params:[
-    { k:'amount', label:'Curvature', min:0, max:1, step:.01, def:.3 },
-    { k:'corner', label:'Corner Dark', min:0, max:1, step:.01, def:.5 },
-    { k:'round',  label:'Screen Bulge', min:0, max:1, step:.01, def:0 },
-    { k:'frame',  label:'Bezel', min:0, max:1, step:.01, def:0 },
+  { id:'crt', name:'CRT', hint:'tube curve · RGB phosphor mask · scanlines · convergence · glow', on:false, open:false, params:[
+    { k:'amount',   label:'Curvature',     min:0, max:1, step:.01, def:.3 },
+    { k:'round',    label:'Screen Bulge',  min:0, max:1, step:.01, def:.2 },
+    { k:'corner',   label:'Corner Dark',   min:0, max:1, step:.01, def:.5 },
+    { k:'frame',    label:'Bezel',         min:0, max:1, step:.01, def:.08 },
+    { k:'mask',     label:'Phosphor', type:'select', def:1,
+      options:[[0,'None'],[1,'Aperture Grille'],[2,'Shadow Mask'],[3,'Slot Mask']] },
+    { k:'phosphor', label:'Mask Depth',    min:0, max:1, step:.01, def:.5, env:1 },
+    { k:'scan',     label:'Scanlines',     min:0, max:1, step:.01, def:.4 },
+    { k:'converge', label:'Convergence',   min:0, max:1, step:.01, def:.25, env:1 },
+    { k:'glow',     label:'Phosphor Glow', min:0, max:1, step:.01, def:.3, env:1 },
+  ]},
+  { id:'sync', name:'Signal / Sync', hint:'horizontal-sync instability — diagonal skew · flagging · bad contact', on:false, open:false, params:[
+    { k:'hsync',   label:'H-Sync',      min:-1, max:1, step:.01, def:0 },
+    { k:'flag',    label:'Flagging',    min:0, max:1, step:.01, def:0, env:1 },
+    { k:'contact', label:'Bad Contact', min:0, max:1, step:.01, def:0, env:1 },
+  ]},
+  { id:'zoom', name:'Zoom', hint:'enlarge / overscan (also hides wobble wrap seams)', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.3, env:1 },
+  ]},
+  { id:'ghost', name:'Ghosting', hint:'multipath echo — faint offset duplicate(s)', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
+    { k:'offset', label:'Offset', min:2, max:80, step:1, def:22 },
+    { k:'echoes', label:'Echoes', min:1, max:3, step:1, def:2 },
+    { k:'pre',    label:'Pre-echo', min:0, max:1, step:.01, def:.3 },
+  ]},
+  { id:'dotcrawl', name:'Dot Crawl', hint:'composite cross-colour — rainbow shimmer on vertical edges', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.6, env:1 },
+    { k:'size',   label:'Dot Size', min:1, max:5, step:1, def:2 },
+    { k:'speed',  label:'Crawl', min:1, max:12, step:1, def:6 },
+  ]},
+  { id:'hum', name:'Hum Bar', hint:'mains-hum brightness band rolling up the screen', on:false, open:false, params:[
+    { k:'amount', label:'Darkness', min:0, max:1, step:.01, def:.4, env:1 },
+    { k:'width',  label:'Band Width', min:0, max:1, step:.01, def:.4 },
+    { k:'speed',  label:'Roll Speed', min:1, max:8, step:1, def:2 },
+  ]},
+  { id:'herring', name:'Herringbone', hint:'RF interference — moving diagonal weave', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.4, env:1 },
+    { k:'freq',   label:'Density', min:1, max:10, step:1, def:5 },
+    { k:'speed',  label:'Drift', min:1, max:8, step:1, def:2 },
   ]},
   { id:'feedback', name:'Feedback Zoom', hint:'droste tunnel · spins/pulses over the loop', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5 },
@@ -482,9 +544,14 @@ const PRESETS = {
   'VHS Tape':    { vhs:{on:1,aberration:8,scanline:.45,bleed:4,tracking:.4,wobble:7}, glitch:{on:0}, noise:{on:1,grain:.22,flicker:.15}, color:{on:1,saturate:1.1,contrast:1.05,hue:0,tint:.15,vignette:.4} },
   '8mm Film':    { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.14,flicker:.2}, color:{on:1,saturate:.8,contrast:1.1,hue:0,tint:.1,vignette:.5}, film:{on:1,weave:1,dust:.6,scratch:.5,sepia:.6,burn:.4}, roll:{on:0}, mosh:{on:0} },
   'Dreamy':      { vhs:{on:1,aberration:12,scanline:.1,bleed:8,tracking:.1,wobble:3}, glitch:{on:0}, noise:{on:1,grain:.08,flicker:.03}, color:{on:1,saturate:1.4,contrast:.95,hue:0,tint:-.3,vignette:.5} },
-  'CRT':         { vhs:{on:1,aberration:5,scanline:.6,bleed:2,tracking:.1,wobble:1}, glitch:{on:0}, noise:{on:1,grain:.1,flicker:.08}, color:{on:1,saturate:1.2,contrast:1.1,hue:0,tint:.05,vignette:.4}, crt:{on:1,amount:.35,corner:.5,round:.5,frame:.08} },
+  'CRT':         { vhs:{on:1,aberration:5,scanline:0,bleed:2,tracking:.1,wobble:1}, glitch:{on:0}, noise:{on:1,grain:.1,flicker:.08}, color:{on:1,saturate:1.2,contrast:1.1,hue:0,tint:.05,vignette:.35}, crt:{on:1,amount:.35,round:.5,corner:.5,frame:.08,mask:2,phosphor:.5,scan:.5,converge:.3,glow:.35}, sync:{on:1,hsync:0,flag:0.15,contact:0.12} },
+  'Trinitron':   { vhs:{on:1,aberration:4,scanline:0,bleed:2,tracking:.05,wobble:1}, glitch:{on:0}, noise:{on:1,grain:.05,flicker:.04}, color:{on:1,saturate:1.25,contrast:1.12,hue:0,tint:.03,vignette:.3}, film:{on:0}, roll:{on:0}, mosh:{on:0}, crt:{on:1,amount:.22,round:.35,corner:.45,frame:.09,mask:1,phosphor:.6,scan:.45,converge:.2,glow:.4} },
+  'Dead Channel':{ vhs:{on:1,aberration:7,scanline:0,bleed:2,tracking:.6,wobble:5}, glitch:{on:0}, noise:{on:1,grain:.3,flicker:.35}, color:{on:1,saturate:.85,contrast:1.2,hue:0,tint:-.05,vignette:.5}, film:{on:0}, roll:{on:0}, mosh:{on:0}, crt:{on:1,amount:.3,round:.4,corner:.55,frame:.1,mask:2,phosphor:.5,scan:.4,converge:.5,glow:.3}, sync:{on:1,hsync:0.35,flag:0.55,contact:0.7}, motion:{on:1,mode:4,depth:.6,rate:5} },
+  'Pixel Flow':  { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.05,flicker:.03}, color:{on:1,saturate:1.25,contrast:1.08,hue:0,tint:0,vignette:.3}, film:{on:0}, roll:{on:0}, mosh:{on:0}, pixsort:{on:1,amount:.9,thresh:.45,dir:1,len:.8} },
+  'Databent':    { vhs:{on:1,aberration:5,scanline:0,bleed:2,tracking:.2,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.1,flicker:.06}, color:{on:1,saturate:1.1,contrast:1.1,hue:0,tint:0,vignette:.3}, film:{on:0}, roll:{on:0}, mosh:{on:0}, compress:{on:1,amount:.6,chroma:.6,block:8}, databend:{on:1,amount:.9,skew:.5,scramble:.5,speed:2} },
+  'Degauss':     { vhs:{on:1,aberration:4,scanline:0,bleed:2,tracking:.1,wobble:1}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.05}, color:{on:1,saturate:1.2,contrast:1.1,hue:0,tint:.03,vignette:.35}, film:{on:0}, roll:{on:0}, mosh:{on:0}, degauss:{on:1,amount:.7,freq:4,color:.7}, crt:{on:1,amount:.3,round:.4,corner:.5,frame:.09,mask:1,phosphor:.5,scan:.4,converge:.25,glow:.35} },
   'Backrooms':   { vhs:{on:1,aberration:4,scanline:.28,bleed:2,tracking:.22,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.2,flicker:.14}, color:{on:1,saturate:.85,contrast:1.12,hue:12,tint:.4,vignette:.55}, film:{on:0}, roll:{on:0}, mosh:{on:0} },
-  'Broken TV':   { vhs:{on:1,aberration:6,scanline:.45,bleed:2,tracking:.9,wobble:8}, glitch:{on:1,amount:.2,slices:18,shift:20,rgb:5}, noise:{on:1,grain:.35,flicker:.3}, color:{on:1,saturate:.7,contrast:1.15,hue:0,tint:0,vignette:.45}, roll:{on:1,hspeed:0,hstep:0,vspeed:.35,band:.6}, crt:{on:1,amount:.3,corner:.5,round:.45,frame:.07}, motion:{on:1,mode:4,depth:.6,rate:6} },
+  'Broken TV':   { vhs:{on:1,aberration:6,scanline:.45,bleed:2,tracking:.9,wobble:8}, glitch:{on:1,amount:.2,slices:18,shift:20,rgb:5}, noise:{on:1,grain:.35,flicker:.3}, color:{on:1,saturate:.7,contrast:1.15,hue:0,tint:0,vignette:.45}, roll:{on:1,hspeed:0,hstep:0,vspeed:.35,band:.6}, crt:{on:1,amount:.3,round:.45,corner:.5,frame:.07,mask:2,phosphor:.45,scan:.4,converge:.4,glow:.3}, sync:{on:1,hsync:0,flag:0.45,contact:0.5}, motion:{on:1,mode:4,depth:.6,rate:6} },
   // ---- Glitch ----
   'Digital Decay':{ vhs:{on:1,aberration:4,scanline:.15,bleed:1,tracking:.2,wobble:2}, glitch:{on:1,amount:.45,slices:22,shift:30,rgb:10}, noise:{on:1,grain:.1,flicker:.05}, color:{on:0} },
   'Datamosh':    { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.08,flicker:0}, color:{on:1,saturate:1.3,contrast:1.1,hue:0,tint:0,vignette:.2}, roll:{on:0}, film:{on:0}, mosh:{on:1,intensity:.75,blocks:.65,sort:.55,chaos:.85,rate:12} },
@@ -502,16 +569,18 @@ const PRESETS = {
   'Neon':        { vhs:{on:1,aberration:16,scanline:.3,bleed:4,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.1,flicker:.05}, color:{on:1,saturate:1.8,contrast:1.15,hue:60,tint:-.2,vignette:.5} },
   'Vaporwave':   { vhs:{on:1,aberration:11,scanline:.18,bleed:5,tracking:.1,wobble:3}, glitch:{on:0}, noise:{on:1,grain:.07,flicker:.04}, color:{on:1,saturate:1.7,contrast:1.0,hue:-35,tint:-.15,vignette:.4}, film:{on:0}, roll:{on:0}, mosh:{on:0} },
   'LED Board':   { vhs:{on:0}, glitch:{on:0}, noise:{on:0}, color:{on:1,saturate:1.6,contrast:1.1,hue:0,tint:0,vignette:.25}, halftone:{on:1,cell:7,bg:0}, bloom:{on:1,amount:.5,size:6} },
-  'Arcade':      { vhs:{on:1,aberration:3,scanline:.55,bleed:1,tracking:.05,wobble:0}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.06}, color:{on:1,saturate:1.6,contrast:1.15,hue:0,tint:0,vignette:.35}, pixelate:{on:1,size:4}, bloom:{on:1,amount:.4,size:5}, crt:{on:1,amount:.4,corner:.55,round:.55,frame:.1} },
+  'Arcade':      { vhs:{on:1,aberration:3,scanline:.55,bleed:1,tracking:.05,wobble:0}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.06}, color:{on:1,saturate:1.6,contrast:1.15,hue:0,tint:0,vignette:.35}, pixelate:{on:1,size:4}, bloom:{on:1,amount:.4,size:5}, crt:{on:1,amount:.4,round:.55,corner:.55,frame:.1,mask:1,phosphor:.6,scan:.55,converge:.15,glow:.4} },
   // ---- Camera / Scene ----
   'Security Cam':{ vhs:{on:1,aberration:3,scanline:.35,bleed:1,tracking:.15,wobble:1}, glitch:{on:0}, noise:{on:1,grain:.28,flicker:.1}, color:{on:1,saturate:.5,contrast:1.15,hue:-15,tint:-.05,vignette:.6}, film:{on:0}, roll:{on:0}, mosh:{on:0}, hud:{on:1,layout:4,size:1,opacity:.85} },
   'Camcorder':   { vhs:{on:1,aberration:5,scanline:.25,bleed:3,tracking:.3,wobble:5}, glitch:{on:0}, noise:{on:1,grain:.2,flicker:.12}, color:{on:1,saturate:1.1,contrast:1.05,hue:0,tint:.1,vignette:.4}, film:{on:0}, roll:{on:0}, mosh:{on:0}, hud:{on:1,layout:3,size:1,opacity:.9} },
   'Broadcast':   { vhs:{on:1,aberration:8,scanline:.4,bleed:3,tracking:.6,wobble:6}, glitch:{on:0}, noise:{on:1,grain:.2,flicker:.2}, color:{on:1,saturate:1.05,contrast:1.05,hue:0,tint:.05,vignette:.4}, film:{on:0}, roll:{on:1,hspeed:0,hstep:0,vspeed:.2,band:.5}, mosh:{on:0}, hud:{on:1,layout:0,color:0,size:1,opacity:.9} },
-  'Fisheye Cam': { vhs:{on:1,aberration:3,scanline:.3,bleed:1,tracking:.15,wobble:1}, glitch:{on:0}, noise:{on:1,grain:.22,flicker:.1}, color:{on:1,saturate:.6,contrast:1.15,hue:-10,tint:-.05,vignette:.4}, film:{on:0}, roll:{on:0}, mosh:{on:0}, crt:{on:1,amount:.5,corner:.6,round:.4,frame:.1}, hud:{on:1,layout:4,color:2,size:.9,opacity:.85} },
+  'Fisheye Cam': { vhs:{on:1,aberration:3,scanline:.3,bleed:1,tracking:.15,wobble:1}, glitch:{on:0}, noise:{on:1,grain:.22,flicker:.1}, color:{on:1,saturate:.6,contrast:1.15,hue:-10,tint:-.05,vignette:.4}, film:{on:0}, roll:{on:0}, mosh:{on:0}, crt:{on:1,amount:.5,round:.4,corner:.6,frame:.1,mask:0,phosphor:0,scan:0,converge:0,glow:0}, hud:{on:1,layout:4,color:2,size:.9,opacity:.85} },
+  'Analog TV':   { vhs:{on:1,aberration:5,scanline:0,bleed:2,tracking:.15,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.08,flicker:.06}, color:{on:1,saturate:1.2,contrast:1.1,hue:0,tint:.04,vignette:.35}, film:{on:0}, roll:{on:0}, mosh:{on:0}, dotcrawl:{on:1,amount:.5,size:2,speed:6}, crt:{on:1,amount:.28,round:.4,corner:.5,frame:.09,mask:1,phosphor:.55,scan:.45,converge:.25,glow:.35}, sync:{on:1,hsync:0,flag:0.15,contact:0.1}, hud:{on:1,layout:5,color:0,size:1,opacity:.95} },
+  'Bad Reception':{ vhs:{on:1,aberration:6,scanline:0,bleed:2,tracking:.3,wobble:3}, glitch:{on:0}, noise:{on:1,grain:.3,flicker:.18}, color:{on:1,saturate:.85,contrast:1.1,hue:0,tint:0,vignette:.45}, film:{on:0}, roll:{on:0}, mosh:{on:0}, ghost:{on:1,amount:.6,offset:26,echoes:2,pre:.4}, hum:{on:1,amount:.35,width:.4,speed:2}, herring:{on:1,amount:.3,freq:5,speed:2}, crt:{on:1,amount:.25,round:.35,corner:.5,frame:.08,mask:1,phosphor:.4,scan:.35,converge:.3,glow:.3}, sync:{on:1,hsync:0,flag:0.25,contact:0.2} },
   'Retro Game':  { vhs:{on:1,aberration:3,scanline:.4,bleed:0,tracking:0,wobble:0}, glitch:{on:0}, noise:{on:1,grain:.04,flicker:.16}, color:{on:1,saturate:1.5,contrast:1.15,hue:0,tint:0,vignette:.3}, film:{on:0}, roll:{on:0}, mosh:{on:0}, pixelate:{on:1,size:7}, hud:{on:0}, motion:{on:1,mode:2,depth:.5,rate:3} },
   'Underwater':  { vhs:{on:1,aberration:6,scanline:.1,bleed:4,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.08,flicker:.05}, color:{on:1,saturate:1.2,contrast:1.0,hue:120,tint:-.2,vignette:.5}, film:{on:0}, roll:{on:0}, mosh:{on:0}, warp:{on:1,amp:8,freq:5,speed:2}, hud:{on:0} },
   // ---- Lens / FX ----
-  'Peephole':    { vhs:{on:1,aberration:4,scanline:.3,bleed:2,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.18,flicker:.08}, color:{on:1,saturate:.9,contrast:1.1,hue:0,tint:.05,vignette:.2}, crt:{on:1,amount:.95,corner:.9,round:.6,frame:.15} },
+  'Peephole':    { vhs:{on:1,aberration:4,scanline:.3,bleed:2,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.18,flicker:.08}, color:{on:1,saturate:.9,contrast:1.1,hue:0,tint:.05,vignette:.2}, crt:{on:1,amount:.95,round:.6,corner:.9,frame:.15,mask:0,phosphor:0,scan:0,converge:0,glow:0} },
   'Trip':        { vhs:{on:1,aberration:8,scanline:.1,bleed:4,tracking:.1,wobble:3}, glitch:{on:0}, noise:{on:1,grain:.05,flicker:.04}, color:{on:1,saturate:1.7,contrast:1.05,hue:90,tint:0,vignette:.35}, warp:{on:1,amp:7,freq:7,speed:3}, bloom:{on:1,amount:.5,size:8}, motion:{on:1,mode:2,depth:.6,rate:3} },
   'Newsprint':   { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.1,flicker:.05}, color:{on:1,saturate:.9,contrast:1.2,hue:0,tint:.05,vignette:.3}, halftone:{on:1,cell:6,bg:1} },
   'Dream Bloom': { vhs:{on:1,aberration:8,scanline:.1,bleed:6,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.03}, color:{on:1,saturate:1.3,contrast:.95,hue:0,tint:-.2,vignette:.4}, bloom:{on:1,amount:.6,size:10} },
@@ -527,12 +596,12 @@ const PRESETS = {
 };
 // select layout (group label → preset names)
 const PRESET_GROUPS = [
-  ['Classic', ['VHS Tape','8mm Film','Dreamy','CRT','Broken TV','Backrooms']],
-  ['Glitch',  ['Digital Decay','Datamosh','JPEG Databend','PNG Glitch','Roll Break']],
+  ['Classic', ['VHS Tape','8mm Film','Dreamy','CRT','Trinitron','Dead Channel','Broken TV','Backrooms']],
+  ['Glitch',  ['Digital Decay','Datamosh','JPEG Databend','PNG Glitch','Databent','Pixel Flow','Roll Break']],
   ['Horror',  ['Cursed Tape','Haunted Film','Corruption','Red Room','Meltdown']],
   ['Vivid',   ['Y2K','Neon','Vaporwave','LED Board','Arcade']],
-  ['Camera',  ['Security Cam','Camcorder','Broadcast','Fisheye Cam','Retro Game','Underwater']],
-  ['Lens/FX', ['Peephole','Trip','Newsprint','Dream Bloom','Heat Haze','Wormhole']],
+  ['Camera',  ['Security Cam','Camcorder','Broadcast','Analog TV','Bad Reception','Fisheye Cam','Retro Game','Underwater']],
+  ['Lens/FX', ['Peephole','Trip','Newsprint','Dream Bloom','Heat Haze','Wormhole','Degauss']],
   ['Art',     ['Cinematic','Acid','Risograph','Metal']],
 ];
 
@@ -667,6 +736,8 @@ const tmp = document.createElement('canvas');
 const tctx = tmp.getContext('2d', { willReadFrequently:true });
 const sc = document.createElement('canvas');                 // scratch for warp/pixelate
 const sctx = sc.getContext('2d', { willReadFrequently:true });
+const htile = document.createElement('canvas');              // small tile for herringbone pattern
+const htx = htile.getContext('2d');
 
 // deterministic pseudo-random keyed on loop phase so recordings are seamless
 function rand(seed){ const x = Math.sin(seed*12.9898)*43758.5453; return x - Math.floor(x); }
@@ -858,9 +929,28 @@ function draw(phase){         // phase in [0,1)
   tctx.drawImage(base, 0, 0, w, h);
   tctx.filter = 'none';
 
-  // ---- displacement: VHS wobble + film gate-weave ----
-  let ox = Math.sin(t)*(v.on?v.wobble:0);
-  let oy = Math.cos(t*2)*(v.on?v.wobble:0)*0.3;
+  // ---- displacement: VHS wobble (selectable pattern) + film gate-weave ----
+  let ox=0, oy=0;
+  if (v.on && v.wobble>0){
+    const A=v.wobble;
+    switch (v.wobmode|0){
+      case 1: {                                   // Pulse — periodic jolt that settles
+        const n=3, u=(phase*n)%1, env=Math.exp(-u*7), pi=Math.floor(phase*n);
+        ox=(rand(pi*1.7)*2-1)*A*env; oy=(rand(pi*2.9)*2-1)*A*0.5*env; break;
+      }
+      case 2:                                     // Jitter — nervous per-frame shake
+        ox=(rand(fseed*1.3)*2-1)*A; oy=(rand(fseed*2.1)*2-1)*A*0.4; break;
+      case 3: {                                   // Step — random positions held, jump per step
+        const n=6, si=Math.floor(phase*n);
+        ox=(rand(si*3.1)*2-1)*A; oy=(rand(si*4.7)*2-1)*A*0.4; break;
+      }
+      case 4:                                     // Drift — slow meander (snake)
+        ox=A*(0.6*Math.sin(t)+0.4*Math.sin(t*2+1.3));
+        oy=A*0.35*(0.6*Math.cos(t*1.5)+0.4*Math.sin(t*0.5)); break;
+      default:                                    // Wave — smooth sine
+        ox=Math.sin(t)*A; oy=Math.cos(t*2)*A*0.3;
+    }
+  }
   if (fm.on && fm.weave>0){
     ox += (rand(fseed*1.3)-0.5)*2*fm.weave;
     oy += (rand(fseed*2.7)-0.5)*2*fm.weave;
@@ -875,6 +965,18 @@ function draw(phase){         // phase in [0,1)
     rollY = phase * rl.vspeed * h;
   }
 
+  // ---- overscan: zoom in just enough to cover the wobble/weave jitter, so the
+  //      shake never reveals the wrap seam. Roll keeps its intentional wrap
+  //      (the zoomed frame is zw×zh wide, so wrapping at that period stays seamless). ----
+  const wob = v.on ? v.wobble : 0, wv = fm.on ? fm.weave : 0, bld = v.on ? Math.ceil(v.bleed) : 0;
+  const jit = wob + wv;
+  const mX = (jit>0 || bld>0) ? wob + wv + bld + 1 : 0;   // max |ox| = wobble + weave + bleed
+  const mY = (jit>0)        ? wob*0.5 + wv + 1 : 0;      // max |oy| = up to 0.5·wobble + weave
+  const shakeZoom = 1 + 2*Math.max(mX/w, mY/h, 0);        // minimum overscan to hide wobble wrap seams
+  const zoomFx = state.zoom.on ? 1 + P('zoom','amount')*0.5 : 1;   // standalone Zoom effect (up to 1.5×)
+  const zoom = Math.min(1.6, Math.max(shakeZoom, zoomFx));
+  const zw = w*zoom, zh = h*zoom, baseX = -(zw-w)/2, baseY = -(zh-h)/2;
+
   ctx.clearRect(0,0,w,h);
 
   // ---- VHS horizontal bleed ----
@@ -883,16 +985,16 @@ function draw(phase){         // phase in [0,1)
     const steps = Math.ceil(v.bleed);
     for (let i=1;i<=steps;i++){
       ctx.globalAlpha = 0.25*(1 - i/steps);
-      drawWrap(tmp, ox+rollX+i, oy+rollY, w, h);
+      drawWrap(tmp, baseX+ox+rollX+i, baseY+oy+rollY, zw, zh);
     }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
   }
-  drawWrap(tmp, ox+rollX, oy+rollY, w, h);
+  drawWrap(tmp, baseX+ox+rollX, baseY+oy+rollY, zw, zh);
 
   // ---- roll seam band (dark tear where the frame wraps) ----
   if (rl.on && rl.band>0 && rl.vspeed!==0){
-    const seamY = ((rollY % h)+h)%h;
+    const seamY = (((baseY+oy+rollY) % zh)+zh)%zh;
     const bh = Math.max(3, h*0.05*rl.band);
     ctx.save();
     ctx.globalCompositeOperation='overlay';
@@ -903,14 +1005,30 @@ function draw(phase){         // phase in [0,1)
     ctx.fillRect(0, seamY-bh, w, bh);
   }
 
-  // ---- warp: per-row sine displacement (wraps at edges) ----
+  // ---- warp: per-row horizontal displacement (selectable pattern, wraps at edges) ----
   const wp = state.warp;
   if (wp.on && wp.amp>0){
-    const amp = P('warp','amp'), fq = wp.freq*0.05, sp = phase*Math.PI*2*wp.speed;
+    const amp = P('warp','amp'), fq = wp.freq*0.05, TAU=Math.PI*2, sp = phase*TAU*wp.speed;
+    const mode = wp.warpmode|0;
+    const pEnv = Math.abs(Math.sin(phase*Math.PI*3));            // Pulse: swell then settle (0 at ends)
+    const tri = p => { const f=p-Math.floor(p); return 2*Math.abs(2*f-1)-1; };  // triangle wave
+    const stepP = Math.floor(phase*Math.max(1,wp.speed)*3);      // Step/Jitter animation index
+    const dxAt = y => {
+      switch (mode){
+        case 1: return Math.sin(y*fq)*amp*pEnv;                                   // Pulse
+        case 2: return (rand(Math.floor(y/3) + stepP*7)*2-1)*amp;                 // Jitter (per-row shake)
+        case 3: { const b=Math.floor((y/h)*10); return (rand(b*3.7 + stepP)*2-1)*amp; }  // Step (banded)
+        case 4: return amp*(0.6*Math.sin(y*fq*0.5 + sp) + 0.4*Math.sin(y*fq*1.3 - sp*2)); // Drift
+        case 5: return amp*((y/h)-0.5)*2*Math.sin(sp);                            // Twist (shear leans)
+        case 6: return amp*0.5*(Math.sin(y*fq + sp) + Math.sin(y*fq*1.15 - sp));   // Beat (interference)
+        case 7: return tri((y*fq + sp)/TAU)*amp;                                  // Zigzag (triangle)
+        default: return Math.sin(y*fq + sp)*amp;                                  // Wave
+      }
+    };
     sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h); sctx.drawImage(canvas,0,0);
     ctx.clearRect(0,0,w,h);
     for (let y=0;y<h;y++){
-      const dx = Math.sin(y*fq + sp)*amp;
+      const dx = dxAt(y);
       ctx.drawImage(sc, 0,y,w,1, dx-w,y,w,1);
       ctx.drawImage(sc, 0,y,w,1, dx,  y,w,1);
       ctx.drawImage(sc, 0,y,w,1, dx+w,y,w,1);
@@ -1204,23 +1322,338 @@ function draw(phase){         // phase in [0,1)
     }
   }
 
-  // ---- CRT barrel curvature (strong = peephole / fisheye) ----
+  // ---- Compression: heavy-JPEG look — 8×8 block flatten + chroma subsample + luma banding ----
+  const cp = state.compress;
+  if (cp.on){
+    const amt = P('compress','amount');
+    if (amt>0){
+      const B = cp.block|0, chb = cp.chroma;
+      const qstep = 2 + amt*30;                       // luma quantisation → banding
+      const im = ctx.getImageData(0,0,w,h), d = im.data;
+      for (let by=0; by<h; by+=B){
+        const ye=Math.min(by+B,h);
+        for (let bx=0; bx<w; bx+=B){
+          const xe=Math.min(bx+B,w);
+          let n=0,sY=0,sCb=0,sCr=0;                    // block means (DC term + chroma)
+          for (let y=by;y<ye;y++) for(let x=bx;x<xe;x++){
+            const i=(y*w+x)*4, r=d[i],g=d[i+1],b=d[i+2], Y=0.299*r+0.587*g+0.114*b;
+            sY+=Y; sCb+=b-Y; sCr+=r-Y; n++;
+          }
+          const mY=sY/n, mCb=sCb/n, mCr=sCr/n;
+          for (let y=by;y<ye;y++) for(let x=bx;x<xe;x++){
+            const i=(y*w+x)*4, r=d[i],g=d[i+1],b=d[i+2];
+            let Y=0.299*r+0.587*g+0.114*b, Cb=b-Y, Cr=r-Y;
+            Y += (mY-Y)*amt*0.7;                        // kill high-freq luma toward block mean
+            Y = Math.round(Y/qstep)*qstep;              // quantise → banding
+            Cb += (mCb-Cb)*chb; Cr += (mCr-Cr)*chb;     // chroma subsample toward block mean
+            const R=Y+Cr, Bb=Y+Cb, G=(Y-0.299*R-0.114*Bb)/0.587;
+            d[i]=R; d[i+1]=G; d[i+2]=Bb;
+          }
+        }
+      }
+      ctx.putImageData(im,0,0);
+    }
+  }
+
+  // ---- Pixel Sort: sort contiguous bright spans by luminance (rows / columns) ----
+  const ps = state.pixsort;
+  if (ps.on){
+    const amt = P('pixsort','amount');
+    if (amt>0){
+      const im = ctx.getImageData(0,0,w,h), d=im.data;
+      const lo = ps.thresh*255;
+      const maxLen = Math.max(4, Math.round((ps.dir===1?h:w)*(0.05+ps.len*0.95)));
+      const lum = i => d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114;
+      const sortLine = (idx,count)=>{
+        let s=0;
+        while (s<count){
+          if (lum(idx(s))<=lo){ s++; continue; }
+          let e=s; while (e<count && lum(idx(e))>lo && (e-s)<maxLen) e++;
+          const arr=[];
+          for (let k=s;k<e;k++){ const i=idx(k); arr.push([d[i],d[i+1],d[i+2],lum(i)]); }
+          arr.sort((a,b)=>a[3]-b[3]);
+          for (let k=s;k<e;k++){ const i=idx(k), a=arr[k-s];
+            d[i]+=(a[0]-d[i])*amt; d[i+1]+=(a[1]-d[i+1])*amt; d[i+2]+=(a[2]-d[i+2])*amt; }
+          s=e;
+        }
+      };
+      if (ps.dir===0||ps.dir===2){ for(let y=0;y<h;y++){ const r=y*w; sortLine(k=>(r+k)*4, w); } }
+      if (ps.dir===1||ps.dir===2){ for(let x=0;x<w;x++){ sortLine(k=>(k*w+x)*4, h); } }
+      ctx.putImageData(im,0,0);
+    }
+  }
+
+  // ---- Databend Shift: per-row horizontal wrap (diagonal shear + wavy) + packet jumps w/ RGB desync ----
+  const db = state.databend;
+  if (db.on){
+    const amt = P('databend','amount');
+    if (amt>0){
+      const TAU=Math.PI*2, nsp=Math.round(db.speed);
+      const stepPhase = Math.floor(phase*Math.max(1,db.speed)*4);
+      const wrap = xx => { let m=xx%w; if(m<0)m+=w; return m|0; };
+      const src = ctx.getImageData(0,0,w,h), out=ctx.createImageData(w,h), sd=src.data, od=out.data;
+      for (let y=0;y<h;y++){
+        let sh = amt*w*( db.skew*0.05*(y/h) + 0.007*Math.sin(y*0.04 + phase*TAU*nsp) );
+        let chroma=0;
+        if (db.scramble>0 && rand(y*0.7+stepPhase) < db.scramble*0.25){
+          sh += (rand(y*1.9+stepPhase)-0.5)*w*0.033*amt;  // packet break (scaled by amount)
+          chroma = (rand(y*2.3+stepPhase)-0.5)*amt*4;     // misread colour → rainbow
+        }
+        const shR=sh+chroma, shG=sh, shB=sh-chroma, row=y*w;
+        for (let x=0;x<w;x++){
+          const di=(row+x)*4;
+          od[di]   = sd[(row+wrap(x-shR))*4];
+          od[di+1] = sd[(row+wrap(x-shG))*4+1];
+          od[di+2] = sd[(row+wrap(x-shB))*4+2];
+          od[di+3] = 255;
+        }
+      }
+      ctx.putImageData(out,0,0);
+    }
+  }
+
+  // ---- Degauss: magnetised CRT — rainbow colour-purity patches (beams hit wrong phosphors).
+  //      Breaks COLOUR, not geometry: G (luma) stays put, R/B fringe in blotchy zones. ----
+  const dg = state.degauss;
+  if (dg.on){
+    const amt = P('degauss','amount');
+    if (amt>0){
+      const TAU=Math.PI*2;
+      const amp = Math.sin(phase*Math.PI);              // disturbance rises then settles — 0 at both ends
+      const str = amt*amp;
+      if (str>0.004){
+        const wob = phase*TAU*dg.freq;                  // shimmer / buzz
+        const maxShift = str*(10 + 18*(0.4+0.6*dg.color));   // per-blob channel misconvergence (px)
+        const a=TAU*2.5/w, b=TAU*1.9/h, cc=TAU*1.7/w, dd=TAU*2.7/h;
+        const cX=x=>x<0?0:x>=w?w-1:x, cY=y=>y<0?0:y>=h?h-1:y;
+        const src=ctx.getImageData(0,0,w,h), out=ctx.createImageData(w,h), sd=src.data, od=out.data;
+        for (let y=0;y<h;y++){
+          for (let x=0;x<w;x++){
+            const fx=Math.sin(x*a + y*b + wob), fy=Math.sin(x*cc - y*dd - wob*0.8);
+            const di=(y*w+x)*4;
+            const rX=cX((x+fx*maxShift)|0), rY=cY((y+fy*maxShift)|0);
+            const bX=cX((x-fx*maxShift)|0), bY=cY((y-fy*maxShift)|0);
+            od[di]   = sd[(rY*w+rX)*4];        // R pulled one way
+            od[di+1] = sd[di+1];               // G stays → picture doesn't sway
+            od[di+2] = sd[(bY*w+bX)*4+2];      // B pulled the other → rainbow fringing
+            od[di+3] = 255;
+          }
+        }
+        ctx.putImageData(out,0,0);
+        if (dg.color>0){                        // moving rainbow hue patches ("acid" purity error)
+          ctx.save(); ctx.globalCompositeOperation='overlay';
+          for (let k=0;k<3;k++){
+            const bx=w*(0.15+0.7*(0.5+0.5*Math.sin(wob*0.7+k*2.1)));
+            const by=h*(0.15+0.7*(0.5+0.5*Math.cos(wob*0.9+k*1.7)));
+            const rad=Math.max(w,h)*(0.3+0.1*k);
+            const hue=Math.round(phase*300 + k*120 + wob*24)%360;
+            const g=ctx.createRadialGradient(bx,by,0,bx,by,rad);
+            g.addColorStop(0,`hsla(${hue},100%,50%,${0.45*str*dg.color})`);
+            g.addColorStop(1,'hsla(0,0%,50%,0)');
+            ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
+          }
+          ctx.restore();
+        }
+      }
+    }
+  }
+
+  // ---- Ghosting: multipath echo — faint offset duplicate(s) of the picture ----
+  const gh = state.ghost;
+  if (gh.on){
+    const gA = P('ghost','amount');
+    if (gA>0){
+      sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h); sctx.drawImage(canvas,0,0);
+      const ech = gh.echoes|0;
+      ctx.save();
+      for (let i=1;i<=ech;i++){                       // trailing echoes to the right, decaying
+        ctx.globalAlpha = gA*0.7*(1-(i-1)/(ech+0.5));
+        ctx.drawImage(sc, gh.offset*i, 0);
+      }
+      if (gh.pre>0){ ctx.globalAlpha = gA*0.4*gh.pre; ctx.drawImage(sc, -gh.offset*0.7, 0); }   // pre-echo (left)
+      ctx.restore();
+    }
+  }
+
+  // ---- Dot crawl: composite cross-colour — rainbow shimmer along vertical edges ----
+  const dc = state.dotcrawl;
+  if (dc.on){
+    const dA = P('dotcrawl','amount');
+    if (dA>0){
+      const im = ctx.getImageData(0,0,w,h), d = im.data;
+      const cell = dc.size|0 || 2;
+      const crawl = Math.round(phase*dc.speed*2);     // integer steps → seamless checker shift
+      for (let y=0;y<h;y++){
+        const yc = Math.floor(y/cell);
+        for (let x=1;x<w-1;x++){
+          const i=(y*w+x)*4;
+          const lL = d[i-4]*.3+d[i-3]*.59+d[i-2]*.11;
+          const lR = d[i+4]*.3+d[i+5]*.59+d[i+6]*.11;
+          const g = lR-lL;                             // signed horizontal luma gradient
+          const ag = g<0?-g:g;
+          if (ag>18){
+            const cb = ((Math.floor(x/cell)+yc+crawl)&1)?1:-1;
+            const s = Math.min(1,(ag-18)/110)*dA*cb*(g<0?-1:1);
+            const hueRow = (yc+crawl)%3;                // cycle opponent colour per row → rainbow
+            if (hueRow===0){ d[i]+=s*95; d[i+2]-=s*95; }
+            else if (hueRow===1){ d[i+1]+=s*95; d[i]-=s*70; d[i+2]-=s*70; }
+            else { d[i+2]+=s*95; d[i]-=s*95; }
+          }
+        }
+      }
+      ctx.putImageData(im,0,0);
+    }
+  }
+
+  // ---- Hum bar: soft dark band(s) rolling up the screen (mains hum) ----
+  const hm = state.hum;
+  if (hm.on){
+    const hA = P('hum','amount');
+    if (hA>0){
+      const bandH = Math.max(8, h*(0.12+0.3*hm.width));
+      const nRoll = Math.max(1, Math.round(hm.speed));
+      const yc = (1-((phase*nRoll)%1))*h;              // rolls upward, integer wraps → seamless
+      const dark = 0.6*hA;
+      ctx.save();
+      const band = cy=>{
+        const g=ctx.createLinearGradient(0,cy-bandH/2,0,cy+bandH/2);
+        g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(.5,`rgba(0,0,0,${dark})`); g.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.fillStyle=g; ctx.fillRect(0,cy-bandH/2,w,bandH);
+      };
+      band(yc); band(yc-h); band(yc+h);                // wrap copies
+      ctx.restore();
+    }
+  }
+
+  // ---- Herringbone: RF interference — moving diagonal weave ----
+  const hb = state.herring;
+  if (hb.on){
+    const hbA = P('herring','amount');
+    if (hbA>0){
+      const T = Math.max(6, Math.round(28 - hb.freq*2));
+      htile.width=T; htile.height=T; htx.clearRect(0,0,T,T);
+      const nsp = Math.max(1, Math.round(hb.speed));
+      const shp = ((phase*nsp)%1)*T;                   // diagonal drift, integer wraps → seamless
+      htx.strokeStyle='#fff'; htx.lineWidth=T*0.32;
+      for (let o=-T;o<=2*T;o+=T){                       // parallel diagonals (tile-wrapped)
+        htx.beginPath(); htx.moveTo(o+shp, -1); htx.lineTo(o+shp-T, T+1); htx.stroke();
+      }
+      const pat = ctx.createPattern(htile,'repeat');
+      ctx.save(); ctx.globalCompositeOperation='overlay'; ctx.globalAlpha=hbA*0.5;
+      ctx.fillStyle=pat; ctx.fillRect(0,0,w,h); ctx.restore();
+    }
+  }
+
+  // ---- Signal / Sync: horizontal-sync instability — per-scanline skew/drift/snap + flagging + bad contact ----
+  const sg = state.sync;
+  if (sg.on){
+    const TAU=Math.PI*2, slip=sg.hsync, flagV=P('sync','flag'), ctc=P('sync','contact');
+    if (slip!==0 || flagV>0){                        // per-scanline horizontal remap (wraps)
+      const snaps=2, u=(phase*snaps)%1;
+      const walk=slip*w*0.14*u, skew=slip*w*0.12*u, wob=slip*3, wobP=phase*TAU*6;
+      const flagAmt=flagV*w*0.20, flagWave=1+0.3*Math.sin(phase*TAU*3);
+      const wrapX=xx=>{ let m=xx%w; if(m<0)m+=w; return m|0; };
+      const src=ctx.getImageData(0,0,w,h), out=ctx.createImageData(w,h), sd=src.data, od=out.data;
+      for (let y=0;y<h;y++){
+        const yy=y/h; let rShift=0;
+        if (slip!==0) rShift += walk + skew*(yy-0.5)*2 + wob*Math.sin(y*0.25+wobP);
+        if (flagV>0)  rShift += flagAmt*Math.exp(-yy/0.05)*flagWave;   // flagging: strong at top
+        const row=y*w;
+        for (let x=0;x<w;x++){ const di=(row+x)*4, gx=wrapX(x+rShift);
+          od[di]=sd[(row+gx)*4]; od[di+1]=sd[(row+gx)*4+1]; od[di+2]=sd[(row+gx)*4+2]; od[di+3]=255; }
+      }
+      ctx.putImageData(out,0,0);
+    }
+    if (flagV>0){                                    // head-switching noise strip at the bottom
+      const bandH=Math.max(3,Math.round(h*(0.03+0.02*flagV))), by=h-bandH;
+      const sh=Math.round((rand(fseed*0.9+3.1)-0.35)*w*0.3*flagV);
+      if (sh){ const band=ctx.getImageData(0,by,w,bandH); ctx.clearRect(0,by,w,bandH);
+        ctx.putImageData(band,sh,by); ctx.putImageData(band,sh>0?sh-w:sh+w,by); }
+      ctx.save(); ctx.globalAlpha=0.65*flagV;
+      for (let yy=0;yy<bandH;yy++){ if (rand(yy*2.3+fseed)>.35){ ctx.fillStyle=rand(yy+fseed*1.7)>.5?'#e8e8e8':'#111'; ctx.fillRect(0,by+yy,w,1);} }
+      ctx.restore();
+    }
+    if (ctc>0){                                      // bad contact: intermittent tears + static bursts
+      const nb=2+Math.round(ctc*4);
+      for (let b=0;b<nb;b++){
+        const center=rand(b*4.7+1.3); let dph=Math.abs(phase-center); dph=Math.min(dph,1-dph);
+        const win=0.015+ctc*0.035; if (dph>=win) continue;
+        const amt=1-dph/win, bandH=Math.max(4,Math.round(h*0.04*(0.5+ctc))), by=Math.floor(rand(b*2.3)*(h-bandH));
+        const shift=Math.round((rand(b*5.1+fseed)-0.5)*w*0.35*amt);
+        if (shift){ const band=ctx.getImageData(0,by,w,bandH); ctx.clearRect(0,by,w,bandH);
+          ctx.putImageData(band,shift,by); ctx.putImageData(band,shift>0?shift-w:shift+w,by); }
+        ctx.save(); ctx.globalAlpha=0.55*amt;
+        for (let yy=0;yy<bandH;yy++){ if (rand(yy*1.7+fseed+b)>.5){ ctx.fillStyle=rand(yy+fseed*1.3)>.5?'#fff':'#111'; ctx.fillRect(0,by+yy,w,1);} }
+        ctx.restore();
+        ctx.save(); ctx.globalCompositeOperation='overlay'; ctx.globalAlpha=0.22*amt;
+        ctx.fillStyle=rand(b+fseed)>.5?'#fff':'#000'; ctx.fillRect(0,0,w,h); ctx.restore();
+      }
+    }
+  }
+
+  // ---- CRT tube: barrel geometry + RGB phosphor mask + scanlines + convergence + glow ----
   const cr = state.crt;
-  if (cr.on && cr.amount>0){
-    const k=cr.amount*1.8, corner=cr.corner;
-    const src=ctx.getImageData(0,0,w,h), out=ctx.createImageData(w,h), sd=src.data, od=out.data;
+  const crPh = (cr.mask|0)>0 ? P('crt','phosphor') : 0;
+  const crConv = P('crt','converge');
+  const crActive = cr.on && (cr.amount>0 || crPh>0 || cr.scan>0 || crConv>0);
+  if (crActive){
+    const k = cr.amount*1.8, corner = cr.corner;
+    const maskType = cr.mask|0;
+    const sp = Math.max(1, Math.round(w/560));   // sub-pixel stripe width
+    const period = 3*sp;                          // R-G-B phosphor triad period (px)
+    const gLo = 1 - crPh;                         // darkness between phosphor stripes
+    const gain = 1 + crPh*0.5;                    // brightness compensation for the mask
+    const slotBrk = Math.max(1, Math.round(sp*0.6));
+    const scanLo = 1 - cr.scan;
+    const cvx = crConv * w * 0.03;                // max convergence offset (px), grows to edges
+    const wrapX = xx => { let m=xx%w; if(m<0)m+=w; return m|0; };
+    const src = ctx.getImageData(0,0,w,h), out = ctx.createImageData(w,h), sd = src.data, od = out.data;
     for (let y=0;y<h;y++){
-      const cy=y/h-0.5;
+      const cy = y/h - 0.5;
+      const sw = cr.scan>0 ? ((y % 2) ? scanLo : 1) : 1;   // scanline gap every other row
       for (let x=0;x<w;x++){
-        const cx=x/w-0.5, r2=cx*cx+cy*cy, f=1-k*r2;
-        const sx=(cx*f+0.5)*w, sy=(cy*f+0.5)*h, di=(y*w+x)*4;
-        if (sx<0||sx>=w||sy<0||sy>=h){ od[di]=od[di+1]=od[di+2]=0; od[di+3]=255; continue; }
-        const si=((sy|0)*w+(sx|0))*4;
-        let d=1-corner*r2*2.2; if(d<0)d=0;
-        od[di]=sd[si]*d; od[di+1]=sd[si+1]*d; od[di+2]=sd[si+2]*d; od[di+3]=255;
+        const cx = x/w - 0.5, r2 = cx*cx + cy*cy;
+        const f = k ? 1 - k*r2 : 1;
+        const sxf = (cx*f + 0.5)*w;
+        const syf = (cy*f + 0.5)*h;
+        const di = (y*w + x)*4;
+        if (syf<0 || syf>=h){ od[di]=od[di+1]=od[di+2]=0; od[di+3]=255; continue; }
+        const sy = syf|0;
+        const co = cvx * cx * 2;                            // signed convergence (0 centre, ±cvx edge)
+        const gx = wrapX(sxf);
+        const rx = crConv>0 ? wrapX(sxf+co) : gx;
+        const bx = crConv>0 ? wrapX(sxf-co) : gx;
+        let R = sd[(sy*w+rx)*4], G = sd[(sy*w+gx)*4+1], B = sd[(sy*w+bx)*4+2];
+        if (crPh>0){                                        // RGB phosphor mask
+          const colIdx = (maskType===2)                    // shadow mask: stagger rows into a triad grid
+            ? Math.floor((((x + sp*Math.floor(y/sp)) % period)+period)%period / sp)
+            : Math.floor((x % period) / sp);
+          const wR = colIdx===0?1:gLo, wG = colIdx===1?1:gLo, wB = colIdx===2?1:gLo;
+          let br = 1;
+          if (maskType===3 && (y % period) < slotBrk) br = gLo;   // slot mask: horizontal breaks
+          R *= wR*br*gain; G *= wG*br*gain; B *= wB*br*gain;
+        }
+        let d = 1 - corner*r2*2.2; if (d<0) d=0;
+        const m = sw*d;
+        od[di]   = R*m>255?255:R*m;
+        od[di+1] = G*m>255?255:G*m;
+        od[di+2] = B*m>255?255:B*m;
+        od[di+3] = 255;
       }
     }
     ctx.putImageData(out,0,0);
+  }
+
+  // ---- CRT phosphor glow (blurred highlights, screen-blended) ----
+  if (cr.on){
+    const gA = P('crt','glow');
+    if (gA>0){
+      sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h);
+      sctx.filter = `blur(${Math.max(2,w*0.006)}px) brightness(1.3)`;
+      sctx.drawImage(canvas,0,0); sctx.filter='none';
+      ctx.save(); ctx.globalCompositeOperation='screen'; ctx.globalAlpha=gA*0.6;
+      ctx.drawImage(sc,0,0); ctx.restore();
+    }
   }
 
   // ---- HUD / text overlay (drawn last so it stays crisp) ----
@@ -1270,6 +1703,10 @@ function drawHUD(w,h,phase){
   const time=`${p2(now.getHours())}:${p2(now.getMinutes())}:${p2(now.getSeconds())}`;
   const recOn = Math.floor(phase*6)%2===0;                 // ~3 blinks per loop
   const col=['#ffffff','#ffb000','#33ff66','#ff3b30','#33e0ff','#000000'][hd.color]||'#fff';
+  // VCR tape counter (advances with real time) — H:MM:SS
+  const cs=Math.floor(now.getTime()/1000)%36000;
+  const ctr=`${Math.floor(cs/3600)}:${p2(Math.floor(cs/60)%60)}:${p2(cs%60)}`;
+  const setFont=s=>ctx.font=`${s}px ui-monospace, Menlo, monospace`;
   ctx.save();
   ctx.globalAlpha=hd.opacity;
   ctx.font=`${base}px ui-monospace, Menlo, monospace`;
@@ -1294,6 +1731,46 @@ function drawHUD(w,h,phase){
       rec(w-pad-base*3.2, pad);
       ctx.textAlign='right'; ctx.fillText(`${date} ${time}`, w-pad, h-pad-base);
       break;
+    case 5:{                                                 // TV Channel (OSD on channel change)
+      const big=Math.round(base*1.7);
+      setFont(big); ctx.fillText('CH 3', pad, pad);
+      setFont(base);
+      ctx.fillText('VIDEO 1', pad, pad+big+base*0.25);
+      ctx.textAlign='right';
+      ctx.fillText('STEREO', w-pad, pad);
+      ctx.fillText(time, w-pad, h-pad-base);
+      break;
+    }
+    case 6:                                                  // VCR Play
+      ctx.fillText('▶ PLAY', pad, pad);
+      ctx.fillText('SP', pad, pad+base*1.3);
+      ctx.textAlign='right';
+      ctx.fillText(ctr, w-pad, pad);
+      ctx.fillText('STEREO', w-pad, pad+base*1.3);
+      break;
+    case 7:                                                  // ON AIR / broadcast bug
+      if(recOn){ ctx.fillStyle='#ff3b30'; ctx.beginPath(); ctx.arc(pad+base*0.35,pad+base*0.55,base*0.32,0,7); ctx.fill(); }
+      ctx.fillStyle=col; ctx.fillText('ON AIR', pad+base, pad);
+      ctx.textAlign='right';
+      ctx.fillText(time, w-pad, pad);
+      ctx.fillText('CH 4', w-pad, h-pad-base);
+      break;
+    case 8:                                                  // 音声多重 / Stereo (analog JP TV)
+      ctx.fillText('4ch', pad, pad);
+      ctx.textAlign='right';
+      ctx.fillText('ステレオ', w-pad, pad);
+      ctx.fillText('音声多重', w-pad, pad+base*1.3);
+      ctx.textAlign='left'; ctx.fillText(time, pad, h-pad-base);
+      break;
+    case 9:{                                                 // No Signal / stand by
+      ctx.textAlign='center';
+      const big=Math.round(base*1.5);
+      setFont(big); ctx.fillText('NO SIGNAL', w/2, h/2-big);
+      setFont(base);
+      ctx.fillText('PLEASE STAND BY', w/2, h/2+base*0.4);
+      ctx.fillText('しばらくお待ちください', w/2, h/2+base*1.7);
+      break;
+    }
   }
   ctx.restore();
 }
@@ -1455,6 +1932,8 @@ function setStatus(s){ statusEl.innerHTML = s; }
 // per-effect on-probability for Random — keep the heavy/destructive ones rare
 const RAND_PROB = { png:.12, jpeg:.15, warp:.18, halftone:.12, feedback:.12, melt:.12,
                     mosh:.25, crt:.2, pixelate:.3, hud:.3, motion:.4,
+                    ghost:.14, dotcrawl:.1, hum:.12, herring:.08, sync:.14, zoom:0,
+                    compress:.14, pixsort:.14, databend:.12, degauss:.06,
                     // colour-mapping / stylise effects: keep them occasional, emboss rarest
                     duotone:.14, solarize:.14, posterize:.14, emboss:.04 };
 // three strength levels: prob = on-probability scale, str = how far params stray from their default
@@ -1486,6 +1965,12 @@ function randomizeFX(){
   if (!FX.some(f=> f.id!=='motion' && state[f.id].on)){
     const pick = ['vhs','glitch','noise','color'][Math.floor(Math.random()*4)];
     state[pick].on = true;
+  }
+  // Zoom is never picked on its own — auto-enable it (sized to the wobble) only when VHS shakes
+  state.zoom.on = false;
+  if (state.vhs.on && state.vhs.wobble>0){
+    state.zoom.on = true;
+    state.zoom.amount = Math.min(1, 0.15 + state.vhs.wobble/20 * 0.7);
   }
   syncUI();
   if (presetSel) presetSel.value = '';
