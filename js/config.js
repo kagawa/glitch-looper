@@ -74,6 +74,12 @@ const FX = [
     { k:'scramble', label:'Scramble', min:0, max:1, step:.01, def:.4 },
     { k:'speed',    label:'Speed', min:0, max:8, step:1, def:2 },
   ]},
+  { id:'bmpmisread', name:'BMP Row Misread', hint:'wrong row width · padding · bottom-up reinterpretation', on:false, open:false, params:[
+    { k:'amount',  label:'Amount', min:0, max:1, step:.01, def:.75, env:1 },
+    { k:'width',   label:'Width Error', min:-32, max:32, step:1, def:7 },
+    { k:'padding', label:'Row Padding', min:0, max:24, step:1, def:4 },
+    { k:'flip',    label:'Row Order', type:'select', def:0, options:[[0,'Top-down'],[1,'BMP bottom-up']] },
+  ]},
   { id:'gif', name:'Indexed / GIF', hint:'256-colour palette · dither · scramble / colour-cycle / streaks', on:false, open:false, params:[
     { k:'colors', label:'Colours', min:2, max:64, step:1, def:16 },
     { k:'dither', label:'Dither', min:0, max:1, step:.01, def:.4 },
@@ -215,6 +221,7 @@ const FX = [
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.3, env:1 },
   ]},
   { id:'mask', name:'Region Mask', hint:'confine effects to a rectangle — fixed / roaming / invertable', on:false, open:false, params:[
+    { k:'source',   label:'Mask Source', type:'select', def:0, options:[[0,'Rectangle'],[1,'Shadows'],[2,'Midtones'],[3,'Highlights'],[4,'Edges'],[5,'Noise']] },
     { k:'mode',     label:'Mode', type:'select', def:0, options:[[0,'Fixed'],[1,'Roam']] },
     { k:'x0',       label:'X start %', min:0, max:100, step:1, def:20 },
     { k:'x1',       label:'X end %',   min:0, max:100, step:1, def:80 },
@@ -235,7 +242,7 @@ const FX = [
 // effect cards are shown grouped by sub-genre (order here = display order)
 const FX_GROUPS = [
   ['Binary Glitch',   ['jpeg','png','webp','gifg','sonify','byteshift','bitplane']],
-  ['Pixel Glitch',    ['glitch','mosh','compress','pixsort','databend','gif']],
+  ['Pixel Glitch',    ['glitch','mosh','compress','pixsort','databend','bmpmisread','gif']],
   ['Analog / Tape',   ['vhs','sync','roll','film','noise','ghost','dotcrawl','hum','herring']],
   ['Screen / Optics', ['crt','degauss','halftone','hud','bloom']],
   ['Distort',         ['warp','melt','feedback','pixelate']],

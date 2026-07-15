@@ -94,6 +94,26 @@ if (db.on){
 }
 }
 
+function applyBmpRowMisread(w,h){
+  const effect=state.bmpmisread;
+  if(!effect.on) return;
+  const amount=P('bmpmisread','amount');
+  if(amount<=0) return;
+  const src=ctx.getImageData(0,0,w,h), out=ctx.createImageData(w,h), source=src.data, target=out.data;
+  const rowBytes=w*4, error=(effect.width|0)*4+(effect.padding|0), length=source.length;
+  for(let y=0;y<h;y++){
+    const sourceY=(effect.flip|0)===1?h-1-y:y;
+    const rowStart=sourceY*rowBytes+y*error;
+    for(let x=0;x<w;x++){
+      const outputIndex=(y*w+x)*4;
+      let sourceIndex=(rowStart+x*4)%length; if(sourceIndex<0) sourceIndex+=length;
+      for(let channel=0;channel<3;channel++) target[outputIndex+channel]=source[outputIndex+channel]+(source[(sourceIndex+channel)%length]-source[outputIndex+channel])*amount;
+      target[outputIndex+3]=255;
+    }
+  }
+  ctx.putImageData(out,0,0);
+}
+
 function applyIndexedGif(w,h,phase){
 // ---- Indexed / GIF: quantise to a cached global palette + dither, then palette-glitch ----
 const gf = state.gif;

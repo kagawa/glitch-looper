@@ -94,6 +94,7 @@ const GROUPS = [
     ['Compression','sim','A heavy low-quality-JPEG look built in-canvas: 8×8 block flatten toward the mean, luma quantisation (banding), and chroma subsampling.','キャンバス内で作る重い低画質JPEG風。8×8ブロックを平均へ平坦化＋輝度量子化（バンディング）＋色間引き。','Amount · Chroma Bleed · Block'],
     ['Pixel Sort','sim','Sorts contiguous bright spans by luminance along rows and/or columns — the classic “pixels pour” glitch-art look.','明るい連続スパンを輝度順に行/列でソート。「ピクセルが流れる」グリッチアートの定番。','Amount · Threshold · Direction · Max Length'],
     ['Databend Shift','sim','Per-row horizontal wrap (a stride/byte-stride error → diagonal shear) plus occasional packet-break jumps with RGB desync (rainbow).','行ごとの横ラップ（ストライド誤差＝斜めシア）＋確率的なパケット破断でRGB分離（レインボー）。','Amount · Skew · Scramble · Speed'],
+    ['BMP Row Misread','sim','Reinterprets rows with the wrong width, padding and row order, producing diagonal RAW/BMP-like drift.','誤った行幅・パディング・行順で再解釈し、斜めに流れるRAW/BMP風の崩れを作る。','Amount · Width Error · Row Padding · Row Order'],
     ['Indexed / GIF','sim','Quantises to a cached global palette (median-cut) with ordered dither, then a palette glitch: scramble, colour-cycle, or per-band index streaks.','グローバルパレット（median-cut）に量子化＋規則ディザ後、パレット破壊/カラーサイクル/帯ごとのインデックスずれ。','Colours · Dither · Palette FX · FX Amount'],
   ]],
   ['Analog / Tape', [
@@ -129,7 +130,7 @@ const GROUPS = [
   ]],
   ['Global', [
     ['Zoom','sim','A centre zoom-in applied LAST, after every other effect (so slices etc. render at normal scale first). Also crops the minimal overscan that hides wobble wrap-seams.','最終段（全エフェクト後）で中央ズーム。Sliceなどは等倍で処理された後に拡大される。wobbleの継ぎ目を隠す最小オーバースキャンも兼ねる。','Amount'],
-    ['Region Mask','sim','Confines every effect to a rectangle; outside it the untouched original shows through. Fixed or roaming region, invertable, with a feathered edge. Excluded from Random (set a region, then reroll within it).','全エフェクトを矩形に限定し、外側は素の原画を表示。固定/移動、反転、縁ぼかし対応。ランダム対象外（範囲を決めてからリロール）。','Mode · X/Y start-end · Invert · Roam Steps · Feather'],
+    ['Region Mask','sim','Confines every effect using a rectangle, shadows, midtones, highlights, edges or seeded noise. Masks are invertable and feathered.','全エフェクトを矩形・暗部・中間調・明部・エッジ・Seed付きノイズへ限定。反転と縁ぼかしに対応。','Mask Source · Mode · X/Y · Invert · Steps · Feather'],
     ['Envelope','sim','Modulates the other effects over the loop (constant / peak / pulse / build-drop / stutter). Tick the ⓔ box on any supported parameter to make it breathe.','他のエフェクトをループ内で変調（一定/ピーク/パルス/ビルド→ドロップ/スタッター）。対応パラメータの ⓔ をオンにすると抑揚が付く。','Curve · Depth · Rate / Count'],
   ]],
 ];

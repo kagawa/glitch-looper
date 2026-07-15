@@ -71,21 +71,41 @@ function applyRegionMask(w,h,phase){
 //      (mclean = the untouched original = the "no-effect" plate.) ----
 const mk = state.mask;
 if (mk.on){
-  let x0,x1,y0,y1;
-  if ((mk.mode|0)===1){                                 // Roam: random rect, changes per loop step (seamless)
-    const steps=Math.max(1,mk.interval|0), st=Math.floor(phase*steps);
-    const sw=(0.2+rand(st*3.3+.1)*0.5)*w, sh=(0.2+rand(st*4.9+.6)*0.5)*h;
-    x0=rand(st*1.1+.3)*(w-sw); y0=rand(st*2.7+.7)*(h-sh); x1=x0+sw; y1=y0+sh;
-  } else {
-    x0=Math.min(mk.x0,mk.x1)/100*w; x1=Math.max(mk.x0,mk.x1)/100*w;
-    y0=Math.min(mk.y0,mk.y1)/100*h; y1=Math.max(mk.y0,mk.y1)/100*h;
-  }
   const feath=mk.feather*Math.min(w,h)*0.12, inv=(mk.invert|0)===1;
-  // build alpha shape: white where EFFECTS should show
   mshape.width=w; mshape.height=h; msx.clearRect(0,0,w,h);
-  if (!inv){ msx.save(); if(feath>0) msx.filter=`blur(${feath}px)`; msx.fillStyle='#fff'; msx.fillRect(x0,y0,x1-x0,y1-y0); msx.restore(); }
-  else { msx.fillStyle='#fff'; msx.fillRect(0,0,w,h);           // everything, then punch a soft hole
-         msx.save(); msx.globalCompositeOperation='destination-out'; if(feath>0) msx.filter=`blur(${feath}px)`; msx.fillStyle='#000'; msx.fillRect(x0,y0,x1-x0,y1-y0); msx.restore(); }
+  if ((mk.source|0)===0){
+    let x0,x1,y0,y1;
+    if ((mk.mode|0)===1){
+      const steps=Math.max(1,mk.interval|0), st=Math.floor(phase*steps);
+      const sw=(0.2+rand(st*3.3+.1)*0.5)*w, sh=(0.2+rand(st*4.9+.6)*0.5)*h;
+      x0=rand(st*1.1+.3)*(w-sw); y0=rand(st*2.7+.7)*(h-sh); x1=x0+sw; y1=y0+sh;
+    } else {
+      x0=Math.min(mk.x0,mk.x1)/100*w; x1=Math.max(mk.x0,mk.x1)/100*w;
+      y0=Math.min(mk.y0,mk.y1)/100*h; y1=Math.max(mk.y0,mk.y1)/100*h;
+    }
+    if (!inv){ msx.fillStyle='#fff'; msx.fillRect(x0,y0,x1-x0,y1-y0); }
+    else { msx.fillStyle='#fff'; msx.fillRect(0,0,w,h); msx.globalCompositeOperation='destination-out'; msx.fillRect(x0,y0,x1-x0,y1-y0); msx.globalCompositeOperation='source-over'; }
+  } else {
+    msx.drawImage(mclean,0,0);
+    const source=msx.getImageData(0,0,w,h), pixels=source.data, luma=new Float32Array(w*h);
+    for(let i=0,p=0;i<pixels.length;i+=4,p++) luma[p]=(pixels[i]*.299+pixels[i+1]*.587+pixels[i+2]*.114)/255;
+    const smooth=(a,b,x)=>{ const t=Math.max(0,Math.min(1,(x-a)/(b-a))); return t*t*(3-2*t); };
+    const kind=mk.source|0;
+    for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+      const p=y*w+x, lum=luma[p]; let alpha=0;
+      if(kind===1) alpha=1-smooth(.12,.62,lum);
+      else if(kind===2) alpha=Math.max(0,1-Math.abs(lum-.5)/.32);
+      else if(kind===3) alpha=smooth(.38,.88,lum);
+      else if(kind===4){ const right=luma[y*w+Math.min(w-1,x+1)], down=luma[Math.min(h-1,y+1)*w+x]; alpha=Math.min(1,(Math.abs(lum-right)+Math.abs(lum-down))*5); }
+      else alpha=rand((x>>3)+(y>>3)*997+Math.floor(phase*Math.max(1,mk.interval))*131)>.5?1:0;
+      pixels[p*4]=pixels[p*4+1]=pixels[p*4+2]=255; pixels[p*4+3]=Math.round(255*(inv?1-alpha:alpha));
+    }
+    msx.putImageData(source,0,0);
+  }
+  if(feath>0){
+    sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h); sctx.filter=`blur(${feath}px)`; sctx.drawImage(mshape,0,0); sctx.filter='none';
+    msx.clearRect(0,0,w,h); msx.drawImage(sc,0,0);
+  }
   // effected copy, limited to the mask via its alpha
   sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h); sctx.drawImage(canvas,0,0);
   sctx.globalCompositeOperation='destination-in'; sctx.drawImage(mshape,0,0); sctx.globalCompositeOperation='source-over';

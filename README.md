@@ -39,3 +39,5 @@ git diff --check
 ```
 
 OGP画像は `npm run og` で再生成できます。
+
+Random／Driftから守りたいエフェクトは、見出しの鍵を閉じます。Random設定内のSeed Lockは、シミュレーション系エフェクトの破壊配置を固定します。Region Maskは矩形に加えて、暗部・中間調・明部・エッジ・ノイズを適用範囲にできます。

@@ -100,6 +100,8 @@ function draw(phase){         // phase in [0,1)
 
   applyDatabendShift(w,h,phase);
 
+  applyBmpRowMisread(w,h);
+
   applyDegauss(w,h,phase);
 
   applyIndexedGif(w,h,phase);

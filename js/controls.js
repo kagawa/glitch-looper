@@ -91,7 +91,7 @@ const RAND_PROB = { png:.12, jpeg:.15, warp:.18, halftone:.12, feedback:.12, mel
                     mosh:.25, crt:.2, pixelate:.3, hud:.3, motion:.4,
                     ghost:.14, dotcrawl:.1, hum:.12, herring:.08, sync:.14, zoom:0,
                     compress:.14, pixsort:.14, databend:.12, degauss:.06, gif:.12,
-                    sonify:.12, byteshift:.12, bitplane:.1, webp:.1, gifg:.1,
+                    sonify:.12, byteshift:.12, bitplane:.1, bmpmisread:.14, webp:.1, gifg:.1,
                     // colour-mapping / stylise effects: keep them occasional, emboss rarest
                     duotone:.14, solarize:.14, posterize:.14, emboss:.04 };
 // three strength levels: prob = on-probability scale, str = how far params stray from their default
@@ -118,14 +118,16 @@ function randomizeFX(){
   const TONE = ['duotone','solarize','posterize','emboss'];
   const toneCap = randLevelVal==='wild' ? 2 : 1;
   let onTone = TONE.filter(id=>state[id].on);
-  while (onTone.length > toneCap){
-    const drop = onTone[Math.floor(Math.random()*onTone.length)];
+  let droppableTone = onTone.filter(id=>!state[id]._locked);
+  while (onTone.length > toneCap && droppableTone.length){
+    const drop = droppableTone[Math.floor(Math.random()*droppableTone.length)];
     state[drop].on = false; onTone = onTone.filter(id=>id!==drop);
+    droppableTone = droppableTone.filter(id=>id!==drop);
   }
   // Envelope/Zoom/Mask render nothing on their own — guarantee a real visible effect is on
   if (!FX.some(f=> !['motion','zoom','mask'].includes(f.id) && state[f.id].on)){
-    const pick = ['vhs','glitch','noise','color'][Math.floor(Math.random()*4)];
-    state[pick].on = true;
+    const candidates = ['vhs','glitch','noise','color'].filter(id=>!state[id]._locked);
+    if (candidates.length) state[candidates[Math.floor(Math.random()*candidates.length)]].on = true;
   }
   // (Zoom is left untouched above; the wobble's own zoom is handled by the base overscan that
   //  hides its wrap seam — no separate Zoom-effect coupling.)
