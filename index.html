@@ -564,7 +564,7 @@ const FX = [
     { k:'mode',   label:'Mode', type:'select', def:0, options:[[0,'Drip'],[1,'Wrap']] },
     { k:'spread', label:'Spread', min:0, max:1, step:.01, def:.5 },
     { k:'curve',  label:'Curve', type:'select', def:1,
-      options:[[0,'Constant'],[1,'Peak'],[2,'Pulse'],[3,'Build → Drop'],[4,'Stutter']] },
+      options:[[1,'Peak'],[2,'Pulse'],[3,'Build → Drop'],[4,'Stutter']] },
     { k:'rate',   label:'Rate', min:1, max:8, step:1, def:2 },
   ]},
   { id:'emboss', name:'Emboss', hint:'directional relief — carved / raised metal look', on:false, open:false, params:[
@@ -1140,26 +1140,22 @@ function schedulePng(){
 // envelope multiplier for destructive effects — makes the glitch "breathe" over the loop
 function motionMul(phase){
   const mo = state.motion; if (!mo.on) return 1;
-  let e;
-  switch(mo.mode){
-    case 0: e = 1; break;                                        // constant
-    case 1: e = Math.sin(Math.PI*phase); break;                 // peak (crash mid, ends=0 → seamless loop)
-    case 2: e = 0.5+0.5*Math.sin(2*Math.PI*phase*mo.rate); break; // pulse
-    case 3: e = phase; break;                                   // build → drop (sawtooth)
-    case 4: e = rand(Math.floor(phase*mo.rate*4)+0.5); break;   // stutter
-    default: e = 1;
-  }
+  const e = envCurve(phase, mo.mode, mo.rate);
   return (1-mo.depth) + mo.depth*e*2;   // trough → clean, peak → ~2x
 }
-// shared envelope curve (also used by Melt's own Curve) — returns 0..1-ish over the loop
+// shared envelope curve (used by the Envelope effect and Melt's own Curve) — returns 0..1 over the loop.
+// Eased with smootherstep / cubic (Penner-style) so the motion accelerates and settles naturally.
 function envCurve(phase, mode, rate){
+  const sm = t => t<=0?0 : t>=1?1 : t*t*t*(t*(t*6-15)+10);   // smootherstep (soft ends, fast middle)
+  const hump = p => p<0.5 ? sm(p*2) : sm((1-p)*2);           // eased 0→1→0 (seamless)
   switch(mode){
     case 0: return 1;                                        // constant
-    case 1: return Math.sin(Math.PI*phase);                 // peak (0→1→0, seamless)
-    case 2: return 0.5+0.5*Math.sin(2*Math.PI*phase*rate);  // pulse
-    case 3: return phase;                                   // build → drop
-    case 4: return rand(Math.floor(phase*rate*4)+0.5);      // stutter
-    default: return Math.sin(Math.PI*phase);
+    case 1: return hump(phase);                              // peak — eased rise & fall
+    case 2: return hump((phase*rate)%1);                     // pulse — eased repeating humps
+    case 3: { const b=0.82;                                  // build → drop — accelerating build, eased release
+      const t=phase/b; return phase<b ? t*t*t : 1-sm((phase-b)/(1-b)); }
+    case 4: return rand(Math.floor(phase*rate*4)+0.5);       // stutter — stepped random
+    default: return hump(phase);
   }
 }
 // per-parameter envelope: only params whose ⓔ checkbox is on get modulated
