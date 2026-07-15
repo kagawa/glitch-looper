@@ -1,0 +1,246 @@
+// ---- real JPEG databending ----
+// re-encode current image as JPEG, corrupt bytes in the entropy-coded region
+// (after the SOS marker, leaving headers/EOI intact), then decode the broken bytes.
+// Produces a pool of frames we cycle through so the glitch animates seamlessly.
+async function buildJpegFrames(){
+  if (!img) return;
+  const j = state.jpeg, w = canvas.width, h = canvas.height;
+  jsrc.width = w; jsrc.height = h;
+  jctx.clearRect(0,0,w,h);
+  jctx.drawImage(img, 0, 0, w, h);
+  const blob = await new Promise(r=> jsrc.toBlob(r, 'image/jpeg', j.quality));
+  const buf = new Uint8Array(await blob.arrayBuffer());
+
+  // find where entropy-coded scan data begins (skip all headers)
+  let start = 2;
+  for (let i=2;i<buf.length-3;i++){
+    if (buf[i]===0xFF && buf[i+1]===0xDA){ start = i + 2 + ((buf[i+2]<<8)|buf[i+3]); break; }
+  }
+  const end = buf.length - 2;                 // keep the EOI marker
+  const span = Math.max(1, end - start);
+  const nFrames = Math.max(1, Math.round(j.frames));
+  const out = [];
+  for (let f=0; f<nFrames; f++){
+    const copy = buf.slice();
+    const hits = 1 + Math.floor(j.amount * 40);
+    for (let k=0;k<hits;k++){
+      const pos = start + Math.floor(Math.random()*span);
+      if (copy[pos]===0xFF || copy[pos-1]===0xFF) continue;  // don't fake a marker
+      let v = Math.floor(Math.random()*255);
+      copy[pos] = v===0xFF ? 0xFE : v;
+    }
+    try { out.push(await createImageBitmap(new Blob([copy], {type:'image/jpeg'}))); }
+    catch(e){ /* some corruptions are undecodable — just drop that frame */ }
+  }
+  if (out.length){ jpegFrames = out; jpegReady = true; }
+  else { jpegReady = false; }
+  if (state.png.on) schedulePng();   // restack PNG glitch on the fresh JPEG result
+}
+function scheduleJpeg(){
+  jpegReady = false;
+  clearTimeout(jpegTimer);
+  jpegTimer = setTimeout(()=> buildJpegFrames().catch(()=>{}), 120);  // debounce
+}
+
+// ---- real WebP databending ----
+// re-encode as low-quality WebP and corrupt bytes in the VP8 payload (past the RIFF/VP8 headers).
+// VP8's arithmetic decoder is fragile, so corruptions are few & undecodable frames are dropped.
+async function buildWebpFrames(){
+  if (!img) return;
+  const myToken = ++webpToken;
+  const wp = state.webp, w = canvas.width, h = canvas.height;
+  wsrc.width = w; wsrc.height = h; wctx.clearRect(0,0,w,h); wctx.drawImage(img,0,0,w,h);
+  const blob = await new Promise(r=> wsrc.toBlob(r, 'image/webp', wp.quality/100));
+  if (!blob || !/webp/.test(blob.type)) { webpReady=false; return; }   // browser can't encode WebP
+  const buf = new Uint8Array(await blob.arrayBuffer());
+  const start = Math.min(buf.length-1, 40);          // skip RIFF + VP8 chunk headers
+  const span = Math.max(1, buf.length - 2 - start);
+  const nFrames = Math.max(1, Math.round(wp.frames));
+  const out = [];
+  for (let f=0; f<nFrames; f++){
+    const copy = buf.slice();
+    const hits = 1 + Math.floor(wp.amount * 12);      // keep it low — VP8 desyncs easily
+    for (let k=0;k<hits;k++){ const pos = start + Math.floor(Math.random()*span); copy[pos] = Math.floor(Math.random()*256); }
+    try { out.push(await createImageBitmap(new Blob([copy], {type:'image/webp'}))); } catch(e){}
+  }
+  if (myToken!==webpToken) return;
+  if (out.length){ webpFrames=out; webpReady=true; } else webpReady=false;
+}
+function scheduleWebp(){
+  webpReady=false; clearTimeout(webpTimer);
+  webpTimer=setTimeout(()=> buildWebpFrames().catch(()=>{}), 120);
+}
+
+// ---- real GIF databending ----
+// Encode the current image as a single-frame GIF (median-cut + LZW), tracking where the colour
+// table and LZW image data live so either part can be corrupted, then decode the broken GIF.
+function gifEncodeBase(srcImg, ncolors){
+  // work at a capped resolution so the many iterative passes stay fast (and it reads more lo-fi)
+  const cw=canvas.width, ch=canvas.height, sc=Math.min(1, 384/Math.max(cw,ch));
+  const w=Math.max(1,Math.round(cw*sc)), h=Math.max(1,Math.round(ch*sc));
+  ggsrc.width=w; ggsrc.height=h; ggctx.clearRect(0,0,w,h); ggctx.drawImage(srcImg,0,0,w,h);
+  const data=ggctx.getImageData(0,0,w,h).data;
+  const sample=[]; for (let i=0;i<data.length;i+=4*7) sample.push([data[i],data[i+1],data[i+2]]);
+  let pal=medianCut(sample, Math.max(2, ncolors|0));
+  let gctBits=1; while ((1<<gctBits) < pal.length) gctBits++;
+  const gctSize=1<<gctBits; while (pal.length<gctSize) pal.push([0,0,0]);
+  const map=makeMapper(pal), idx=new Uint8Array(w*h);
+  for (let i=0,pi=0;i<data.length;i+=4,pi++) idx[pi]=map(data[i],data[i+1],data[i+2]);
+  const minCode=Math.max(2, gctBits);
+  const bytes=[]; const put=(...a)=>{ for(const x of a) bytes.push(x&0xFF); }; const puts=s=>{ for(const ch of s) bytes.push(ch.charCodeAt(0)); };
+  puts('GIF89a');
+  put(w&255,(w>>8)&255, h&255,(h>>8)&255, 0x80|((gctBits-1)<<4)|(gctBits-1), 0, 0);
+  const ctStart=bytes.length; for (const p of pal) put(p[0],p[1],p[2]); const ctLen=bytes.length-ctStart;
+  put(0x2C, 0,0,0,0, w&255,(w>>8)&255, h&255,(h>>8)&255, 0x00);
+  put(minCode);
+  const lzwStart=bytes.length; for (const b of packSubBlocks(gifLZW(idx, minCode))) bytes.push(b);
+  put(0x3B);
+  const base=new Uint8Array(bytes);
+  const lzwPos=[]; let p=lzwStart;
+  while (p<base.length-1){ const len=base[p]; if(len===0) break; for(let q=p+1;q<=p+len && q<base.length;q++) lzwPos.push(q); p+=len+1; }
+  return { base, ctStart, ctLen, lzwPos };
+}
+const gifDecode = copy => createImageBitmap(new Blob([copy], {type:'image/gif'})).catch(()=>null);
+
+// GIF Databend: corrupt the real GIF file bytes — the colour table (garish colours) and the LZW
+// image data (tears the picture). A single pass can only break as much as the browser still decodes,
+// so higher Data ITERATES: re-encode the decoded (already-glitched) result and corrupt again. Each
+// pass stays within the decode limit but the damage accumulates past the single-pass ceiling.
+async function buildGifgFrames(){
+  if (!img) return;
+  const myToken=++gifgToken; const gg=state.gifg;
+  // Decoders behave OPPOSITELY: tolerant ones (Chrome/FF) heal most corruption, strict ones (iOS Safari)
+  // wipe everything below the first corrupted code. So keep it gentle and bias hits LATE (the corruption
+  // point stays low in the frame → the top of the picture survives on strict decoders too).
+  const passes = 1 + Math.round(gg.data*3);                    // 1–4 gentle iterative passes
+  const nFrames=Math.max(1, Math.round(gg.frames)), out=[];
+  const corrupt = (enc)=>{
+    const { base, ctStart, ctLen, lzwPos } = enc;
+    const lateStart=Math.floor(lzwPos.length*(0.85 - gg.data*0.4));  // Data 0 → last 15%, Data 1 → last 55%
+    const palHits=Math.round(gg.palette*ctLen*0.12);           // light per pass → accumulates over passes
+    let lz=Math.max(1, Math.round(1 + gg.data*8));             // few hits per pass (stays decodable)
+    return async ()=>{                                          // per-pass back-off (falls to palette-only)
+      for (let t=0;t<4;t++){
+        const copy=base.slice();
+        for (let k=0;k<palHits;k++) copy[ctStart+Math.floor(Math.random()*ctLen)]=Math.floor(Math.random()*256);
+        if (lz>0 && lzwPos.length>lateStart) for (let k=0;k<lz;k++){ const pos=lzwPos[lateStart+Math.floor(Math.random()*(lzwPos.length-lateStart))]; copy[pos]=Math.floor(Math.random()*256); }
+        const bmp=await gifDecode(copy); if (bmp) return bmp;
+        lz=Math.floor(lz/2);                                    // t=... eventually lz=0 → palette-only, always decodes
+      }
+      return null;
+    };
+  };
+  const makeFrame = async ()=>{
+    let cur=img, result=null;
+    for (let p=0; p<passes; p++){
+      const bmp=await corrupt(gifEncodeBase(cur,64))();          // re-encode previous result, corrupt, decode
+      if (bmp){ result=bmp; cur=bmp; }                           // success → accumulate; fail → skip, keep going
+    }
+    return result || await gifDecode(gifEncodeBase(img,64).base.slice());   // fallback: clean re-encode
+  };
+  for (let f=0; f<nFrames; f++){ const b=await makeFrame(); if(b) out.push(b); }
+  if (myToken!==gifgToken) return;
+  if (out.length){ gifgFrames=out; gifgReady=true; } else gifgReady=false;
+}
+function scheduleGifg(){ gifgReady=false; clearTimeout(gifgTimer); gifgTimer=setTimeout(()=> buildGifgFrames().catch(()=>{}), 120); }
+
+// ---- real PNG glitch (inspired by ucnv/pnglitch) ----
+// PNG is structurally valid (re-deflated, correct CRCs); the glitch lives in the
+// filtered scanline data. Corrupting each row's filter-type byte makes the decoder
+// un-filter with the wrong predictor -> Sub=horizontal, Up=vertical, Avg/Paeth=diagonal
+// colour bleed. Flipping pixel bytes adds pure random noise.
+const CRC_TABLE = (()=>{ const t=new Uint32Array(256);
+  for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c = c&1 ? 0xEDB88320^(c>>>1) : c>>>1; t[n]=c>>>0; }
+  return t; })();
+function crc32(bytes){ let c=0xFFFFFFFF;
+  for(let i=0;i<bytes.length;i++) c = CRC_TABLE[(c^bytes[i])&255] ^ (c>>>8);
+  return (c^0xFFFFFFFF)>>>0; }
+function u32(n){ return new Uint8Array([(n>>>24)&255,(n>>>16)&255,(n>>>8)&255,n&255]); }
+function concat(arrays){ let len=0; for(const a of arrays) len+=a.length;
+  const out=new Uint8Array(len); let o=0; for(const a of arrays){ out.set(a,o); o+=a.length; } return out; }
+function pngChunk(type, data){
+  const tb=new Uint8Array([type.charCodeAt(0),type.charCodeAt(1),type.charCodeAt(2),type.charCodeAt(3)]);
+  const body=concat([tb, data]);
+  return concat([u32(data.length), body, u32(crc32(body))]);
+}
+async function deflate(bytes){
+  const cs=new CompressionStream('deflate');           // zlib wrapper = PNG IDAT format
+  const wr=cs.writable.getWriter(); wr.write(bytes); wr.close();
+  return new Uint8Array(await new Response(cs.readable).arrayBuffer());
+}
+function paeth(a,b,c){ const p=a+b-c, pa=Math.abs(p-a), pb=Math.abs(p-b), pc=Math.abs(p-c);
+  return (pa<=pb && pa<=pc) ? a : (pb<=pc) ? b : c; }
+async function buildPngFrames(){
+  if (!img) return;
+  const myToken = ++pngToken;                            // supersede any older in-flight build
+  const p=state.png, w=canvas.width, h=canvas.height, stride=w*4, bpp=4;
+  // if JPEG databend is also on, glitch its output -> both effects stack (orig→JPEG→PNG)
+  const srcImg = (state.jpeg.on && jpegReady && jpegFrames.length) ? jpegFrames[0] : img;
+  psrc.width=w; psrc.height=h; pctx.clearRect(0,0,w,h); pctx.drawImage(srcImg,0,0,w,h);
+  const px=pctx.getImageData(0,0,w,h).data;
+
+  const sig=new Uint8Array([137,80,78,71,13,10,26,10]);
+  const ihdr=concat([u32(w),u32(h),new Uint8Array([8,6,0,0,0])]);   // 8-bit, RGBA
+  const rawLen=h*(1+stride);
+  const nFrames=Math.max(1,Math.round(p.frames));
+  const out=[];
+  for(let f=0;f<nFrames;f++){
+    const g=new Uint8Array(rawLen);
+    // encode scanlines with a filter chosen per horizontal band (run of rows).
+    // Sub=horizontal / Up=vertical / Average・Paeth=diagonal — corruption bleeds in mixed directions.
+    const dir=p.dir|0;   // 0=mix 1=horizontal(Sub) 2=vertical(Up) 3=diagonal(Paeth/Avg)
+    let y=0;
+    while(y<h){
+      const ft = dir===1 ? (Math.random()<0.85?1:0)
+               : dir===2 ? (Math.random()<0.85?2:0)
+               : dir===3 ? (Math.random()<0.5?4:3)
+               :           Math.floor(Math.random()*5);
+      const run=4+Math.floor(Math.random()*Math.max(1,h*0.25));
+      for(let r=0;r<run && y<h; r++,y++){
+        const o=y*(1+stride), rb=y*stride, ab=(y-1)*stride;
+        g[o]=ft;
+        for(let i=0;i<stride;i++){
+          const cur=px[rb+i];
+          const a=i>=bpp?px[rb+i-bpp]:0;                          // left
+          const b=y>0?px[ab+i]:0;                                 // up
+          const c=(y>0&&i>=bpp)?px[ab+i-bpp]:0;                   // upper-left
+          let v;
+          switch(ft){ case 0:v=cur;break; case 1:v=cur-a;break; case 2:v=cur-b;break;
+                      case 3:v=cur-((a+b)>>1);break; default:v=cur-paeth(a,b,c); }
+          g[o+1+i]=v&255;
+        }
+      }
+    }
+    // corrupt filtered pixel data -> propagates along each band's filter direction.
+    // amount/noise use a squared response + gentle coefficients: because each hit BLEEDS along
+    // its filter direction, a few hits already streak a lot — so keep the low/mid range subtle.
+    // per-direction gain: Sub(H)/Up(V) bleed only along a 1-D line, while Paeth/Average(diagonal)
+    // and Mix cascade in 2-D — so boost the 1-D filters to keep impact comparable across dir.
+    const dm = (dir===1||dir===2) ? 4 : 1;
+    const amt=p.amount*p.amount, noi=p.noise*p.noise;
+    const dhits=Math.floor(amt*rawLen*0.0004*dm);
+    for(let k=0;k<dhits;k++){
+      const ry=Math.floor(Math.random()*h), ri=Math.floor(Math.random()*stride);
+      g[ry*(1+stride)+1+ri]=Math.floor(Math.random()*256);
+    }
+    // extra chaos: scramble filter bytes + heavier random noise
+    const fhits=Math.floor(noi*h*0.08);
+    for(let k=0;k<fhits;k++) g[Math.floor(Math.random()*h)*(1+stride)]=Math.floor(Math.random()*5);
+    const nhits=Math.floor(noi*rawLen*0.001*dm);
+    for(let k=0;k<nhits;k++) g[Math.floor(Math.random()*rawLen)]=Math.floor(Math.random()*256);
+    // keep every scanline's filter byte a VALID type (0-4) — an out-of-range value makes the
+    // whole PNG un-decodable (createImageBitmap rejects it), which is why glitching sometimes
+    // produced no frames at all. The corruption still shows via changed (but valid) filter types.
+    for(let yy=0;yy<h;yy++){ const fo=yy*(1+stride); if(g[fo]>4) g[fo]%=5; }
+
+    const idat=await deflate(g);
+    const png=concat([sig, pngChunk('IHDR',ihdr), pngChunk('IDAT',idat), pngChunk('IEND',new Uint8Array(0))]);
+    try { out.push(await createImageBitmap(new Blob([png],{type:'image/png'}))); } catch(e){}
+  }
+  if(myToken!==pngToken) return;                         // a newer build already ran — drop stale result
+  if(out.length){ pngFrames=out; pngReady=true; } else pngReady=false;
+}
+function schedulePng(){
+  pngReady=false; clearTimeout(pngTimer);
+  pngTimer=setTimeout(()=> buildPngFrames().catch(()=>{}), 120);
+}
