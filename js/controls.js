@@ -56,6 +56,7 @@ const shareToggle = document.getElementById('shareToggle');
 const sharePop = document.getElementById('sharePop');
 const autoBtn = document.getElementById('autoBtn');
 const driftBtn = document.getElementById('driftBtn');
+const seedLockBtn = document.getElementById('seedLockBtn');
 function closeAllPops(){ document.querySelectorAll('.popover').forEach(p=> p.setAttribute('hidden','')); }
 function wirePop(btn, pop){
   btn.addEventListener('click', e=>{ e.stopPropagation();
@@ -66,6 +67,11 @@ wirePop(rndCfgBtn, rndPop); wirePop(shareToggle, sharePop);
 document.addEventListener('click', closeAllPops);
 autoBtn.onclick = ()=> toggleAuto();
 driftBtn.onclick = ()=> toggleDrift();
+seedLockBtn.onclick = ()=>{
+  seedLocked = !seedLocked;
+  seedLockBtn.classList.toggle('active', seedLocked);
+  seedLockBtn.textContent = seedLocked ? `🔒 Seed ${randomSeed}` : '🔓 Seed lock';
+};
 // sliders: auto-reroll interval + param-drift amount
 const autoMsRange = document.getElementById('autoMsRange'), autoMsVal = document.getElementById('autoMsVal');
 const driftAmtRange = document.getElementById('driftAmtRange'), driftAmtVal = document.getElementById('driftAmtVal');
@@ -92,7 +98,9 @@ const RAND_PROB = { png:.12, jpeg:.15, warp:.18, halftone:.12, feedback:.12, mel
 const RAND_LEVELS = { normal:{prob:.5, str:.4}, strong:{prob:1, str:1}, wild:{prob:1.7, str:1} };
 function randomizeFX(){
   const lv = RAND_LEVELS[randLevelVal] || RAND_LEVELS.normal;
+  if (!seedLocked) randomSeed = Math.floor(Math.random()*1_000_000);
   FX.forEach(f=>{
+    if (state[f.id]._locked) return;
     if (f.id==='mask' || f.id==='zoom') return;                // leave Mask & Zoom exactly as the user set them
     if (f.id==='motion'){ state.motion.on = true; return; }    // Envelope always on, but don't randomise its values
     state[f.id].on = Math.random() < Math.min(0.95, (RAND_PROB[f.id] ?? 0.5) * lv.prob);
@@ -142,6 +150,7 @@ let autoMs = 4000;      // auto-reroll interval (ms), slider-controlled
 let driftAmt = 0.5;     // drift wander range as a fraction of each param's span, slider-controlled
 function driftTick(){
   FX.forEach(f=>{
+    if (state[f.id]._locked) return;
     if (!state[f.id].on || f.id==='jpeg' || f.id==='png') return;   // skip the heavy real-glitch pools
     if (f.id==='zoom' || f.id==='motion' || f.id==='mask') return;  // Zoom / Envelope / Mask shouldn't wander
     f.params.forEach(p=>{

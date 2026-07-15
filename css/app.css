@@ -98,6 +98,8 @@ canvas {
   user-select: none;
 }
 .grp > .head .name { flex: 1; font-weight: 600; }
+.fxlock { border: 0; background: none; padding: 2px 4px; opacity: .45; font-size: 12px; }
+.fxlock:hover, .fxlock.active { border: 0; opacity: 1; color: var(--accent2); }
 .grp > .head .name small { color: var(--muted); font-weight: 400; margin-left: 6px; }
 .grp .body { padding: 4px 12px 12px; display: none; }
 .grp.open .body { display: block; }

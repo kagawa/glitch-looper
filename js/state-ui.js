@@ -1,6 +1,6 @@
 // ---------- state ----------
 const state = {};
-FX.forEach(f => { state[f.id] = { on:f.on };
+FX.forEach(f => { state[f.id] = { on:f.on, _locked:false };
   f.params.forEach(p => { state[f.id][p.k] = p.def; if (p.env) state[f.id][p.k+'_env'] = !!p.envd; }); });
 
 const LOOP_MS = 3000;   // 1 loop period
@@ -49,6 +49,7 @@ function buildUI(){
       <div class="head">
         <input type="checkbox" ${state[f.id].on?'checked':''} data-fx="${f.id}" class="fxtoggle">
         <span class="name">${f.name}<small>${f.hint}</small></span>
+        <button type="button" class="fxlock${state[f.id]._locked?' active':''}" data-fx="${f.id}" title="Protect from Random and Drift" aria-label="Protect ${f.name} from Random and Drift">${state[f.id]._locked?'🔒':'🔓'}</button>
         <span class="caret">▶</span>
       </div>
       <div class="body">
@@ -70,7 +71,7 @@ function buildUI(){
         ).join('')}
       </div>`;
     g.querySelector('.head').addEventListener('click', e=>{
-      if (e.target.classList.contains('fxtoggle')) return;
+      if (e.target.classList.contains('fxtoggle') || e.target.classList.contains('fxlock')) return;
       g.classList.toggle('open');
       g.querySelector('.caret').textContent = g.classList.contains('open') ? '▼':'▶';
     });
@@ -121,6 +122,14 @@ function buildUI(){
   controls.querySelectorAll('.envchk').forEach(c=>{
     c.addEventListener('change', ()=>{ state[c.dataset.fx][c.dataset.k+'_env'] = c.checked; });
   });
+  controls.querySelectorAll('.fxlock').forEach(button=>{
+    button.addEventListener('click', ()=>{
+      const effect = state[button.dataset.fx];
+      effect._locked = !effect._locked;
+      button.classList.toggle('active', effect._locked);
+      button.textContent = effect._locked ? '🔒' : '🔓';
+    });
+  });
 
   const lab = document.createElement('span'); lab.className='presetlab'; lab.textContent='Preset';
   presetSel = document.createElement('select'); presetSel.className='presetsel';
@@ -147,6 +156,10 @@ function syncUI(){
   });
   controls.querySelectorAll('.fxsel').forEach(s=> s.value = state[s.dataset.fx][s.dataset.k]);
   controls.querySelectorAll('.envchk').forEach(c=> c.checked = !!state[c.dataset.fx][c.dataset.k+'_env']);
+  controls.querySelectorAll('.fxlock').forEach(button=>{
+    const locked = !!state[button.dataset.fx]._locked;
+    button.classList.toggle('active', locked); button.textContent = locked ? '🔒' : '🔓';
+  });
   if (state.jpeg.on) scheduleJpeg(); else jpegReady = false;
   if (state.png.on)  schedulePng();  else pngReady  = false;
   if (state.webp.on) scheduleWebp(); else webpReady = false;

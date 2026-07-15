@@ -27,7 +27,8 @@ function ensureGifPalette(n){
 }
 
 // deterministic pseudo-random keyed on loop phase so recordings are seamless
-function rand(seed){ const x = Math.sin(seed*12.9898)*43758.5453; return x - Math.floor(x); }
+let randomSeed = Math.floor(Math.random()*1_000_000), seedLocked = false;
+function rand(seed){ const x = Math.sin((seed+randomSeed)*12.9898)*43758.5453; return x - Math.floor(x); }
 
 // draw an image tiled so any offset wraps around (right edge re-enters from left)
 function drawWrap(src, ox, oy, w, h){

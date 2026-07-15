@@ -1,6 +1,6 @@
 // ---------- shareable state in the URL (restores the exact look) ----------
 function encodeState(){
-  const o={};
+  const o={ _meta:{ seed:randomSeed, seedLocked:seedLocked?1:0, locks:FX.filter(f=>state[f.id]._locked).map(f=>f.id) } };
   FX.forEach(f=>{ if(!state[f.id].on) return; const e={};
     f.params.forEach(p=>{ e[p.k]=state[f.id][p.k]; if(p.env && state[f.id][p.k+'_env']) e[p.k+'_env']=1; });
     o[f.id]=e;
@@ -12,14 +12,19 @@ function applyState(str){
     let b=str.replace(/-/g,'+').replace(/_/g,'/'); b+='==='.slice((b.length+3)%4);
     o=JSON.parse(decodeURIComponent(escape(atob(b))));
   }catch(e){ return false; }
+  const meta=o._meta||{};
+  if (Number.isFinite(meta.seed)) randomSeed=meta.seed;
+  seedLocked=!!meta.seedLocked;
+  FX.forEach(f=>{ state[f.id]._locked=Array.isArray(meta.locks)&&meta.locks.includes(f.id); });
   FX.forEach(f=>{ state[f.id].on=false; });
-  Object.keys(o).forEach(id=>{ if(!state[id]) return; state[id].on=true;
+  Object.keys(o).forEach(id=>{ if(id==='_meta'||!state[id]) return; state[id].on=true;
     const e=o[id]; Object.keys(e).forEach(k=>{
       if(k.endsWith('_env')) state[id][k]=!!e[k];
       else if(state[id][k]!==undefined) state[id][k]=e[k];
     });
   });
   syncUI();
+  if (seedLockBtn){ seedLockBtn.classList.toggle('active',seedLocked); seedLockBtn.textContent=seedLocked?`🔒 Seed ${randomSeed}`:'🔓 Seed lock'; }
   return true;
 }
 function shareURL(){ return location.origin+location.pathname+'#s='+encodeState(); }
