@@ -47,7 +47,14 @@
           <label class="popslider"><span>Amount</span>
             <input type="range" id="driftAmtRange" min="5" max="100" step="5" value="50">
             <span class="popval" id="driftAmtVal">50%</span></label>
-          <button id="seedLockBtn" class="popbtn">🔓 Seed lock</button>
+          <div class="seedbox">
+            <span class="pop-lab">Pattern Seed</span>
+            <div class="seedrow">
+              <input id="seedInput" type="number" min="-1" step="1" placeholder="Auto (-1)" aria-label="Pattern seed; blank or minus one for auto">
+              <button id="newSeedBtn" type="button">🎲 New</button>
+            </div>
+            <span id="seedCurrent" class="seedcurrent"></span>
+          </div>
         </div>
       </div>
     </div>

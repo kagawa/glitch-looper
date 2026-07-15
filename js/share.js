@@ -24,7 +24,7 @@ function applyState(str){
     });
   });
   syncUI();
-  if (seedLockBtn){ seedLockBtn.classList.toggle('active',seedLocked); seedLockBtn.textContent=seedLocked?`🔒 Seed ${randomSeed}`:'🔓 Seed lock'; }
+  if (typeof syncSeedUI==='function') syncSeedUI();
   return true;
 }
 function shareURL(){ return location.origin+location.pathname+'#s='+encodeState(); }

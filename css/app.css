@@ -211,6 +211,11 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .popslider > span:first-child { flex: 0 0 52px; }
 .popslider input[type=range] { flex: 1; min-width: 80px; }
 .popslider .popval { flex: 0 0 40px; text-align: right; color: var(--fg); font-variant-numeric: tabular-nums; }
+.seedbox { border-top: 1px solid var(--line); padding-top: 9px; display: flex; flex-direction: column; gap: 6px; }
+.seedrow { display: flex; gap: 6px; }
+.seedrow input { min-width: 0; width: 100%; background: var(--panel2); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font: inherit; }
+.seedrow button { flex: 0 0 auto; padding: 6px 9px; }
+.seedcurrent { color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
 .kbd { margin-left: auto; font-size: 10px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; }
 #canvas { cursor: pointer; }              /* click the image to change it */
 @media (max-width: 560px) {
