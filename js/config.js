@@ -221,7 +221,7 @@ const FX = [
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.3, env:1 },
   ]},
   { id:'mask', name:'Region Mask', hint:'confine effects to a rectangle — fixed / roaming / invertable', on:false, open:false, params:[
-    { k:'source',   label:'Mask Source', type:'select', def:0, options:[[0,'Rectangle'],[1,'Shadows'],[2,'Midtones'],[3,'Highlights'],[4,'Edges'],[5,'Noise']] },
+    { k:'source',   label:'Mask Source', type:'select', def:0, options:[[0,'Rectangle'],[6,'Roaming Rectangle'],[1,'Shadows'],[2,'Midtones'],[3,'Highlights'],[4,'Edges'],[5,'Noise']] },
     { k:'threshold',label:'Threshold', min:0, max:1, step:.01, def:.5 },
     { k:'mode',     label:'Mode', type:'select', def:0, options:[[0,'Fixed'],[1,'Roam']] },
     { k:'x0',       label:'X start %', min:0, max:100, step:1, def:20 },

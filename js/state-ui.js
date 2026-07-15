@@ -117,7 +117,10 @@ function buildUI(){
     s.addEventListener('change', ()=>{
       state[s.dataset.fx][s.dataset.k] = parseInt(s.value, 10);
       if (s.dataset.fx==='png') schedulePng();
-      if (s.dataset.fx==='mask') updateMaskRows();
+      if (s.dataset.fx==='mask'){
+        if (s.dataset.k==='source') state.mask.mode=(state.mask.source|0)===6?1:0;
+        updateMaskRows();
+      }
     });
   });
   controls.querySelectorAll('.envchk').forEach(c=>{
@@ -142,13 +145,14 @@ function buildUI(){
   updateMaskRows();
 }
 function updateMaskRows(){
-  const source=state.mask.source|0, roam=(state.mask.mode|0)===1;
+  const source=state.mask.source|0;
   controls.querySelectorAll('label[data-fx="mask"]').forEach(row=>{
     const key=row.dataset.param;
     let visible=true;
-    if (['mode','x0','x1','y0','y1'].includes(key)) visible=source===0;
-    if (key==='threshold') visible=source!==0;
-    if (key==='interval') visible=(source===0&&roam)||source===5;
+    if (key==='mode') visible=false;
+    if (['x0','x1','y0','y1'].includes(key)) visible=source===0;
+    if (key==='threshold') visible=source!==0&&source!==6;
+    if (key==='interval') visible=source===5||source===6;
     row.hidden=!visible;
   });
 }
@@ -162,6 +166,7 @@ function applyPreset(name){
   syncUI();
 }
 function syncUI(){
+  if ((state.mask.source|0)===0 && (state.mask.mode|0)===1) state.mask.source=6;
   controls.querySelectorAll('.fxtoggle').forEach(c=> c.checked = state[c.dataset.fx].on);
   controls.querySelectorAll('input[type=range]').forEach(r=>{
     r.value = state[r.dataset.fx][r.dataset.k];

@@ -132,6 +132,7 @@ label.row {
   color: var(--muted);
 }
 label.row span.k { color: var(--fg); }
+label.row[hidden] { display: none; }
 input[type=range] { width: 100%; accent-color: var(--accent); }
 input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; }
 select.fxsel { width: 100%; background: var(--panel2); color: var(--fg); border: 1px solid var(--line);

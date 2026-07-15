@@ -73,9 +73,9 @@ const mk = state.mask;
 if (mk.on){
   const feath=mk.feather*Math.min(w,h)*0.12, inv=(mk.invert|0)===1;
   mshape.width=w; mshape.height=h; msx.clearRect(0,0,w,h);
-  if ((mk.source|0)===0){
+  if ((mk.source|0)===0 || (mk.source|0)===6){
     let x0,x1,y0,y1;
-    if ((mk.mode|0)===1){
+    if ((mk.source|0)===6 || (mk.mode|0)===1){
       const steps=Math.max(1,mk.interval|0), st=Math.floor(phase*steps);
       const sw=(0.2+rand(st*3.3+.1)*0.5)*w, sh=(0.2+rand(st*4.9+.6)*0.5)*h;
       x0=rand(st*1.1+.3)*(w-sw); y0=rand(st*2.7+.7)*(h-sh); x1=x0+sw; y1=y0+sh;
