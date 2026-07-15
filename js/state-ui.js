@@ -153,3 +153,34 @@ function syncUI(){
   if (state.gifg.on) scheduleGifg(); else gifgReady = false;
   updateCatCounts();
 }
+// envelope multiplier for destructive effects — makes the glitch "breathe" over the loop
+function motionMul(phase){
+  const mo = state.motion; if (!mo.on) return 1;
+  const e = envCurve(phase, mo.mode, mo.rate);
+  return (1-mo.depth) + mo.depth*e*2;   // trough → clean, peak → ~2x
+}
+// shared envelope curve (used by the Envelope effect and Melt's own Curve) — returns 0..1 over the loop.
+// Eased with smootherstep / cubic (Penner-style) so the motion accelerates and settles naturally.
+function envCurve(phase, mode, rate){
+  const sm = t => t<=0?0 : t>=1?1 : t*t*t*(t*(t*6-15)+10);   // smootherstep (soft ends, fast middle)
+  const hump = p => p<0.5 ? sm(p*2) : sm((1-p)*2);           // eased 0→1→0 (seamless)
+  switch(mode){
+    case 0: return 1;                                        // constant
+    case 1: return hump(phase);                              // peak — eased rise & fall
+    case 2: return hump((phase*rate)%1);                     // pulse — eased repeating humps
+    case 3: { const b=0.82;                                  // build → drop — accelerating build, eased release
+      const t=phase/b; return phase<b ? t*t*t : 1-sm((phase-b)/(1-b)); }
+    case 4: return rand(Math.floor(phase*rate*4)+0.5);       // stutter — stepped random
+    case 5: return phase<0.25 ? sm(phase/0.25) : phase>0.75 ? sm((1-phase)/0.25) : 1;  // swell — plateau peak
+    case 6: { const b=0.18;                                  // drop → build — release then re-build (starts/ends high)
+      return phase<b ? 1-sm(phase/b) : (t=>t*t*t)((phase-b)/(1-b)); }
+    case 7: return Math.abs(Math.sin(Math.PI*phase*rate)) * hump(phase);   // bounce — decaying bounces within a peak
+    case 8: { const N=Math.max(1,rate*3), seg=phase*N, i=Math.floor(seg)%N, j=(i+1)%N, t=seg-Math.floor(seg);
+      const a=rand(i+0.5); return a+(rand(j+0.5)-a)*sm(t); }              // wander — smooth random
+    default: return hump(phase);
+  }
+}
+// per-parameter envelope: only params whose ⓔ checkbox is on get modulated
+let ENV = 1;
+function envF(fx,k){ return (state.motion.on && state[fx][k+'_env']) ? ENV : 1; }
+function P(fx,k){ return state[fx][k] * envF(fx,k); }
