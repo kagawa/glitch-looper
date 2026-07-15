@@ -962,7 +962,9 @@ function scheduleWebp(){
 // Encode the current image as a single-frame GIF (median-cut + LZW), tracking where the colour
 // table and LZW image data live so either part can be corrupted, then decode the broken GIF.
 function gifEncodeBase(srcImg, ncolors){
-  const w=canvas.width, h=canvas.height;
+  // work at a capped resolution so the many iterative passes stay fast (and it reads more lo-fi)
+  const cw=canvas.width, ch=canvas.height, sc=Math.min(1, 384/Math.max(cw,ch));
+  const w=Math.max(1,Math.round(cw*sc)), h=Math.max(1,Math.round(ch*sc));
   ggsrc.width=w; ggsrc.height=h; ggctx.clearRect(0,0,w,h); ggctx.drawImage(srcImg,0,0,w,h);
   const data=ggctx.getImageData(0,0,w,h).data;
   const sample=[]; for (let i=0;i<data.length;i+=4*7) sample.push([data[i],data[i+1],data[i+2]]);
@@ -994,20 +996,23 @@ const gifDecode = copy => createImageBitmap(new Blob([copy], {type:'image/gif'})
 async function buildGifgFrames(){
   if (!img) return;
   const myToken=++gifgToken; const gg=state.gifg;
-  const passes = 1 + Math.round(gg.data*9);                    // 1–10 iterative re-glitch passes (accumulates)
+  // Decoders behave OPPOSITELY: tolerant ones (Chrome/FF) heal most corruption, strict ones (iOS Safari)
+  // wipe everything below the first corrupted code. So keep it gentle and bias hits LATE (the corruption
+  // point stays low in the frame → the top of the picture survives on strict decoders too).
+  const passes = 1 + Math.round(gg.data*3);                    // 1–4 gentle iterative passes
   const nFrames=Math.max(1, Math.round(gg.frames)), out=[];
   const corrupt = (enc)=>{
     const { base, ctStart, ctLen, lzwPos } = enc;
-    const lateStart=Math.floor(lzwPos.length*(0.55 - gg.data*0.5));  // higher Data corrupts further up the stream
-    const palHits=Math.round(gg.palette*ctLen*0.2);             // light per pass → accumulates over passes
-    let lz=Math.round(3 + gg.data*45);                          // heavier per pass (backs off if it won't decode)
-    return async ()=>{                                          // returns a decode attempt with per-pass back-off
-      for (let t=0;t<3;t++){
+    const lateStart=Math.floor(lzwPos.length*(0.85 - gg.data*0.4));  // Data 0 → last 15%, Data 1 → last 55%
+    const palHits=Math.round(gg.palette*ctLen*0.12);           // light per pass → accumulates over passes
+    let lz=Math.max(1, Math.round(1 + gg.data*8));             // few hits per pass (stays decodable)
+    return async ()=>{                                          // per-pass back-off (falls to palette-only)
+      for (let t=0;t<4;t++){
         const copy=base.slice();
         for (let k=0;k<palHits;k++) copy[ctStart+Math.floor(Math.random()*ctLen)]=Math.floor(Math.random()*256);
         if (lz>0 && lzwPos.length>lateStart) for (let k=0;k<lz;k++){ const pos=lzwPos[lateStart+Math.floor(Math.random()*(lzwPos.length-lateStart))]; copy[pos]=Math.floor(Math.random()*256); }
         const bmp=await gifDecode(copy); if (bmp) return bmp;
-        lz=Math.floor(lz/2);
+        lz=Math.floor(lz/2);                                    // t=... eventually lz=0 → palette-only, always decodes
       }
       return null;
     };
@@ -1015,9 +1020,8 @@ async function buildGifgFrames(){
   const makeFrame = async ()=>{
     let cur=img, result=null;
     for (let p=0; p<passes; p++){
-      const bmp=await corrupt(gifEncodeBase(cur,64))();          // re-encode the previous result, corrupt, decode
-      if (!bmp) break;                                           // ceiling hit → stop, keep the last good frame
-      result=bmp; cur=bmp;
+      const bmp=await corrupt(gifEncodeBase(cur,64))();          // re-encode previous result, corrupt, decode
+      if (bmp){ result=bmp; cur=bmp; }                           // success → accumulate; fail → skip, keep going
     }
     return result || await gifDecode(gifEncodeBase(img,64).base.slice());   // fallback: clean re-encode
   };
