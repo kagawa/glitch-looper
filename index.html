@@ -559,8 +559,9 @@ const FX = [
     { k:'speed',  label:'Spin/loop', min:-4, max:4, step:1, def:0 },
     { k:'pulse',  label:'Zoom Pulse', min:0, max:1, step:.01, def:0 },
   ]},
-  { id:'melt', name:'Melt', hint:'pixel drip (breathes over the loop)', on:false, open:false, params:[
+  { id:'melt', name:'Melt', hint:'pixel drip (breathes over the loop) — Drip or vertical Wrap', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.4, env:1 },
+    { k:'mode',   label:'Mode', type:'select', def:0, options:[[0,'Drip'],[1,'Wrap (loops)']] },
   ]},
   { id:'emboss', name:'Emboss', hint:'directional relief — carved / raised metal look', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.7, env:1 },
@@ -1362,14 +1363,19 @@ function draw(phase){         // phase in [0,1)
   }
 
   // ---- melt: per-column pixel drip, breathes 0→max→0 over the loop (seamless) ----
+  //      Drip = pixels smear down (top stretches); Wrap = drips off the bottom and re-enters the top,
+  //      offsets exceed the height so columns can travel a full loop and come back.
   const ml = state.melt;
   if (ml.on && ml.amount>0){
-    const amt=P('melt','amount'), breathe=0.5-0.5*Math.cos(phase*Math.PI*2);
+    const amt=P('melt','amount'), breathe=0.5-0.5*Math.cos(phase*Math.PI*2), wrap=(ml.mode|0)===1;
+    const span = wrap ? amt*h*2.5*breathe : amt*h*0.6*breathe;   // Wrap goes past the height (loops)
     const src=ctx.getImageData(0,0,w,h), out=ctx.createImageData(w,h), sd=src.data, od=out.data;
     for (let x=0;x<w;x++){
-      const off=Math.floor(rand(x*0.13)*amt*h*0.6*breathe);
+      const off=Math.floor(rand(x*0.13)*span);
       for (let y=0;y<h;y++){
-        const sy=y-off>=0?y-off:0, si=(sy*w+x)*4, di=(y*w+x)*4;
+        let sy = y-off;
+        sy = wrap ? ((sy%h)+h)%h : (sy>=0?sy:0);                 // Wrap: mod h  ·  Drip: clamp to top
+        const si=(sy*w+x)*4, di=(y*w+x)*4;
         od[di]=sd[si]; od[di+1]=sd[si+1]; od[di+2]=sd[si+2]; od[di+3]=255;
       }
     }
