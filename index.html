@@ -994,13 +994,13 @@ const gifDecode = copy => createImageBitmap(new Blob([copy], {type:'image/gif'})
 async function buildGifgFrames(){
   if (!img) return;
   const myToken=++gifgToken; const gg=state.gifg;
-  const passes = 1 + Math.round(gg.data*4);                    // 1–5 iterative re-glitch passes
+  const passes = 1 + Math.round(gg.data*9);                    // 1–10 iterative re-glitch passes (accumulates)
   const nFrames=Math.max(1, Math.round(gg.frames)), out=[];
   const corrupt = (enc)=>{
     const { base, ctStart, ctLen, lzwPos } = enc;
-    const lateStart=Math.floor(lzwPos.length*(0.7 - gg.data*0.5));   // higher Data reaches further up the stream
+    const lateStart=Math.floor(lzwPos.length*(0.55 - gg.data*0.5));  // higher Data corrupts further up the stream
     const palHits=Math.round(gg.palette*ctLen*0.2);             // light per pass → accumulates over passes
-    let lz=Math.round(2 + gg.data*26);                          // moderate per pass (stays decodable)
+    let lz=Math.round(3 + gg.data*45);                          // heavier per pass (backs off if it won't decode)
     return async ()=>{                                          // returns a decode attempt with per-pass back-off
       for (let t=0;t<3;t++){
         const copy=base.slice();
