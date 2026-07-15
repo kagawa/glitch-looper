@@ -561,7 +561,8 @@ const FX = [
   ]},
   { id:'melt', name:'Melt', hint:'pixel drip (breathes over the loop) — Drip or vertical Wrap', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.4, env:1 },
-    { k:'mode',   label:'Mode', type:'select', def:0, options:[[0,'Drip'],[1,'Wrap (loops)']] },
+    { k:'mode',   label:'Mode', type:'select', def:0, options:[[0,'Drip'],[1,'Wrap']] },
+    { k:'curve',  label:'Curve', min:0, max:1, step:.01, def:.5 },
   ]},
   { id:'emboss', name:'Emboss', hint:'directional relief — carved / raised metal look', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.7, env:1 },
@@ -1368,10 +1369,11 @@ function draw(phase){         // phase in [0,1)
   const ml = state.melt;
   if (ml.on && ml.amount>0){
     const amt=P('melt','amount'), breathe=0.5-0.5*Math.cos(phase*Math.PI*2), wrap=(ml.mode|0)===1;
-    const span = wrap ? amt*h*2.5*breathe : amt*h*0.6*breathe;   // Wrap goes past the height (loops)
+    const span = amt*h*(wrap?1.0:0.6)*breathe;                   // Wrap can travel a full height and loop back
+    const cexp = 0.3 + ml.curve*3;   // drip shape: low curve → most columns melt a lot; high → few long drips
     const src=ctx.getImageData(0,0,w,h), out=ctx.createImageData(w,h), sd=src.data, od=out.data;
     for (let x=0;x<w;x++){
-      const off=Math.floor(rand(x*0.13)*span);
+      const off=Math.floor(Math.pow(rand(x*0.13), cexp)*span);
       for (let y=0;y<h;y++){
         let sy = y-off;
         sy = wrap ? ((sy%h)+h)%h : (sy>=0?sy:0);                 // Wrap: mod h  ·  Drip: clamp to top
