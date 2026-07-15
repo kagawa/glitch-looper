@@ -373,7 +373,7 @@
 <script>
 // ---------- effect parameter schema ----------
 const FX = [
-  { id:'vhs', name:'VHS', hint:'chroma shift · scanlines · bleed', on:false, open:true, params:[
+  { id:'vhs', name:'VHS', hint:'chroma shift · scanlines · bleed', on:false, open:false, params:[
     { k:'aberration', label:'Aberration (H)', min:0, max:20, step:.5, def:6, env:1, envd:1 },
     { k:'scanline',   label:'Scanlines', min:0, max:1,  step:.01, def:.35 },
     { k:'bleed',      label:'Bleed', min:0, max:12, step:.5, def:3 },
@@ -454,6 +454,26 @@ const FX = [
       options:[[0,'None'],[1,'Scramble'],[2,'Colour Cycle'],[3,'Index Streaks']] },
     { k:'amount', label:'FX Amount', min:0, max:1, step:.01, def:.5, env:1 },
   ]},
+  { id:'sonify', name:'Sonify', hint:'audio-style databend on the raw byte stream — echo / reverse / reverb / tremolo', on:false, open:false, params:[
+    { k:'mode',   label:'Effect', type:'select', def:0, options:[[0,'Echo'],[1,'Reverse'],[2,'Reverb'],[3,'Tremolo']] },
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
+    { k:'delay',  label:'Delay / Rate', min:1, max:100, step:1, def:30, env:1 },
+  ]},
+  { id:'byteshift', name:'Byte Shift', hint:'raw reinterpret — channel roll + diagonal shear', on:false, open:false, params:[
+    { k:'amount', label:'Shift', min:0, max:1, step:.01, def:.4, env:1 },
+    { k:'roll',   label:'Channel Roll', type:'select', def:1, options:[[0,'RGB'],[1,'GBR'],[2,'BRG']] },
+    { k:'skew',   label:'Skew', min:0, max:1, step:.01, def:.3 },
+  ]},
+  { id:'bitplane', name:'Bit-plane', hint:'split bit planes — displace / XOR / drop for banded glitch', on:false, open:false, params:[
+    { k:'mode',   label:'Mode', type:'select', def:0, options:[[0,'Plane Shift'],[1,'XOR'],[2,'Drop Low']] },
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
+    { k:'bits',   label:'Bit Split', min:2, max:7, step:1, def:6 },
+  ]},
+  { id:'webp', name:'WebP Databend', hint:'real WebP re-encode + byte corruption (VP8 predictive glitch)', on:false, open:false, params:[
+    { k:'amount', label:'Corruption', min:0, max:1, step:.01, def:.3 },
+    { k:'quality',label:'Quality', min:1, max:90, step:1, def:40 },
+    { k:'frames', label:'Frames', min:1, max:12, step:1, def:6 },
+  ]},
   { id:'degauss', name:'Degauss', hint:'magnetised CRT — rainbow colour-purity patches (breaks colour, not geometry)', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.6, env:1 },
     { k:'freq',   label:'Shimmer', min:1, max:8, step:1, def:4 },
@@ -503,11 +523,13 @@ const FX = [
     { k:'flag',    label:'Flagging',    min:0, max:1, step:.01, def:0, env:1 },
     { k:'contact', label:'Bad Contact', min:0, max:1, step:.01, def:0, env:1 },
   ]},
-  { id:'ghost', name:'Ghosting', hint:'multipath echo — faint offset duplicate(s)', on:false, open:false, params:[
+  { id:'ghost', name:'Ghosting', hint:'multipath echo — faint offset duplicate(s), can drift over the loop', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
     { k:'offset', label:'Offset', min:2, max:80, step:1, def:22 },
     { k:'echoes', label:'Echoes', min:1, max:3, step:1, def:2 },
     { k:'pre',    label:'Pre-echo', min:0, max:1, step:.01, def:.3 },
+    { k:'drift',  label:'Drift', min:0, max:1, step:.01, def:0 },
+    { k:'rate',   label:'Drift Rate', min:1, max:4, step:1, def:1 },
   ]},
   { id:'dotcrawl', name:'Dot Crawl', hint:'composite cross-colour — rainbow shimmer on vertical edges', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.6, env:1 },
@@ -565,7 +587,7 @@ const FX = [
     { k:'interval', label:'Roam Steps', min:1, max:12, step:1, def:4 },
     { k:'feather',  label:'Feather', min:0, max:1, step:.01, def:.08 },
   ]},
-  { id:'motion', name:'Envelope', hint:'makes destruction breathe over the loop (pick targets via ⓔ)', on:false, open:true, params:[
+  { id:'motion', name:'Envelope', hint:'makes destruction breathe over the loop (pick targets via ⓔ)', on:false, open:false, params:[
     { k:'mode', label:'Curve', type:'select', def:1,
       options:[[0,'Constant'],[1,'Peak (crash mid)'],[2,'Pulse'],[3,'Build → Drop'],[4,'Stutter']] },
     { k:'depth', label:'Depth', min:0, max:1, step:.01, def:.7 },
@@ -575,7 +597,8 @@ const FX = [
 
 // effect cards are shown grouped by sub-genre (order here = display order)
 const FX_GROUPS = [
-  ['Glitch / Data',   ['glitch','mosh','jpeg','png','compress','pixsort','databend','gif']],
+  ['Databend (real)', ['jpeg','png','webp']],
+  ['Glitch (sim)',    ['glitch','mosh','compress','pixsort','databend','gif','sonify','byteshift','bitplane']],
   ['Analog / Tape',   ['vhs','sync','roll','film','noise','ghost','dotcrawl','hum','herring']],
   ['Screen / Optics', ['crt','degauss','halftone','hud','bloom']],
   ['Distort',         ['warp','melt','feedback','pixelate']],
@@ -672,6 +695,11 @@ let jpegFrames = [], jpegReady = false, jpegTimer = null;
 const jsrc = document.createElement('canvas');
 const jctx = jsrc.getContext('2d');
 
+// real WebP databend: re-encode as low-quality WebP, corrupt bytes in the VP8 payload, decode
+let webpFrames = [], webpReady = false, webpTimer = null, webpToken = 0;
+const wsrc = document.createElement('canvas');
+const wctx = wsrc.getContext('2d');
+
 // real PNG glitch (pnglitch-style): corrupt scanline filter bytes + pixel bytes, re-deflate
 let pngFrames = [], pngReady = false, pngTimer = null, pngToken = 0;
 const psrc = document.createElement('canvas');
@@ -748,6 +776,7 @@ function buildUI(){
       document.getElementById(`v-${r.dataset.fx}-${r.dataset.k}`).textContent = r.value;
       if (r.dataset.fx==='jpeg') scheduleJpeg();
       if (r.dataset.fx==='png')  schedulePng();
+      if (r.dataset.fx==='webp') scheduleWebp();
     });
   });
   controls.querySelectorAll('.fxtoggle').forEach(c=>{
@@ -755,6 +784,7 @@ function buildUI(){
       state[c.dataset.fx].on = c.checked;
       if (c.dataset.fx==='jpeg'){ if (c.checked) scheduleJpeg(); else if (state.png.on) schedulePng(); }
       if (c.dataset.fx==='png'  && c.checked) schedulePng();
+      if (c.dataset.fx==='webp' && c.checked) scheduleWebp();
       updateCatCounts();
     });
   });
@@ -795,6 +825,7 @@ function syncUI(){
   controls.querySelectorAll('.envchk').forEach(c=> c.checked = !!state[c.dataset.fx][c.dataset.k+'_env']);
   if (state.jpeg.on) scheduleJpeg(); else jpegReady = false;
   if (state.png.on)  schedulePng();  else pngReady  = false;
+  if (state.webp.on) scheduleWebp(); else webpReady = false;
   updateCatCounts();
 }
 
@@ -883,6 +914,35 @@ function scheduleJpeg(){
   jpegTimer = setTimeout(()=> buildJpegFrames().catch(()=>{}), 120);  // debounce
 }
 
+// ---- real WebP databending ----
+// re-encode as low-quality WebP and corrupt bytes in the VP8 payload (past the RIFF/VP8 headers).
+// VP8's arithmetic decoder is fragile, so corruptions are few & undecodable frames are dropped.
+async function buildWebpFrames(){
+  if (!img) return;
+  const myToken = ++webpToken;
+  const wp = state.webp, w = canvas.width, h = canvas.height;
+  wsrc.width = w; wsrc.height = h; wctx.clearRect(0,0,w,h); wctx.drawImage(img,0,0,w,h);
+  const blob = await new Promise(r=> wsrc.toBlob(r, 'image/webp', wp.quality/100));
+  if (!blob || !/webp/.test(blob.type)) { webpReady=false; return; }   // browser can't encode WebP
+  const buf = new Uint8Array(await blob.arrayBuffer());
+  const start = Math.min(buf.length-1, 40);          // skip RIFF + VP8 chunk headers
+  const span = Math.max(1, buf.length - 2 - start);
+  const nFrames = Math.max(1, Math.round(wp.frames));
+  const out = [];
+  for (let f=0; f<nFrames; f++){
+    const copy = buf.slice();
+    const hits = 1 + Math.floor(wp.amount * 12);      // keep it low — VP8 desyncs easily
+    for (let k=0;k<hits;k++){ const pos = start + Math.floor(Math.random()*span); copy[pos] = Math.floor(Math.random()*256); }
+    try { out.push(await createImageBitmap(new Blob([copy], {type:'image/webp'}))); } catch(e){}
+  }
+  if (myToken!==webpToken) return;
+  if (out.length){ webpFrames=out; webpReady=true; } else webpReady=false;
+}
+function scheduleWebp(){
+  webpReady=false; clearTimeout(webpTimer);
+  webpTimer=setTimeout(()=> buildWebpFrames().catch(()=>{}), 120);
+}
+
 // ---- real PNG glitch (inspired by ucnv/pnglitch) ----
 // PNG is structurally valid (re-deflated, correct CRCs); the glitch lives in the
 // filtered scanline data. Corrupting each row's filter-type byte makes the decoder
@@ -950,16 +1010,22 @@ async function buildPngFrames(){
         }
       }
     }
-    // corrupt filtered pixel data -> propagates along each band's filter direction
-    const dhits=Math.floor(p.amount*rawLen*0.012);
+    // corrupt filtered pixel data -> propagates along each band's filter direction.
+    // amount/noise use a squared response + gentle coefficients: because each hit BLEEDS along
+    // its filter direction, a few hits already streak a lot — so keep the low/mid range subtle.
+    // per-direction gain: Sub(H)/Up(V) bleed only along a 1-D line, while Paeth/Average(diagonal)
+    // and Mix cascade in 2-D — so boost the 1-D filters to keep impact comparable across dir.
+    const dm = (dir===1||dir===2) ? 4 : 1;
+    const amt=p.amount*p.amount, noi=p.noise*p.noise;
+    const dhits=Math.floor(amt*rawLen*0.0004*dm);
     for(let k=0;k<dhits;k++){
       const ry=Math.floor(Math.random()*h), ri=Math.floor(Math.random()*stride);
       g[ry*(1+stride)+1+ri]=Math.floor(Math.random()*256);
     }
     // extra chaos: scramble filter bytes + heavier random noise
-    const fhits=Math.floor(p.noise*h*0.4);
+    const fhits=Math.floor(noi*h*0.08);
     for(let k=0;k<fhits;k++) g[Math.floor(Math.random()*h)*(1+stride)]=Math.floor(Math.random()*5);
-    const nhits=Math.floor(p.noise*rawLen*0.02);
+    const nhits=Math.floor(noi*rawLen*0.001*dm);
     for(let k=0;k<nhits;k++) g[Math.floor(Math.random()*rawLen)]=Math.floor(Math.random()*256);
     // keep every scanline's filter byte a VALID type (0-4) — an out-of-range value makes the
     // whole PNG un-decodable (createImageBitmap rejects it), which is why glitching sometimes
@@ -1011,12 +1077,14 @@ function draw(phase){         // phase in [0,1)
   let fp = [];
   if (c.on){ fp.push(`saturate(${c.saturate})`, `contrast(${c.contrast})`); if (c.hue) fp.push(`hue-rotate(${c.hue}deg)`); }
   if (fm.on && fm.sepia>0){ fp.push(`sepia(${fm.sepia})`); }
-  // pick base image: real PNG glitch > real JPEG databend > original
+  // pick base image: real PNG glitch > real JPEG databend > real WebP databend > original
   let base = img;
   if (state.png.on && pngReady && pngFrames.length)
     base = pngFrames[Math.floor(phase*pngFrames.length) % pngFrames.length];
   else if (state.jpeg.on && jpegReady && jpegFrames.length)
     base = jpegFrames[Math.floor(phase*jpegFrames.length) % jpegFrames.length];
+  else if (state.webp.on && webpReady && webpFrames.length)
+    base = webpFrames[Math.floor(phase*webpFrames.length) % webpFrames.length];
   tctx.clearRect(0,0,w,h);
   tctx.filter = fp.length ? fp.join(' ') : 'none';
   tctx.drawImage(base, 0, 0, w, h);
@@ -1079,8 +1147,9 @@ function draw(phase){         // phase in [0,1)
   drawWrap(tmp, baseX+ox+rollX, baseY+oy+rollY, zw, zh);
 
   // clean plate for Region Mask: the pristine original image (so EVERY effect — incl. roll,
-  // wobble, JPEG/PNG base-glitch, colour grade — is confined to the mask region)
-  if (state.mask.on){ mclean.width=w; mclean.height=h; mcx.clearRect(0,0,w,h); mcx.drawImage(img,0,0,w,h); }
+  // wobble, JPEG/PNG base-glitch, colour grade — is confined to the mask region).
+  // Match the base's overscan scale (zw/zh) so the masked & unmasked regions never differ in size.
+  if (state.mask.on){ mclean.width=w; mclean.height=h; mcx.clearRect(0,0,w,h); mcx.drawImage(img, baseX, baseY, zw, zh); }
 
   // ---- roll seam band (dark tear where the frame wraps) ----
   if (rl.on && rl.band>0 && rl.vspeed!==0){
@@ -1585,6 +1654,72 @@ function draw(phase){         // phase in [0,1)
     ctx.putImageData(im,0,0);
   }
 
+  // ---- Sonify: treat the RGBA byte stream as audio — echo (IIR delay) + reverse blocks ----
+  const so = state.sonify;
+  if (so.on){
+    const amt = P('sonify','amount');
+    if (amt>0){
+      const im=ctx.getImageData(0,0,w,h), d=im.data, len=d.length, mode=so.mode|0;
+      const D=Math.max(5, Math.round(P('sonify','delay')*37)|1);   // delay in bytes (∤ 4 → channels roll)
+      if (mode===0){                                 // Echo — signed delay (echoes the deviation → no white-out)
+        const f=amt*0.7;
+        for (let i=D;i<len;i++){ if((i&3)===3) continue; d[i]=d[i]+f*(d[i-D]-128); }
+      } else if (mode===1){                          // Reverse — mirror a fraction of blocks
+        const blocks=Math.max(2, Math.round(4+amt*24)), bs=Math.floor(len/blocks);
+        for (let b=0;b<blocks;b++){ if(rand(b*3.1+0.2)>amt) continue;
+          for (let lo=b*bs, hi=Math.min(len,(b+1)*bs)-1; lo<hi; lo++,hi--){ const t=d[lo]; d[lo]=d[hi]; d[hi]=t; } }
+      } else if (mode===2){                          // Reverb — dense diffuse tail (non-uniform signed taps)
+        const f=amt*0.5, D2=Math.round(D*1.7), D3=Math.round(D*2.3), D4=Math.round(D*3.1), st=Math.max(1,D4);
+        for (let i=st;i<len;i++){ if((i&3)===3) continue;
+          d[i]=d[i]+f*(0.6*(d[i-D]-128)+0.4*(d[i-D2]-128)+0.28*(d[i-D3]-128)+0.18*(d[i-D4]-128)); }
+      } else {                                       // Tremolo — amplitude LFO along the stream → rolling bands
+        const k=6.283/Math.max(8,D), dep=amt;
+        for (let i=0;i<len;i++){ if((i&3)===3) continue; d[i]=d[i]*(1+dep*Math.sin(i*k)); }
+      }
+      for (let i=3;i<len;i+=4) d[i]=255;              // restore opaque alpha
+      ctx.putImageData(im,0,0);
+    }
+  }
+
+  // ---- Byte Shift: raw reinterpret — per-row horizontal wrap (diagonal skew) + RGB channel roll ----
+  const bsf = state.byteshift;
+  if (bsf.on){
+    const amt=P('byteshift','amount');
+    if (amt>0){
+      const roll=bsf.roll|0, r0=roll%3, r1=(roll+1)%3, r2=(roll+2)%3;
+      const px=Math.round(amt*w*0.6);
+      const src=ctx.getImageData(0,0,w,h), out=ctx.createImageData(w,h), sd=src.data, od=out.data;
+      for (let y=0;y<h;y++){
+        const rowShift=px+Math.round(y*bsf.skew*1.5), row=y*w;
+        for (let x=0;x<w;x++){
+          const i=(row+x)*4, sx=((x+rowShift)%w+w)%w, si=(row+sx)*4;
+          od[i]=sd[si+r0]; od[i+1]=sd[si+r1]; od[i+2]=sd[si+r2]; od[i+3]=255;
+        }
+      }
+      ctx.putImageData(out,0,0);
+    }
+  }
+
+  // ---- Bit-plane: split each channel at a bit boundary, displace / XOR / drop the low planes ----
+  const bpl = state.bitplane;
+  if (bpl.on){
+    const amt=P('bitplane','amount');
+    if (amt>0){
+      const mode=bpl.mode|0, nb=bpl.bits|0;
+      const hiMask=(0xFF<<nb)&0xFF, loMask=0xFF>>(8-nb), shift=Math.round(amt*90)+1;
+      const src=ctx.getImageData(0,0,w,h), out=ctx.createImageData(w,h), sd=src.data, od=out.data;
+      for (let y=0;y<h;y++){ const row=y*w;
+        for (let x=0;x<w;x++){
+          const i=(row+x)*4, sx=((x+shift)%w+w)%w, si=(row+sx)*4;
+          for (let c=0;c<3;c++){ const a=sd[i+c], b=sd[si+c];
+            od[i+c] = mode===0 ? ((a&hiMask)|(b&loMask)) : mode===1 ? (a^(b&loMask)) : (a&hiMask); }
+          od[i+3]=255;
+        }
+      }
+      ctx.putImageData(out,0,0);
+    }
+  }
+
   // ---- Ghosting: multipath echo — faint offset duplicate(s) of the picture ----
   const gh = state.ghost;
   if (gh.on){
@@ -1592,12 +1727,30 @@ function draw(phase){         // phase in [0,1)
     if (gA>0){
       sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h); sctx.drawImage(canvas,0,0);
       const ech = gh.echoes|0;
+      const drawGhost = (off, aMul)=>{                // one ghost = its trailing echoes (+ pre-echo)
+        for (let i=1;i<=ech;i++){ ctx.globalAlpha = gA*0.7*(1-(i-1)/(ech+0.5))*aMul; ctx.drawImage(sc, off*i, 0); }
+        if (gh.pre>0){ ctx.globalAlpha = gA*0.4*gh.pre*aMul; ctx.drawImage(sc, -off*0.7, 0); }
+      };
       ctx.save();
-      for (let i=1;i<=ech;i++){                       // trailing echoes to the right, decaying
-        ctx.globalAlpha = gA*0.7*(1-(i-1)/(ech+0.5));
-        ctx.drawImage(sc, gh.offset*i, 0);
+      if (gh.drift<=0){
+        drawGhost(gh.offset, 1);                      // static ghost
+      } else {
+        // Continuous emission: each ghost slides outward ONE-WAY while fading in→out (no back-and-forth);
+        // N instances staggered by a phase so as one dies another is born → no gap ("飛び飛び") in between.
+        // dr scales how far it travels; amplitude reaches 0 at the cycle ends so the reset is invisible.
+        const rate=gh.rate|0, dr=gh.drift, N=2;
+        const ss=(lo,hi,x)=>{ if(x<=lo)return 0; if(x>=hi)return 1; const t=(x-lo)/(hi-lo); return t*t*(3-2*t); };
+        const insts=[]; let tot=0;
+        for (let n=0;n<N;n++){
+          const u=((phase*rate)+n/N)%1;
+          const amp = ss(0,0.08,u)*(1-ss(0.55,1,u));  // fade in fast → hold → fade to 0 by cycle end
+          if (amp<=0.001) continue;
+          insts.push({ amp, off: gh.offset*(1 + dr*(u*2.4 - 1)) });   // one-way slide (0…2.4× at dr=1)
+          tot+=amp;
+        }
+        const norm = tot>1 ? 1/tot : 1;               // keep total ghost opacity constant (crossfade)
+        for (const it of insts) drawGhost(it.off, it.amp*norm);
       }
-      if (gh.pre>0){ ctx.globalAlpha = gA*0.4*gh.pre; ctx.drawImage(sc, -gh.offset*0.7, 0); }   // pre-echo (left)
       ctx.restore();
     }
   }
@@ -1618,13 +1771,13 @@ function draw(phase){         // phase in [0,1)
           const lR = d[i+4]*.3+d[i+5]*.59+d[i+6]*.11;
           const g = lR-lL;                             // signed horizontal luma gradient
           const ag = g<0?-g:g;
-          if (ag>18){
+          if (ag>10){                                    // lower threshold → more edges shimmer
             const cb = ((Math.floor(x/cell)+yc+crawl)&1)?1:-1;
-            const s = Math.min(1,(ag-18)/110)*dA*cb*(g<0?-1:1);
+            const s = Math.min(1,(ag-10)/70)*dA*cb*(g<0?-1:1);   // saturates sooner → stronger
             const hueRow = (yc+crawl)%3;                // cycle opponent colour per row → rainbow
-            if (hueRow===0){ d[i]+=s*95; d[i+2]-=s*95; }
-            else if (hueRow===1){ d[i+1]+=s*95; d[i]-=s*70; d[i+2]-=s*70; }
-            else { d[i+2]+=s*95; d[i]-=s*95; }
+            if (hueRow===0){ d[i]+=s*165; d[i+2]-=s*165; }
+            else if (hueRow===1){ d[i+1]+=s*165; d[i]-=s*120; d[i+2]-=s*120; }
+            else { d[i+2]+=s*165; d[i]-=s*165; }
           }
         }
       }
@@ -1661,9 +1814,12 @@ function draw(phase){         // phase in [0,1)
       htile.width=T; htile.height=T; htx.clearRect(0,0,T,T);
       const nsp = Math.max(1, Math.round(hb.speed));
       const shp = ((phase*nsp)%1)*T;                   // diagonal drift, integer wraps → seamless
-      htx.strokeStyle='#fff'; htx.lineWidth=T*0.32;
-      for (let o=-T;o<=2*T;o+=T){                       // parallel diagonals (tile-wrapped)
-        htx.beginPath(); htx.moveTo(o+shp, -1); htx.lineTo(o+shp-T, T+1); htx.stroke();
+      htx.strokeStyle='#fff'; htx.lineWidth=T*0.32; htx.lineCap='square';
+      // slope must be exactly -1 (shift -T over height T) so the diagonals line up across tiles;
+      // extend past the edges by e along that same slope so the pattern stays continuous.
+      const e=2;
+      for (let o=-T;o<=2*T;o+=T){
+        htx.beginPath(); htx.moveTo(o+shp+e, -e); htx.lineTo(o+shp-T-e, T+e); htx.stroke();
       }
       const pat = ctx.createPattern(htile,'repeat');
       ctx.save(); ctx.globalCompositeOperation='overlay'; ctx.globalAlpha=hbA*0.5;
@@ -2046,6 +2202,7 @@ function loadImage(file){
     setStatus(`${im.width}×${im.height} → ${w}×${h}, processing`);
     if (state.jpeg.on) scheduleJpeg();
     if (state.png.on)  schedulePng();
+    if (state.webp.on) scheduleWebp();
     URL.revokeObjectURL(url);
   };
   im.src = url;
@@ -2099,6 +2256,7 @@ const RAND_PROB = { png:.12, jpeg:.15, warp:.18, halftone:.12, feedback:.12, mel
                     mosh:.25, crt:.2, pixelate:.3, hud:.3, motion:.4,
                     ghost:.14, dotcrawl:.1, hum:.12, herring:.08, sync:.14, zoom:0,
                     compress:.14, pixsort:.14, databend:.12, degauss:.06, gif:.12,
+                    sonify:.12, byteshift:.12, bitplane:.1, webp:.1,
                     // colour-mapping / stylise effects: keep them occasional, emboss rarest
                     duotone:.14, solarize:.14, posterize:.14, emboss:.04 };
 // three strength levels: prob = on-probability scale, str = how far params stray from their default
@@ -2106,9 +2264,9 @@ const RAND_LEVELS = { normal:{prob:.5, str:.4}, strong:{prob:1, str:1}, wild:{pr
 function randomizeFX(){
   const lv = RAND_LEVELS[randLevelVal] || RAND_LEVELS.normal;
   FX.forEach(f=>{
-    if (f.id==='mask') return;                                 // leave the mask region as the user set it
-    state[f.id].on = f.id==='motion' ? true                    // Envelope always on
-                   : Math.random() < Math.min(0.95, (RAND_PROB[f.id] ?? 0.5) * lv.prob);
+    if (f.id==='mask' || f.id==='zoom') return;                // leave Mask & Zoom exactly as the user set them
+    if (f.id==='motion'){ state.motion.on = true; return; }    // Envelope always on, but don't randomise its values
+    state[f.id].on = Math.random() < Math.min(0.95, (RAND_PROB[f.id] ?? 0.5) * lv.prob);
     f.params.forEach(p=>{
       if (p.type==='select'){ state[f.id][p.k] = p.options[Math.floor(Math.random()*p.options.length)][0]; }
       else {
@@ -2132,12 +2290,8 @@ function randomizeFX(){
     const pick = ['vhs','glitch','noise','color'][Math.floor(Math.random()*4)];
     state[pick].on = true;
   }
-  // Zoom is never picked on its own — auto-enable it (sized to the wobble) only when VHS shakes
-  state.zoom.on = false;
-  if (state.vhs.on && state.vhs.wobble>0){
-    state.zoom.on = true;
-    state.zoom.amount = Math.min(1, 0.15 + state.vhs.wobble/20 * 0.7);
-  }
+  // (Zoom is left untouched above; the wobble's own zoom is handled by the base overscan that
+  //  hides its wrap seam — no separate Zoom-effect coupling.)
   syncUI();
   if (presetSel) presetSel.value = '';
   if (!autoTimer) setStatus('🎲 Randomized — export if you like it');
