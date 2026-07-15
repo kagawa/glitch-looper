@@ -475,8 +475,13 @@ const FX = [
     { k:'quality',label:'Quality', min:1, max:90, step:1, def:40 },
     { k:'frames', label:'Frames', min:1, max:12, step:1, def:6 },
   ]},
-  { id:'gifg', name:'GIF Databend', hint:'real GIF encode + byte corruption (palette + LZW index streaks)', on:false, open:false, params:[
-    { k:'amount', label:'Corruption', min:0, max:1, step:.01, def:.3 },
+  { id:'gifpal', name:'GIF Palette', hint:'real GIF encode + colour-table corruption (palette shifts)', on:false, open:false, params:[
+    { k:'amount', label:'Corruption', min:0, max:1, step:.01, def:.4 },
+    { k:'colors', label:'Colours', min:2, max:128, step:1, def:32 },
+    { k:'frames', label:'Frames', min:1, max:12, step:1, def:6 },
+  ]},
+  { id:'gifg', name:'GIF Databend', hint:'real GIF encode + LZW byte corruption (image tears from the bottom)', on:false, open:false, params:[
+    { k:'amount', label:'Corruption', min:0, max:1, step:.01, def:.4 },
     { k:'colors', label:'Colours', min:2, max:128, step:1, def:32 },
     { k:'frames', label:'Frames', min:1, max:12, step:1, def:6 },
   ]},
@@ -603,7 +608,7 @@ const FX = [
 
 // effect cards are shown grouped by sub-genre (order here = display order)
 const FX_GROUPS = [
-  ['Binary Glitch',   ['jpeg','png','webp','gifg','sonify','byteshift','bitplane']],
+  ['Binary Glitch',   ['jpeg','png','webp','gifpal','gifg','sonify','byteshift','bitplane']],
   ['Pixel Glitch',    ['glitch','mosh','compress','pixsort','databend','gif']],
   ['Analog / Tape',   ['vhs','sync','roll','film','noise','ghost','dotcrawl','hum','herring']],
   ['Screen / Optics', ['crt','degauss','halftone','hud','bloom']],
@@ -706,9 +711,10 @@ let webpFrames = [], webpReady = false, webpTimer = null, webpToken = 0;
 const wsrc = document.createElement('canvas');
 const wctx = wsrc.getContext('2d');
 
-// real GIF databend: encode a single-frame GIF (median-cut + LZW), corrupt the colour table
-// and LZW image bytes (keeping sub-block lengths intact), then decode the broken GIF.
+// real GIF databend: encode a single-frame GIF (median-cut + LZW), then corrupt either the colour
+// table (GIF Palette) or the LZW image bytes (GIF Databend) and decode the broken GIF.
 let gifgFrames = [], gifgReady = false, gifgTimer = null, gifgToken = 0;
+let gifpalFrames = [], gifpalReady = false, gifpalTimer = null, gifpalToken = 0;
 const ggsrc = document.createElement('canvas');
 const ggctx = ggsrc.getContext('2d', { willReadFrequently:true });
 
@@ -790,6 +796,7 @@ function buildUI(){
       if (r.dataset.fx==='png')  schedulePng();
       if (r.dataset.fx==='webp') scheduleWebp();
       if (r.dataset.fx==='gifg') scheduleGifg();
+      if (r.dataset.fx==='gifpal') scheduleGifpal();
     });
   });
   controls.querySelectorAll('.fxtoggle').forEach(c=>{
@@ -799,6 +806,7 @@ function buildUI(){
       if (c.dataset.fx==='png'  && c.checked) schedulePng();
       if (c.dataset.fx==='webp' && c.checked) scheduleWebp();
       if (c.dataset.fx==='gifg' && c.checked) scheduleGifg();
+      if (c.dataset.fx==='gifpal' && c.checked) scheduleGifpal();
       updateCatCounts();
     });
   });
@@ -841,6 +849,7 @@ function syncUI(){
   if (state.png.on)  schedulePng();  else pngReady  = false;
   if (state.webp.on) scheduleWebp(); else webpReady = false;
   if (state.gifg.on) scheduleGifg(); else gifgReady = false;
+  if (state.gifpal.on) scheduleGifpal(); else gifpalReady = false;
   updateCatCounts();
 }
 
@@ -959,65 +968,77 @@ function scheduleWebp(){
 }
 
 // ---- real GIF databending ----
-async function buildGifgFrames(){
-  if (!img) return;
-  const myToken = ++gifgToken;
-  const gg = state.gifg, w = canvas.width, h = canvas.height;
+// Encode the current image as a single-frame GIF (median-cut + LZW), tracking where the colour
+// table and LZW image data live so either part can be corrupted, then decode the broken GIF.
+function gifEncodeBase(ncolors){
+  const w=canvas.width, h=canvas.height;
   ggsrc.width=w; ggsrc.height=h; ggctx.clearRect(0,0,w,h); ggctx.drawImage(img,0,0,w,h);
-  const data = ggctx.getImageData(0,0,w,h).data;
-  // median-cut palette, padded to a power-of-two global colour table
+  const data=ggctx.getImageData(0,0,w,h).data;
   const sample=[]; for (let i=0;i<data.length;i+=4*7) sample.push([data[i],data[i+1],data[i+2]]);
-  let pal = medianCut(sample, Math.max(2, gg.colors|0));
-  let gctBits=1; while ((1<<gctBits) < pal.length) gctBits++;   // 1..8
+  let pal=medianCut(sample, Math.max(2, ncolors|0));
+  let gctBits=1; while ((1<<gctBits) < pal.length) gctBits++;
   const gctSize=1<<gctBits; while (pal.length<gctSize) pal.push([0,0,0]);
-  const map = makeMapper(pal), idx=new Uint8Array(w*h);
+  const map=makeMapper(pal), idx=new Uint8Array(w*h);
   for (let i=0,pi=0;i<data.length;i+=4,pi++) idx[pi]=map(data[i],data[i+1],data[i+2]);
-  const minCode = Math.max(2, gctBits);
-  // assemble the GIF, tracking where the colour table and LZW data live
+  const minCode=Math.max(2, gctBits);
   const bytes=[]; const put=(...a)=>{ for(const x of a) bytes.push(x&0xFF); }; const puts=s=>{ for(const ch of s) bytes.push(ch.charCodeAt(0)); };
   puts('GIF89a');
   put(w&255,(w>>8)&255, h&255,(h>>8)&255, 0x80|((gctBits-1)<<4)|(gctBits-1), 0, 0);
   const ctStart=bytes.length; for (const p of pal) put(p[0],p[1],p[2]); const ctLen=bytes.length-ctStart;
-  put(0x2C, 0,0,0,0, w&255,(w>>8)&255, h&255,(h>>8)&255, 0x00);   // image descriptor (no local table)
+  put(0x2C, 0,0,0,0, w&255,(w>>8)&255, h&255,(h>>8)&255, 0x00);
   put(minCode);
-  const lzwStart=bytes.length;
-  for (const b of packSubBlocks(gifLZW(idx, minCode))) bytes.push(b);
+  const lzwStart=bytes.length; for (const b of packSubBlocks(gifLZW(idx, minCode))) bytes.push(b);
   put(0x3B);
   const base=new Uint8Array(bytes);
-  // corruptible LZW positions = data bytes inside sub-blocks (never the length bytes)
   const lzwPos=[]; let p=lzwStart;
   while (p<base.length-1){ const len=base[p]; if(len===0) break; for(let q=p+1;q<=p+len && q<base.length;q++) lzwPos.push(q); p+=len+1; }
+  return { base, ctStart, ctLen, lzwPos };
+}
+const gifDecode = copy => createImageBitmap(new Blob([copy], {type:'image/gif'})).catch(()=>null);
+
+// GIF Palette: corrupt only the colour table — always decodes, wrecks the colours.
+async function buildGifpalFrames(){
+  if (!img) return;
+  const myToken=++gifpalToken; const gp=state.gifpal;
+  const { base, ctStart, ctLen } = gifEncodeBase(gp.colors);
+  const nFrames=Math.max(1, Math.round(gp.frames)), out=[];
+  for (let f=0; f<nFrames; f++){
+    const copy=base.slice(); const chits=Math.max(1, Math.round(gp.amount*ctLen*0.5));
+    for (let k=0;k<chits;k++) copy[ctStart+Math.floor(Math.random()*ctLen)]=Math.floor(Math.random()*256);
+    const b=await gifDecode(copy); if(b) out.push(b);
+  }
+  if (myToken!==gifpalToken) return;
+  if (out.length){ gifpalFrames=out; gifpalReady=true; } else gifpalReady=false;
+}
+function scheduleGifpal(){ gifpalReady=false; clearTimeout(gifpalTimer); gifpalTimer=setTimeout(()=> buildGifpalFrames().catch(()=>{}), 120); }
+
+// GIF Databend: corrupt only the LZW image bytes. Browsers reject heavily-broken LZW, so keep as much
+// as still decodes — hits are biased to the later stream (top decodes, lower part tears = classic
+// databend), backing off on failure down to the clean re-encoded GIF.
+async function buildGifgFrames(){
+  if (!img) return;
+  const myToken=++gifgToken; const gg=state.gifg;
+  const { base, lzwPos } = gifEncodeBase(gg.colors);
+  const lateStart=Math.floor(lzwPos.length*0.35);
   const nFrames=Math.max(1, Math.round(gg.frames)), out=[];
-  const lateStart=Math.floor(lzwPos.length*0.35);   // bias LZW hits to the later stream so the top decodes
-  const decode = copy => createImageBitmap(new Blob([copy], {type:'image/gif'})).catch(()=>null);
-  // Each frame: strong palette corruption (always valid) + as much LZW corruption as still DECODES.
-  // The browser's GIF decoder rejects heavily-broken LZW, so we back off the hit count and retry —
-  // fewer, later-placed hits garble the lower part of the image (the classic databend tear) yet decode.
   const makeFrame = async ()=>{
-    const pal=[]; const chits=Math.max(1, Math.round(gg.amount*ctLen*0.5));
-    for (let k=0;k<chits;k++) pal.push([ctStart+Math.floor(Math.random()*ctLen), Math.floor(Math.random()*256)]);
     let hits=Math.round(1 + gg.amount*30);
     for (let attempt=0; attempt<5; attempt++){
       const copy=base.slice();
-      for (const [pos,v] of pal) copy[pos]=v;                                     // palette
       if (hits>0 && lzwPos.length>lateStart){
         for (let k=0;k<hits;k++){ const pos=lzwPos[lateStart+Math.floor(Math.random()*(lzwPos.length-lateStart))]; copy[pos]=Math.floor(Math.random()*256); }
       }
-      const bmp=await decode(copy);
-      if (bmp) return bmp;                                                        // decoded (with whatever LZW survived)
-      hits=Math.floor(hits/2);                                                    // back off: fewer LZW hits, retry
+      const bmp=await gifDecode(copy);
+      if (bmp) return bmp;
+      hits=Math.floor(hits/2);                       // back off: fewer LZW hits, retry
     }
-    const copy=base.slice(); for (const [pos,v] of pal) copy[pos]=v;              // guaranteed fallback: palette only
-    return await decode(copy);
+    return await gifDecode(base.slice());            // fallback: clean re-encode (quantised, no tear)
   };
   for (let f=0; f<nFrames; f++){ const b=await makeFrame(); if(b) out.push(b); }
   if (myToken!==gifgToken) return;
   if (out.length){ gifgFrames=out; gifgReady=true; } else gifgReady=false;
 }
-function scheduleGifg(){
-  gifgReady=false; clearTimeout(gifgTimer);
-  gifgTimer=setTimeout(()=> buildGifgFrames().catch(()=>{}), 120);
-}
+function scheduleGifg(){ gifgReady=false; clearTimeout(gifgTimer); gifgTimer=setTimeout(()=> buildGifgFrames().catch(()=>{}), 120); }
 
 // ---- real PNG glitch (inspired by ucnv/pnglitch) ----
 // PNG is structurally valid (re-deflated, correct CRCs); the glitch lives in the
@@ -1163,6 +1184,8 @@ function draw(phase){         // phase in [0,1)
     base = webpFrames[Math.floor(phase*webpFrames.length) % webpFrames.length];
   else if (state.gifg.on && gifgReady && gifgFrames.length)
     base = gifgFrames[Math.floor(phase*gifgFrames.length) % gifgFrames.length];
+  else if (state.gifpal.on && gifpalReady && gifpalFrames.length)
+    base = gifpalFrames[Math.floor(phase*gifpalFrames.length) % gifpalFrames.length];
   tctx.clearRect(0,0,w,h);
   tctx.filter = fp.length ? fp.join(' ') : 'none';
   tctx.drawImage(base, 0, 0, w, h);
@@ -2282,6 +2305,7 @@ function loadImage(file){
     if (state.png.on)  schedulePng();
     if (state.webp.on) scheduleWebp();
     if (state.gifg.on) scheduleGifg();
+    if (state.gifpal.on) scheduleGifpal();
     URL.revokeObjectURL(url);
   };
   im.src = url;
@@ -2335,7 +2359,7 @@ const RAND_PROB = { png:.12, jpeg:.15, warp:.18, halftone:.12, feedback:.12, mel
                     mosh:.25, crt:.2, pixelate:.3, hud:.3, motion:.4,
                     ghost:.14, dotcrawl:.1, hum:.12, herring:.08, sync:.14, zoom:0,
                     compress:.14, pixsort:.14, databend:.12, degauss:.06, gif:.12,
-                    sonify:.12, byteshift:.12, bitplane:.1, webp:.1, gifg:.1,
+                    sonify:.12, byteshift:.12, bitplane:.1, webp:.1, gifg:.1, gifpal:.1,
                     // colour-mapping / stylise effects: keep them occasional, emboss rarest
                     duotone:.14, solarize:.14, posterize:.14, emboss:.04 };
 // three strength levels: prob = on-probability scale, str = how far params stray from their default
