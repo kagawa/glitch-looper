@@ -475,9 +475,10 @@ const FX = [
     { k:'quality',label:'Quality', min:1, max:90, step:1, def:40 },
     { k:'frames', label:'Frames', min:1, max:12, step:1, def:6 },
   ]},
-  { id:'gifg', name:'GIF Databend', hint:'real GIF encode + byte corruption (colour table + LZW image tears)', on:false, open:false, params:[
-    { k:'amount', label:'Corruption', min:0, max:1, step:.01, def:.5 },
-    { k:'frames', label:'Frames', min:1, max:12, step:1, def:6 },
+  { id:'gifg', name:'GIF Databend', hint:'real GIF encode + byte corruption — LZW image data & colour table (separate)', on:false, open:false, params:[
+    { k:'data',    label:'Data (LZW)', min:0, max:1, step:.01, def:.5 },
+    { k:'palette', label:'Palette', min:0, max:1, step:.01, def:.4 },
+    { k:'frames',  label:'Frames', min:1, max:12, step:1, def:6 },
   ]},
   { id:'degauss', name:'Degauss', hint:'magnetised CRT — rainbow colour-purity patches (breaks colour, not geometry)', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.6, env:1 },
@@ -993,11 +994,13 @@ async function buildGifgFrames(){
   if (!img) return;
   const myToken=++gifgToken; const gg=state.gifg;
   const { base, ctStart, ctLen, lzwPos } = gifEncodeBase(64);
-  const lateStart=Math.floor(lzwPos.length*0.25);               // corrupt the later ~75% of the stream
+  // Data (LZW) corruption region: higher Data reaches further up the stream (tears more of the image);
+  // heavier corruption breaks decoding though, so the hit count backs off to what still decodes.
+  const lateStart=Math.floor(lzwPos.length*(0.7 - gg.data*0.6));   // Data 0 → later 30%, Data 1 → later 90%
   const nFrames=Math.max(1, Math.round(gg.frames)), out=[];
   const makeFrame = async ()=>{
-    const palHits = Math.round(gg.amount*ctLen*0.6);            // colour-table corruption (scaled by Corruption)
-    let hits=Math.round(3 + gg.amount*120);                     // much heavier LZW corruption
+    const palHits = Math.round(gg.palette*ctLen*0.7);          // colour-table corruption
+    let hits=Math.round(2 + gg.data*160);                       // LZW corruption (attempted; backs off below)
     for (let attempt=0; attempt<8; attempt++){
       const copy=base.slice();
       for (let k=0;k<palHits;k++) copy[ctStart+Math.floor(Math.random()*ctLen)]=Math.floor(Math.random()*256);
