@@ -61,8 +61,8 @@
   </header>
   <p class="back"><a href="./">← back to the app</a></p>
   <p class="lead">
-    <span class="en">Every effect turns a still image into a seamless looping video, entirely in your browser — nothing is uploaded. Effects stack; the <b>Envelope</b> makes them breathe over the loop. Tags: <span class="tag real">real</span> genuinely corrupts encoded file bytes; <span class="tag sim">sim</span> mimics the look with pixel processing.</span>
-    <span class="jp">各エフェクトは静止画をシームレスなループ動画に変換します。処理はすべてブラウザ内で完結し、画像はアップロードされません。効果は重ねがけでき、<b>Envelope</b> でループ内の抑揚を付けられます。タグ: <span class="tag real">real</span>＝エンコード済みバイトを実際に破壊、<span class="tag sim">sim</span>＝ピクセル処理で見た目を模倣。</span>
+    <span class="en">Every effect turns a still image into a seamless looping video, entirely in your browser — nothing is uploaded. Effects stack; the <b>Envelope</b> makes them breathe over the loop. Glitch effects are grouped by how they process the image — <b>binary</b> (bytes / bits / file format) vs <b>pixels</b>. Tag: <span class="tag real">real</span> genuinely corrupts encoded file bytes then re-decodes (unpredictable); <span class="tag sim">sim</span> is deterministic processing.</span>
+    <span class="jp">各エフェクトは静止画をシームレスなループ動画に変換します。処理はすべてブラウザ内で完結し、画像はアップロードされません。効果は重ねがけでき、<b>Envelope</b> でループ内の抑揚を付けられます。グリッチ系は処理方法で分類 — <b>バイナリ</b>（バイト/ビット/ファイル形式）か <b>ピクセル</b> か。タグ: <span class="tag real">real</span>＝エンコード済みバイトを実際に破壊して再デコード（予測不能）、<span class="tag sim">sim</span>＝決定的な処理。</span>
   </p>
 
   <main id="doc"></main>
@@ -79,21 +79,21 @@
 
 <script>
 const GROUPS = [
-  ['Databend (real)', [
+  ['Binary Glitch', [
     ['JPEG databend','real','Re-encodes the frame as JPEG, corrupts bytes after the SOS marker (headers/EOI kept), and decodes the broken data — genuine DCT-block melt and colour drift. A pool of frames is cycled for seamless animation.','フレームをJPEGに再エンコードし、SOSマーカー以降のバイトを破壊（ヘッダ/EOIは維持）して再デコード。本物のDCTブロック崩れと色ずれ。複数フレームを巡回してシームレスにアニメ化。','Amount · Quality · Frames'],
     ['PNG glitch','real','Rebuilds valid PNG scanlines with a real filter per band (Sub/Up/Average/Paeth), corrupts filter & pixel bytes, then re-deflates. Corruption bleeds horizontally / vertically / diagonally depending on each band’s filter.','走査線を帯ごとに実フィルタ（Sub/Up/Average/Paeth）で再構築し、フィルタ/画素バイトを破壊して再deflate。破壊は帯のフィルタ方向に沿って横/縦/斜めに滲む。','Bleed · Noise · Dir · Frames'],
     ['WebP Databend','real','Re-encodes to low-quality WebP, corrupts the VP8 payload, and decodes. VP8’s intra-block prediction chains give a texture different from JPEG. Fragile — undecodable frames are dropped, and it needs a browser that can encode WebP.','低画質WebPに再エンコードしVP8ペイロードを破壊して再デコード。VP8のブロック内予測が連鎖しJPEGと違う質感。壊れやすくデコード失敗フレームは自動除外、WebPエンコード対応ブラウザが必要。','Corruption · Quality · Frames'],
+    ['Sonify','sim','Treats the raw RGBA byte stream as audio and applies an audio effect: Echo (delay), Reverse (mirror blocks), Reverb (diffuse tail), Tremolo (rolling bands). Delays that aren’t a multiple of 4 roll the colour channels.','生のRGBAバイト列を音とみなし音声エフェクトを適用。Echo（ディレイ）/Reverse（ブロック反転）/Reverb（拡散残響）/Tremolo（流れる明暗）。4の倍数でないディレイは色チャンネルを回す。','Effect · Amount · Delay / Rate (ⓔ)'],
+    ['Byte Shift','sim','Raw reinterpret: a smooth per-row diagonal shear (stride error) with an RGB channel roll (RGB→GBR/BRG = hue rotation).','生バイト再解釈。行ごとの滑らかな斜めシア（ストライド誤差）＋RGBチャンネルロール（RGB→GBR/BRG＝色相回転）。','Shift · Channel Roll · Skew'],
+    ['Bit-plane','sim','Splits each channel at a bit boundary and displaces, XORs, or drops the low bit-planes for banded, ghosted glitch.','各チャンネルをビット境界で分割し、下位プレーンをずらす/XOR/欠落させ、帯状＋ゴースト状のグリッチに。','Mode · Amount · Bit Split'],
   ]],
-  ['Glitch (sim)', [
+  ['Pixel Glitch', [
     ['Slice','sim','Horizontal slice displacement plus an RGB split. A visual glitch — not real data corruption.','水平スライスのずらし＋RGB分離。見た目のグリッチで実データ破壊ではない。','Amount · Slices · Shift · RGB'],
     ['Datamosh (fake)','sim','Block smear + pixel sort + channel corruption that mimic the look of gif/video moshing (removed I-frames), without touching real data.','ブロック塗り＋ピクセルソート＋チャンネル破壊で、gif/動画のmoshing（Iフレーム除去）の見た目を模倣。実データは触らない。','Intensity · Blocks · Sort · Chaos · Rate'],
     ['Compression','sim','A heavy low-quality-JPEG look built in-canvas: 8×8 block flatten toward the mean, luma quantisation (banding), and chroma subsampling.','キャンバス内で作る重い低画質JPEG風。8×8ブロックを平均へ平坦化＋輝度量子化（バンディング）＋色間引き。','Amount · Chroma Bleed · Block'],
     ['Pixel Sort','sim','Sorts contiguous bright spans by luminance along rows and/or columns — the classic “pixels pour” glitch-art look.','明るい連続スパンを輝度順に行/列でソート。「ピクセルが流れる」グリッチアートの定番。','Amount · Threshold · Direction · Max Length'],
     ['Databend Shift','sim','Per-row horizontal wrap (a stride/byte-stride error → diagonal shear) plus occasional packet-break jumps with RGB desync (rainbow).','行ごとの横ラップ（ストライド誤差＝斜めシア）＋確率的なパケット破断でRGB分離（レインボー）。','Amount · Skew · Scramble · Speed'],
     ['Indexed / GIF','sim','Quantises to a cached global palette (median-cut) with ordered dither, then a palette glitch: scramble, colour-cycle, or per-band index streaks.','グローバルパレット（median-cut）に量子化＋規則ディザ後、パレット破壊/カラーサイクル/帯ごとのインデックスずれ。','Colours · Dither · Palette FX · FX Amount'],
-    ['Sonify','sim','Treats the raw RGBA byte stream as audio and applies an audio effect: Echo (delay), Reverse (mirror blocks), Reverb (diffuse tail), Tremolo (rolling bands). Delays that aren’t a multiple of 4 roll the colour channels.','生のRGBAバイト列を音とみなし音声エフェクトを適用。Echo（ディレイ）/Reverse（ブロック反転）/Reverb（拡散残響）/Tremolo（流れる明暗）。4の倍数でないディレイは色チャンネルを回す。','Effect · Amount · Delay / Rate (ⓔ)'],
-    ['Byte Shift','sim','Raw reinterpret: a smooth per-row diagonal shear (stride error) with an RGB channel roll (RGB→GBR/BRG = hue rotation).','生バイト再解釈。行ごとの滑らかな斜めシア（ストライド誤差）＋RGBチャンネルロール（RGB→GBR/BRG＝色相回転）。','Shift · Channel Roll · Skew'],
-    ['Bit-plane','sim','Splits each channel at a bit boundary and displaces, XORs, or drops the low bit-planes for banded, ghosted glitch.','各チャンネルをビット境界で分割し、下位プレーンをずらす/XOR/欠落させ、帯状＋ゴースト状のグリッチに。','Mode · Amount · Bit Split'],
   ]],
   ['Analog / Tape', [
     ['VHS','sim','Chroma shift (aberration), scanlines, horizontal bleed, tracking noise, and screen wobble with a selectable pattern (wave/pulse/jitter/step/drift).','色ずれ（アバレーション）、走査線、横にじみ、トラッキングノイズ、揺れ（波/パルス/ジッタ/ステップ/ドリフト選択）。','Aberration · Scanlines · Bleed · Tracking · Wobble · Pattern'],
