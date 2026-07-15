@@ -122,6 +122,24 @@
   .grp.open .body { display: block; }
   .grp .caret { color: var(--muted); font-size: 10px; }
 
+  /* effect sub-genre sections */
+  .cat { border-top: 2px solid var(--line); }
+  .cat:first-child { border-top: none; }
+  .cathead {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 12px; cursor: pointer; user-select: none;
+    background: linear-gradient(var(--panel2), var(--bg));
+    font-size: 11px; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--muted); font-weight: 700;
+  }
+  .cathead .catname { flex: 1; }
+  .cathead .catcount { color: var(--accent); font-weight: 700; min-width: 14px; text-align: right; }
+  .cathead .catcount:empty { display: none; }
+  .cathead .caret { color: var(--muted); font-size: 10px; }
+  .cat > .catbody { display: none; }
+  .cat.open > .catbody { display: block; }
+  .cat > .catbody > .grp:first-child { border-top: none; }
+
   label.row {
     display: grid;
     grid-template-columns: 78px 1fr 38px;
@@ -387,8 +405,7 @@ const FX = [
     { k:'vspeed', label:'V-Roll', min:-2, max:2, step:.05, def:0 },
     { k:'band',   label:'Roll Band', min:0, max:1, step:.01, def:.4 },
   ]},
-  { id:'film', name:'Film 8mm', hint:'old film · dust · scratches · weave', on:false, open:false, params:[
-    { k:'weave',   label:'Gate Weave', min:0, max:10, step:.25, def:3 },
+  { id:'film', name:'Film 8mm', hint:'old film · dust · scratches · burn (shake = VHS Wobble)', on:false, open:false, params:[
     { k:'dust',    label:'Dust', min:0, max:1, step:.01, def:.4, env:1 },
     { k:'scratch', label:'Scratches', min:0, max:1, step:.01, def:.3, env:1 },
     { k:'sepia',   label:'Sepia', min:0, max:1, step:.01, def:.5 },
@@ -429,6 +446,13 @@ const FX = [
     { k:'skew',     label:'Skew', min:0, max:1, step:.01, def:.4 },
     { k:'scramble', label:'Scramble', min:0, max:1, step:.01, def:.4 },
     { k:'speed',    label:'Speed', min:0, max:8, step:1, def:2 },
+  ]},
+  { id:'gif', name:'Indexed / GIF', hint:'256-colour palette · dither · scramble / colour-cycle / streaks', on:false, open:false, params:[
+    { k:'colors', label:'Colours', min:2, max:64, step:1, def:16 },
+    { k:'dither', label:'Dither', min:0, max:1, step:.01, def:.4 },
+    { k:'glitch', label:'Palette FX', type:'select', def:0,
+      options:[[0,'None'],[1,'Scramble'],[2,'Colour Cycle'],[3,'Index Streaks']] },
+    { k:'amount', label:'FX Amount', min:0, max:1, step:.01, def:.5, env:1 },
   ]},
   { id:'degauss', name:'Degauss', hint:'magnetised CRT — rainbow colour-purity patches (breaks colour, not geometry)', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.6, env:1 },
@@ -479,9 +503,6 @@ const FX = [
     { k:'flag',    label:'Flagging',    min:0, max:1, step:.01, def:0, env:1 },
     { k:'contact', label:'Bad Contact', min:0, max:1, step:.01, def:0, env:1 },
   ]},
-  { id:'zoom', name:'Zoom', hint:'enlarge / overscan (also hides wobble wrap seams)', on:false, open:false, params:[
-    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.3, env:1 },
-  ]},
   { id:'ghost', name:'Ghosting', hint:'multipath echo — faint offset duplicate(s)', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
     { k:'offset', label:'Offset', min:2, max:80, step:1, def:22 },
@@ -531,6 +552,19 @@ const FX = [
     { k:'threshold', label:'Threshold', min:0, max:1, step:.01, def:.55 },
     { k:'amount',    label:'Amount', min:0, max:1, step:.01, def:.8, env:1 },
   ]},
+  { id:'zoom', name:'Zoom', hint:'enlarge / overscan (also hides wobble wrap seams)', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.3, env:1 },
+  ]},
+  { id:'mask', name:'Region Mask', hint:'confine effects to a rectangle — fixed / roaming / invertable', on:false, open:false, params:[
+    { k:'mode',     label:'Mode', type:'select', def:0, options:[[0,'Fixed'],[1,'Roam']] },
+    { k:'x0',       label:'X start %', min:0, max:100, step:1, def:20 },
+    { k:'x1',       label:'X end %',   min:0, max:100, step:1, def:80 },
+    { k:'y0',       label:'Y start %', min:0, max:100, step:1, def:20 },
+    { k:'y1',       label:'Y end %',   min:0, max:100, step:1, def:80 },
+    { k:'invert',   label:'Invert', type:'select', def:0, options:[[0,'Effects inside'],[1,'Effects outside']] },
+    { k:'interval', label:'Roam Steps', min:1, max:12, step:1, def:4 },
+    { k:'feather',  label:'Feather', min:0, max:1, step:.01, def:.08 },
+  ]},
   { id:'motion', name:'Envelope', hint:'makes destruction breathe over the loop (pick targets via ⓔ)', on:false, open:true, params:[
     { k:'mode', label:'Curve', type:'select', def:1,
       options:[[0,'Constant'],[1,'Peak (crash mid)'],[2,'Pulse'],[3,'Build → Drop'],[4,'Stutter']] },
@@ -539,10 +573,20 @@ const FX = [
   ]},
 ];
 
+// effect cards are shown grouped by sub-genre (order here = display order)
+const FX_GROUPS = [
+  ['Glitch / Data',   ['glitch','mosh','jpeg','png','compress','pixsort','databend','gif']],
+  ['Analog / Tape',   ['vhs','sync','roll','film','noise','ghost','dotcrawl','hum','herring']],
+  ['Screen / Optics', ['crt','degauss','halftone','hud','bloom']],
+  ['Distort',         ['warp','melt','feedback','pixelate']],
+  ['Colour / Tone',   ['color','duotone','solarize','posterize','emboss']],
+  ['Global',          ['zoom','mask','motion']],
+];
+
 const PRESETS = {
   // ---- Classic ----
   'VHS Tape':    { vhs:{on:1,aberration:8,scanline:.45,bleed:4,tracking:.4,wobble:7}, glitch:{on:0}, noise:{on:1,grain:.22,flicker:.15}, color:{on:1,saturate:1.1,contrast:1.05,hue:0,tint:.15,vignette:.4} },
-  '8mm Film':    { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.14,flicker:.2}, color:{on:1,saturate:.8,contrast:1.1,hue:0,tint:.1,vignette:.5}, film:{on:1,weave:1,dust:.6,scratch:.5,sepia:.6,burn:.4}, roll:{on:0}, mosh:{on:0} },
+  '8mm Film':    { vhs:{on:1,aberration:0,scanline:0,bleed:0,tracking:0,wobble:1,wobmode:2}, glitch:{on:0}, noise:{on:1,grain:.14,flicker:.2}, color:{on:1,saturate:.8,contrast:1.1,hue:0,tint:.1,vignette:.5}, film:{on:1,dust:.6,scratch:.5,sepia:.6,burn:.4}, roll:{on:0}, mosh:{on:0} },
   'Dreamy':      { vhs:{on:1,aberration:12,scanline:.1,bleed:8,tracking:.1,wobble:3}, glitch:{on:0}, noise:{on:1,grain:.08,flicker:.03}, color:{on:1,saturate:1.4,contrast:.95,hue:0,tint:-.3,vignette:.5} },
   'CRT':         { vhs:{on:1,aberration:5,scanline:0,bleed:2,tracking:.1,wobble:1}, glitch:{on:0}, noise:{on:1,grain:.1,flicker:.08}, color:{on:1,saturate:1.2,contrast:1.1,hue:0,tint:.05,vignette:.35}, crt:{on:1,amount:.35,round:.5,corner:.5,frame:.08,mask:2,phosphor:.5,scan:.5,converge:.3,glow:.35}, sync:{on:1,hsync:0,flag:0.15,contact:0.12} },
   'Trinitron':   { vhs:{on:1,aberration:4,scanline:0,bleed:2,tracking:.05,wobble:1}, glitch:{on:0}, noise:{on:1,grain:.05,flicker:.04}, color:{on:1,saturate:1.25,contrast:1.12,hue:0,tint:.03,vignette:.3}, film:{on:0}, roll:{on:0}, mosh:{on:0}, crt:{on:1,amount:.22,round:.35,corner:.45,frame:.09,mask:1,phosphor:.6,scan:.45,converge:.2,glow:.4} },
@@ -559,8 +603,8 @@ const PRESETS = {
   'PNG Glitch':  { vhs:{on:0}, glitch:{on:0}, noise:{on:0}, color:{on:0}, roll:{on:0}, film:{on:0}, mosh:{on:0}, jpeg:{on:0}, png:{on:1,amount:.3,noise:.15,dir:0,frames:8} },
   'Roll Break':  { vhs:{on:1,aberration:6,scanline:.3,bleed:2,tracking:.5,wobble:4}, glitch:{on:1,amount:.22,slices:16,shift:18,rgb:6}, noise:{on:1,grain:.15,flicker:.1}, color:{on:0}, roll:{on:1,hspeed:1.5,hstep:.4,vspeed:.5,band:.5}, film:{on:0}, mosh:{on:0} },
   // ---- Horror ----
-  'Cursed Tape': { vhs:{on:1,aberration:10,scanline:.5,bleed:3,tracking:.85,wobble:9}, glitch:{on:1,amount:.18,slices:20,shift:18,rgb:6}, noise:{on:1,grain:.4,flicker:.45}, color:{on:1,saturate:.55,contrast:1.35,hue:-25,tint:-.2,vignette:.75}, film:{on:1,weave:1.5,dust:.35,scratch:.35,sepia:0,burn:.35}, roll:{on:1,hspeed:0,hstep:0,vspeed:.15,band:.4}, mosh:{on:0}, motion:{on:1,mode:4,depth:.7,rate:5} },
-  'Haunted Film':{ vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.35,flicker:.5}, color:{on:1,saturate:.4,contrast:1.3,hue:15,tint:.15,vignette:.8}, film:{on:1,weave:3,dust:.8,scratch:.7,sepia:.55,burn:.7}, roll:{on:0}, mosh:{on:0}, motion:{on:1,mode:2,depth:.6,rate:4} },
+  'Cursed Tape': { vhs:{on:1,aberration:10,scanline:.5,bleed:3,tracking:.85,wobble:9}, glitch:{on:1,amount:.18,slices:20,shift:18,rgb:6}, noise:{on:1,grain:.4,flicker:.45}, color:{on:1,saturate:.55,contrast:1.35,hue:-25,tint:-.2,vignette:.75}, film:{on:1,dust:.35,scratch:.35,sepia:0,burn:.35}, roll:{on:1,hspeed:0,hstep:0,vspeed:.15,band:.4}, mosh:{on:0}, motion:{on:1,mode:4,depth:.7,rate:5} },
+  'Haunted Film':{ vhs:{on:1,aberration:0,scanline:0,bleed:0,tracking:0,wobble:3,wobmode:2}, glitch:{on:0}, noise:{on:1,grain:.35,flicker:.5}, color:{on:1,saturate:.4,contrast:1.3,hue:15,tint:.15,vignette:.8}, film:{on:1,dust:.8,scratch:.7,sepia:.55,burn:.7}, roll:{on:0}, mosh:{on:0}, motion:{on:1,mode:2,depth:.6,rate:4} },
   'Corruption':  { vhs:{on:1,aberration:6,scanline:.2,bleed:1,tracking:.3,wobble:2}, glitch:{on:1,amount:.28,slices:24,shift:25,rgb:10}, noise:{on:1,grain:.2,flicker:.2}, color:{on:1,saturate:.7,contrast:1.2,hue:-40,tint:-.1,vignette:.7}, film:{on:0}, mosh:{on:1,intensity:.6,blocks:.7,sort:.4,chaos:.9,rate:14}, png:{on:1,amount:.25,noise:.15,dir:2,frames:8}, motion:{on:1,mode:3,depth:.8,rate:2} },
   'Red Room':    { vhs:{on:1,aberration:7,scanline:.35,bleed:2,tracking:.4,wobble:3}, glitch:{on:1,amount:.15,slices:14,shift:16,rgb:8}, noise:{on:1,grain:.25,flicker:.55}, color:{on:1,saturate:1.3,contrast:1.4,hue:-120,tint:.1,vignette:.7}, film:{on:0}, mosh:{on:0}, motion:{on:1,mode:2,depth:.7,rate:6} },
   'Meltdown':    { vhs:{on:1,aberration:6,scanline:.2,bleed:2,tracking:.25,wobble:3}, glitch:{on:0}, noise:{on:1,grain:.15,flicker:.15}, color:{on:1,saturate:.7,contrast:1.2,hue:-30,tint:-.1,vignette:.6}, film:{on:0}, mosh:{on:0}, warp:{on:1,amp:4,freq:5,speed:1}, melt:{on:1,amount:.55}, motion:{on:1,mode:1,depth:.6,rate:2} },
@@ -629,7 +673,7 @@ const jsrc = document.createElement('canvas');
 const jctx = jsrc.getContext('2d');
 
 // real PNG glitch (pnglitch-style): corrupt scanline filter bytes + pixel bytes, re-deflate
-let pngFrames = [], pngReady = false, pngTimer = null;
+let pngFrames = [], pngReady = false, pngTimer = null, pngToken = 0;
 const psrc = document.createElement('canvas');
 const pctx = psrc.getContext('2d', { willReadFrequently:true });
 
@@ -637,8 +681,18 @@ const pctx = psrc.getContext('2d', { willReadFrequently:true });
 const controls = document.getElementById('controls');
 const presetsEl = document.getElementById('presets');
 let presetSel;
+const CAT_IDS = {};   // sub-genre label → effect ids (filled by buildUI)
+function updateCatCounts(){
+  controls.querySelectorAll('.catcount').forEach(el=>{
+    const ids = CAT_IDS[el.dataset.cat] || [];
+    const n = ids.filter(id=> state[id] && state[id].on).length;
+    el.textContent = n ? n : '';
+  });
+}
 function buildUI(){
-  FX.forEach(f => {
+  const byId = {}; FX.forEach(f=> byId[f.id]=f);
+  const placed = new Set();
+  const makeCard = (f)=>{
     const g = document.createElement('div');
     g.className = 'grp' + (f.open ? ' open':'');
     g.innerHTML = `
@@ -665,15 +719,28 @@ function buildUI(){
              </label>`
         ).join('')}
       </div>`;
-    controls.appendChild(g);
-
-    g.querySelector('.head .caret').closest('.head').addEventListener('click', e=>{
+    g.querySelector('.head').addEventListener('click', e=>{
       if (e.target.classList.contains('fxtoggle')) return;
       g.classList.toggle('open');
       g.querySelector('.caret').textContent = g.classList.contains('open') ? '▼':'▶';
     });
     g.querySelector('.caret').textContent = f.open ? '▼':'▶';
-  });
+    return g;
+  };
+  const addGroup = (label, ids)=>{
+    ids = ids.filter(id=> byId[id] && !placed.has(id));
+    if (!ids.length) return;
+    CAT_IDS[label] = ids;
+    const cat = document.createElement('div'); cat.className = 'cat';   // collapsed by default
+    const head = document.createElement('div'); head.className = 'cathead';
+    head.innerHTML = `<span class="catname">${label}</span><span class="catcount" data-cat="${label}"></span><span class="caret">▶</span>`;
+    const body = document.createElement('div'); body.className = 'catbody';
+    ids.forEach(id=>{ placed.add(id); body.appendChild(makeCard(byId[id])); });
+    head.addEventListener('click', ()=>{ cat.classList.toggle('open'); head.querySelector('.caret').textContent = cat.classList.contains('open')?'▼':'▶'; });
+    cat.appendChild(head); cat.appendChild(body); controls.appendChild(cat);
+  };
+  FX_GROUPS.forEach(([label,ids])=> addGroup(label, ids));
+  addGroup('Other', FX.map(f=>f.id));   // catch any effect missing from FX_GROUPS
 
   controls.querySelectorAll('input[type=range]').forEach(r=>{
     r.addEventListener('input', ()=>{
@@ -688,6 +755,7 @@ function buildUI(){
       state[c.dataset.fx].on = c.checked;
       if (c.dataset.fx==='jpeg'){ if (c.checked) scheduleJpeg(); else if (state.png.on) schedulePng(); }
       if (c.dataset.fx==='png'  && c.checked) schedulePng();
+      updateCatCounts();
     });
   });
   controls.querySelectorAll('.fxsel').forEach(s=>{
@@ -727,6 +795,7 @@ function syncUI(){
   controls.querySelectorAll('.envchk').forEach(c=> c.checked = !!state[c.dataset.fx][c.dataset.k+'_env']);
   if (state.jpeg.on) scheduleJpeg(); else jpegReady = false;
   if (state.png.on)  schedulePng();  else pngReady  = false;
+  updateCatCounts();
 }
 
 // ---------- canvas / rendering ----------
@@ -738,6 +807,24 @@ const sc = document.createElement('canvas');                 // scratch for warp
 const sctx = sc.getContext('2d', { willReadFrequently:true });
 const htile = document.createElement('canvas');              // small tile for herringbone pattern
 const htx = htile.getContext('2d');
+const gsrc = document.createElement('canvas');               // small sampler for GIF palette
+const gctx = gsrc.getContext('2d', { willReadFrequently:true });
+const mshape = document.createElement('canvas');             // region-mask alpha shape
+const msx = mshape.getContext('2d');
+const mclean = document.createElement('canvas');             // region-mask clean plate (base, pre-glitch)
+const mcx = mclean.getContext('2d');
+
+// GIF indexed-colour palette, cached (rebuilt on image/colour-count change) — a single global table
+let gifPal=null, gifMapper=null, gifKey='';
+function ensureGifPalette(n){
+  const key=String(n);
+  if (gifKey===key && gifPal) return;
+  const S=72; gsrc.width=S; gsrc.height=S; gctx.clearRect(0,0,S,S); gctx.drawImage(img,0,0,S,S);
+  const d=gctx.getImageData(0,0,S,S).data, samp=[];
+  for (let i=0;i<d.length;i+=4) samp.push([d[i],d[i+1],d[i+2]]);
+  gifPal=medianCut(samp,n); while(gifPal.length<2) gifPal.push([0,0,0]);
+  gifMapper=makeMapper(gifPal); gifKey=key;
+}
 
 // deterministic pseudo-random keyed on loop phase so recordings are seamless
 function rand(seed){ const x = Math.sin(seed*12.9898)*43758.5453; return x - Math.floor(x); }
@@ -824,6 +911,7 @@ function paeth(a,b,c){ const p=a+b-c, pa=Math.abs(p-a), pb=Math.abs(p-b), pc=Mat
   return (pa<=pb && pa<=pc) ? a : (pb<=pc) ? b : c; }
 async function buildPngFrames(){
   if (!img) return;
+  const myToken = ++pngToken;                            // supersede any older in-flight build
   const p=state.png, w=canvas.width, h=canvas.height, stride=w*4, bpp=4;
   // if JPEG databend is also on, glitch its output -> both effects stack (orig→JPEG→PNG)
   const srcImg = (state.jpeg.on && jpegReady && jpegFrames.length) ? jpegFrames[0] : img;
@@ -873,11 +961,16 @@ async function buildPngFrames(){
     for(let k=0;k<fhits;k++) g[Math.floor(Math.random()*h)*(1+stride)]=Math.floor(Math.random()*5);
     const nhits=Math.floor(p.noise*rawLen*0.02);
     for(let k=0;k<nhits;k++) g[Math.floor(Math.random()*rawLen)]=Math.floor(Math.random()*256);
+    // keep every scanline's filter byte a VALID type (0-4) — an out-of-range value makes the
+    // whole PNG un-decodable (createImageBitmap rejects it), which is why glitching sometimes
+    // produced no frames at all. The corruption still shows via changed (but valid) filter types.
+    for(let yy=0;yy<h;yy++){ const fo=yy*(1+stride); if(g[fo]>4) g[fo]%=5; }
 
     const idat=await deflate(g);
     const png=concat([sig, pngChunk('IHDR',ihdr), pngChunk('IDAT',idat), pngChunk('IEND',new Uint8Array(0))]);
     try { out.push(await createImageBitmap(new Blob([png],{type:'image/png'}))); } catch(e){}
   }
+  if(myToken!==pngToken) return;                         // a newer build already ran — drop stale result
   if(out.length){ pngFrames=out; pngReady=true; } else pngReady=false;
 }
 function schedulePng(){
@@ -929,7 +1022,7 @@ function draw(phase){         // phase in [0,1)
   tctx.drawImage(base, 0, 0, w, h);
   tctx.filter = 'none';
 
-  // ---- displacement: VHS wobble (selectable pattern) + film gate-weave ----
+  // ---- displacement: VHS wobble (selectable pattern — includes former film gate-weave = Jitter) ----
   let ox=0, oy=0;
   if (v.on && v.wobble>0){
     const A=v.wobble;
@@ -951,10 +1044,6 @@ function draw(phase){         // phase in [0,1)
         ox=Math.sin(t)*A; oy=Math.cos(t*2)*A*0.3;
     }
   }
-  if (fm.on && fm.weave>0){
-    ox += (rand(fseed*1.3)-0.5)*2*fm.weave;
-    oy += (rand(fseed*2.7)-0.5)*2*fm.weave;
-  }
 
   // ---- roll: wrap-around scroll (slides off one edge, back in the other) ----
   let rollX = 0, rollY = 0;
@@ -965,17 +1054,14 @@ function draw(phase){         // phase in [0,1)
     rollY = phase * rl.vspeed * h;
   }
 
-  // ---- overscan: zoom in just enough to cover the wobble/weave jitter, so the
+  // ---- overscan: zoom in just enough to cover the wobble jitter, so the
   //      shake never reveals the wrap seam. Roll keeps its intentional wrap
   //      (the zoomed frame is zw×zh wide, so wrapping at that period stays seamless). ----
-  const wob = v.on ? v.wobble : 0, wv = fm.on ? fm.weave : 0, bld = v.on ? Math.ceil(v.bleed) : 0;
-  const jit = wob + wv;
-  const mX = (jit>0 || bld>0) ? wob + wv + bld + 1 : 0;   // max |ox| = wobble + weave + bleed
-  const mY = (jit>0)        ? wob*0.5 + wv + 1 : 0;      // max |oy| = up to 0.5·wobble + weave
-  const shakeZoom = 1 + 2*Math.max(mX/w, mY/h, 0);        // minimum overscan to hide wobble wrap seams
-  const zoomFx = state.zoom.on ? 1 + P('zoom','amount')*0.5 : 1;   // standalone Zoom effect (up to 1.5×)
-  const zoom = Math.min(1.6, Math.max(shakeZoom, zoomFx));
-  const zw = w*zoom, zh = h*zoom, baseX = -(zw-w)/2, baseY = -(zh-h)/2;
+  const wob = v.on ? v.wobble : 0, bld = v.on ? Math.ceil(v.bleed) : 0;
+  const mX = (wob>0 || bld>0) ? wob + bld + 1 : 0;       // max |ox| = wobble + bleed
+  const mY = (wob>0)          ? wob*0.5 + 1 : 0;         // max |oy| = up to 0.5·wobble
+  const zoom = Math.min(1.4, 1 + 2*Math.max(mX/w, mY/h, 0));   // overscan ONLY to hide wobble wrap seams
+  const zw = w*zoom, zh = h*zoom, baseX = -(zw-w)/2, baseY = -(zh-h)/2;   // (Zoom effect is applied last, post-FX)
 
   ctx.clearRect(0,0,w,h);
 
@@ -991,6 +1077,10 @@ function draw(phase){         // phase in [0,1)
     ctx.globalCompositeOperation = 'source-over';
   }
   drawWrap(tmp, baseX+ox+rollX, baseY+oy+rollY, zw, zh);
+
+  // clean plate for Region Mask: the pristine original image (so EVERY effect — incl. roll,
+  // wobble, JPEG/PNG base-glitch, colour grade — is confined to the mask region)
+  if (state.mask.on){ mclean.width=w; mclean.height=h; mcx.clearRect(0,0,w,h); mcx.drawImage(img,0,0,w,h); }
 
   // ---- roll seam band (dark tear where the frame wraps) ----
   if (rl.on && rl.band>0 && rl.vspeed!==0){
@@ -1458,6 +1548,43 @@ function draw(phase){         // phase in [0,1)
     }
   }
 
+  // ---- Indexed / GIF: quantise to a cached global palette + dither, then palette-glitch ----
+  const gf = state.gif;
+  if (gf.on && img){
+    const n = Math.max(2, gf.colors|0);
+    ensureGifPalette(n);
+    const pal = gifPal, N = pal.length, map = gifMapper;
+    const mode = gf.glitch|0, amt = P('gif','amount'), dith = gf.dither;
+    let disp = pal;                                       // display palette (scramble/cycle reorder it)
+    if (mode===1){                                        // Scramble: swap entries (seeded → static/seamless)
+      disp = pal.slice();
+      const swaps = Math.round(amt*N);
+      for (let s=0;s<swaps;s++){ const a=Math.floor(rand(s*1.7+.3)*N), b=Math.floor(rand(s*2.9+1.1)*N); const t=disp[a]; disp[a]=disp[b]; disp[b]=t; }
+    } else if (mode===2){                                 // Colour Cycle: rotate palette (integer turns/loop)
+      const cyc=Math.max(1,Math.round(1+amt*5)), rot=Math.floor(phase*N*cyc)%N;
+      disp = pal.map((_,i)=>pal[(i+rot)%N]);
+    }
+    const bayer=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5];  // 4×4 ordered dither
+    const dAmp = dith*(170/N), streakStep = Math.floor(phase*(4+amt*8));
+    const im = ctx.getImageData(0,0,w,h), d = im.data;
+    for (let y=0;y<h;y++){
+      let bandOff=0;
+      if (mode===3){ const band=Math.floor(y/12); bandOff=Math.floor((rand(band*1.3+streakStep)-0.5)*2*amt*N); }
+      for (let x=0;x<w;x++){
+        const i=(y*w+x)*4;
+        let r=d[i], g=d[i+1], b=d[i+2];
+        if (dith>0){ const t=(bayer[(y&3)*4+(x&3)]-7.5)/7.5*dAmp;
+          r+=t; g+=t; b+=t; r=r<0?0:r>255?255:r; g=g<0?0:g>255?255:g; b=b<0?0:b>255?255:b; }
+        let idx = map(r|0,g|0,b|0);
+        let c;
+        if (mode===3){ idx=(idx+bandOff)%N; if(idx<0)idx+=N; c=pal[idx]; }
+        else c = disp[idx];
+        d[i]=c[0]; d[i+1]=c[1]; d[i+2]=c[2];
+      }
+    }
+    ctx.putImageData(im,0,0);
+  }
+
   // ---- Ghosting: multipath echo — faint offset duplicate(s) of the picture ----
   const gh = state.ghost;
   if (gh.on){
@@ -1653,6 +1780,43 @@ function draw(phase){         // phase in [0,1)
       sctx.drawImage(canvas,0,0); sctx.filter='none';
       ctx.save(); ctx.globalCompositeOperation='screen'; ctx.globalAlpha=gA*0.6;
       ctx.drawImage(sc,0,0); ctx.restore();
+    }
+  }
+
+  // ---- Region Mask: confine all the effects above to a rectangle; restore the pristine image outside it.
+  //      (mclean = the untouched original = the "no-effect" plate.) ----
+  const mk = state.mask;
+  if (mk.on){
+    let x0,x1,y0,y1;
+    if ((mk.mode|0)===1){                                 // Roam: random rect, changes per loop step (seamless)
+      const steps=Math.max(1,mk.interval|0), st=Math.floor(phase*steps);
+      const sw=(0.2+rand(st*3.3+.1)*0.5)*w, sh=(0.2+rand(st*4.9+.6)*0.5)*h;
+      x0=rand(st*1.1+.3)*(w-sw); y0=rand(st*2.7+.7)*(h-sh); x1=x0+sw; y1=y0+sh;
+    } else {
+      x0=Math.min(mk.x0,mk.x1)/100*w; x1=Math.max(mk.x0,mk.x1)/100*w;
+      y0=Math.min(mk.y0,mk.y1)/100*h; y1=Math.max(mk.y0,mk.y1)/100*h;
+    }
+    const feath=mk.feather*Math.min(w,h)*0.12, inv=(mk.invert|0)===1;
+    // build alpha shape: white where EFFECTS should show
+    mshape.width=w; mshape.height=h; msx.clearRect(0,0,w,h);
+    if (!inv){ msx.save(); if(feath>0) msx.filter=`blur(${feath}px)`; msx.fillStyle='#fff'; msx.fillRect(x0,y0,x1-x0,y1-y0); msx.restore(); }
+    else { msx.fillStyle='#fff'; msx.fillRect(0,0,w,h);           // everything, then punch a soft hole
+           msx.save(); msx.globalCompositeOperation='destination-out'; if(feath>0) msx.filter=`blur(${feath}px)`; msx.fillStyle='#000'; msx.fillRect(x0,y0,x1-x0,y1-y0); msx.restore(); }
+    // effected copy, limited to the mask via its alpha
+    sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h); sctx.drawImage(canvas,0,0);
+    sctx.globalCompositeOperation='destination-in'; sctx.drawImage(mshape,0,0); sctx.globalCompositeOperation='source-over';
+    // clean base underneath, effected-in-mask on top
+    ctx.clearRect(0,0,w,h); ctx.drawImage(mclean,0,0); ctx.drawImage(sc,0,0);
+  }
+
+  // ---- Zoom (applied LAST, after every effect): centre zoom-in on the finished frame ----
+  if (state.zoom.on){
+    const za = 1 + P('zoom','amount')*0.5;               // up to 1.5×
+    if (za>1.001){
+      sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h); sctx.drawImage(canvas,0,0);
+      const dw=w*za, dh=h*za;
+      ctx.clearRect(0,0,w,h);
+      ctx.drawImage(sc, -(dw-w)/2, -(dh-h)/2, dw, dh);   // centred
     }
   }
 
@@ -1869,6 +2033,7 @@ function loadImage(file){
   const im = new Image();
   im.onload = ()=>{
     img = im;
+    gifKey = '';                        // rebuild GIF palette for the new image
     // cap size for perf
     const maxW = 720;
     const scale = Math.min(1, maxW/im.width);
@@ -1933,7 +2098,7 @@ function setStatus(s){ statusEl.innerHTML = s; }
 const RAND_PROB = { png:.12, jpeg:.15, warp:.18, halftone:.12, feedback:.12, melt:.12,
                     mosh:.25, crt:.2, pixelate:.3, hud:.3, motion:.4,
                     ghost:.14, dotcrawl:.1, hum:.12, herring:.08, sync:.14, zoom:0,
-                    compress:.14, pixsort:.14, databend:.12, degauss:.06,
+                    compress:.14, pixsort:.14, databend:.12, degauss:.06, gif:.12,
                     // colour-mapping / stylise effects: keep them occasional, emboss rarest
                     duotone:.14, solarize:.14, posterize:.14, emboss:.04 };
 // three strength levels: prob = on-probability scale, str = how far params stray from their default
@@ -1941,6 +2106,7 @@ const RAND_LEVELS = { normal:{prob:.5, str:.4}, strong:{prob:1, str:1}, wild:{pr
 function randomizeFX(){
   const lv = RAND_LEVELS[randLevelVal] || RAND_LEVELS.normal;
   FX.forEach(f=>{
+    if (f.id==='mask') return;                                 // leave the mask region as the user set it
     state[f.id].on = f.id==='motion' ? true                    // Envelope always on
                    : Math.random() < Math.min(0.95, (RAND_PROB[f.id] ?? 0.5) * lv.prob);
     f.params.forEach(p=>{
@@ -1961,8 +2127,8 @@ function randomizeFX(){
     const drop = onTone[Math.floor(Math.random()*onTone.length)];
     state[drop].on = false; onTone = onTone.filter(id=>id!==drop);
   }
-  // Envelope alone renders nothing — guarantee at least one visible effect is on
-  if (!FX.some(f=> f.id!=='motion' && state[f.id].on)){
+  // Envelope/Zoom/Mask render nothing on their own — guarantee a real visible effect is on
+  if (!FX.some(f=> !['motion','zoom','mask'].includes(f.id) && state[f.id].on)){
     const pick = ['vhs','glitch','noise','color'][Math.floor(Math.random()*4)];
     state[pick].on = true;
   }
@@ -1994,6 +2160,7 @@ let driftAmt = 0.5;     // drift wander range as a fraction of each param's span
 function driftTick(){
   FX.forEach(f=>{
     if (!state[f.id].on || f.id==='jpeg' || f.id==='png') return;   // skip the heavy real-glitch pools
+    if (f.id==='zoom' || f.id==='motion' || f.id==='mask') return;  // Zoom / Envelope / Mask shouldn't wander
     f.params.forEach(p=>{
       if (p.type==='select') return;
       const key=f.id+'.'+p.k, cur=state[f.id][p.k], span=p.max-p.min;
