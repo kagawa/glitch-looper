@@ -475,12 +475,7 @@ const FX = [
     { k:'quality',label:'Quality', min:1, max:90, step:1, def:40 },
     { k:'frames', label:'Frames', min:1, max:12, step:1, def:6 },
   ]},
-  { id:'gifpal', name:'GIF Palette', hint:'real GIF encode + colour-table corruption (palette shifts)', on:false, open:false, params:[
-    { k:'amount', label:'Corruption', min:0, max:1, step:.01, def:.4 },
-    { k:'colors', label:'Colours', min:2, max:128, step:1, def:32 },
-    { k:'frames', label:'Frames', min:1, max:12, step:1, def:6 },
-  ]},
-  { id:'gifg', name:'GIF Databend', hint:'real GIF encode + LZW byte corruption (image tears from the bottom)', on:false, open:false, params:[
+  { id:'gifg', name:'GIF Databend', hint:'real GIF encode + byte corruption (colour table + LZW image tears)', on:false, open:false, params:[
     { k:'amount', label:'Corruption', min:0, max:1, step:.01, def:.5 },
     { k:'frames', label:'Frames', min:1, max:12, step:1, def:6 },
   ]},
@@ -607,7 +602,7 @@ const FX = [
 
 // effect cards are shown grouped by sub-genre (order here = display order)
 const FX_GROUPS = [
-  ['Binary Glitch',   ['jpeg','png','webp','gifpal','gifg','sonify','byteshift','bitplane']],
+  ['Binary Glitch',   ['jpeg','png','webp','gifg','sonify','byteshift','bitplane']],
   ['Pixel Glitch',    ['glitch','mosh','compress','pixsort','databend','gif']],
   ['Analog / Tape',   ['vhs','sync','roll','film','noise','ghost','dotcrawl','hum','herring']],
   ['Screen / Optics', ['crt','degauss','halftone','hud','bloom']],
@@ -713,7 +708,6 @@ const wctx = wsrc.getContext('2d');
 // real GIF databend: encode a single-frame GIF (median-cut + LZW), then corrupt either the colour
 // table (GIF Palette) or the LZW image bytes (GIF Databend) and decode the broken GIF.
 let gifgFrames = [], gifgReady = false, gifgTimer = null, gifgToken = 0;
-let gifpalFrames = [], gifpalReady = false, gifpalTimer = null, gifpalToken = 0;
 const ggsrc = document.createElement('canvas');
 const ggctx = ggsrc.getContext('2d', { willReadFrequently:true });
 
@@ -795,7 +789,6 @@ function buildUI(){
       if (r.dataset.fx==='png')  schedulePng();
       if (r.dataset.fx==='webp') scheduleWebp();
       if (r.dataset.fx==='gifg') scheduleGifg();
-      if (r.dataset.fx==='gifpal') scheduleGifpal();
     });
   });
   controls.querySelectorAll('.fxtoggle').forEach(c=>{
@@ -805,7 +798,6 @@ function buildUI(){
       if (c.dataset.fx==='png'  && c.checked) schedulePng();
       if (c.dataset.fx==='webp' && c.checked) scheduleWebp();
       if (c.dataset.fx==='gifg' && c.checked) scheduleGifg();
-      if (c.dataset.fx==='gifpal'){ if (c.checked) scheduleGifpal(); else if (state.gifg.on) scheduleGifg(); }
       updateCatCounts();
     });
   });
@@ -848,7 +840,6 @@ function syncUI(){
   if (state.png.on)  schedulePng();  else pngReady  = false;
   if (state.webp.on) scheduleWebp(); else webpReady = false;
   if (state.gifg.on) scheduleGifg(); else gifgReady = false;
-  if (state.gifpal.on) scheduleGifpal(); else gifpalReady = false;
   updateCatCounts();
 }
 
@@ -995,34 +986,17 @@ function gifEncodeBase(ncolors){
 }
 const gifDecode = copy => createImageBitmap(new Blob([copy], {type:'image/gif'})).catch(()=>null);
 
-// GIF Palette: corrupt only the colour table — always decodes, wrecks the colours.
-async function buildGifpalFrames(){
-  if (!img) return;
-  const myToken=++gifpalToken; const gp=state.gifpal;
-  const { base, ctStart, ctLen } = gifEncodeBase(gp.colors);
-  const nFrames=Math.max(1, Math.round(gp.frames)), out=[];
-  for (let f=0; f<nFrames; f++){
-    const copy=base.slice(); const chits=Math.max(1, Math.round(gp.amount*ctLen*0.7));
-    for (let k=0;k<chits;k++) copy[ctStart+Math.floor(Math.random()*ctLen)]=Math.floor(Math.random()*256);
-    const b=await gifDecode(copy); if(b) out.push(b);
-  }
-  if (myToken!==gifpalToken) return;
-  if (out.length){ gifpalFrames=out; gifpalReady=true; } else gifpalReady=false;
-}
-// when the palette changes, rebuild GIF Databend too (it folds the palette in when both are on)
-function scheduleGifpal(){ gifpalReady=false; clearTimeout(gifpalTimer); gifpalTimer=setTimeout(()=>{ buildGifpalFrames().catch(()=>{}); if (state.gifg.on) buildGifgFrames().catch(()=>{}); }, 120); }
-
-// GIF Databend: corrupt only the LZW image bytes. Browsers reject heavily-broken LZW, so keep as much
-// as still decodes — hits are biased to the later stream (top decodes, lower part tears = classic
-// databend), backing off on failure down to the clean re-encoded GIF.
+// GIF Databend: corrupt the real GIF file bytes — the colour table (always shows: garish colours)
+// AND the LZW image data (tears the picture when it still decodes). Browsers reject heavily-broken
+// LZW, so we keep as much LZW as still decodes: later-biased hits back off to the palette-only frame.
 async function buildGifgFrames(){
   if (!img) return;
-  const myToken=++gifgToken; const gg=state.gifg, gp=state.gifpal;
-  const { base, ctStart, ctLen, lzwPos } = gifEncodeBase(64);   // fixed palette (Colours isn't a param here)
+  const myToken=++gifgToken; const gg=state.gifg;
+  const { base, ctStart, ctLen, lzwPos } = gifEncodeBase(64);
   const lateStart=Math.floor(lzwPos.length*0.25);               // corrupt the later ~75% of the stream
   const nFrames=Math.max(1, Math.round(gg.frames)), out=[];
   const makeFrame = async ()=>{
-    const palHits = gp.on ? Math.max(1, Math.round(gp.amount*ctLen*0.7)) : 0;   // combine GIF Palette when it's also on
+    const palHits = Math.round(gg.amount*ctLen*0.6);            // colour-table corruption (scaled by Corruption)
     let hits=Math.round(3 + gg.amount*120);                     // much heavier LZW corruption
     for (let attempt=0; attempt<8; attempt++){
       const copy=base.slice();
@@ -1188,8 +1162,6 @@ function draw(phase){         // phase in [0,1)
     base = webpFrames[Math.floor(phase*webpFrames.length) % webpFrames.length];
   else if (state.gifg.on && gifgReady && gifgFrames.length)
     base = gifgFrames[Math.floor(phase*gifgFrames.length) % gifgFrames.length];
-  else if (state.gifpal.on && gifpalReady && gifpalFrames.length)
-    base = gifpalFrames[Math.floor(phase*gifpalFrames.length) % gifpalFrames.length];
   tctx.clearRect(0,0,w,h);
   tctx.filter = fp.length ? fp.join(' ') : 'none';
   tctx.drawImage(base, 0, 0, w, h);
@@ -2293,7 +2265,6 @@ function loadImage(file){
     if (state.png.on)  schedulePng();
     if (state.webp.on) scheduleWebp();
     if (state.gifg.on) scheduleGifg();
-    if (state.gifpal.on) scheduleGifpal();
     URL.revokeObjectURL(url);
   };
   im.src = url;
@@ -2347,7 +2318,7 @@ const RAND_PROB = { png:.12, jpeg:.15, warp:.18, halftone:.12, feedback:.12, mel
                     mosh:.25, crt:.2, pixelate:.3, hud:.3, motion:.4,
                     ghost:.14, dotcrawl:.1, hum:.12, herring:.08, sync:.14, zoom:0,
                     compress:.14, pixsort:.14, databend:.12, degauss:.06, gif:.12,
-                    sonify:.12, byteshift:.12, bitplane:.1, webp:.1, gifg:.1, gifpal:.1,
+                    sonify:.12, byteshift:.12, bitplane:.1, webp:.1, gifg:.1,
                     // colour-mapping / stylise effects: keep them occasional, emboss rarest
                     duotone:.14, solarize:.14, posterize:.14, emboss:.04 };
 // three strength levels: prob = on-probability scale, str = how far params stray from their default
