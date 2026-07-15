@@ -54,14 +54,14 @@ function buildUI(){
       </div>
       <div class="body">
         ${f.params.map(p=> p.type==='select'
-          ? `<label class="row">
+          ? `<label class="row" data-fx="${f.id}" data-param="${p.k}">
                <span class="k">${p.label}</span>
                <select class="fxsel" data-fx="${f.id}" data-k="${p.k}">
                  ${p.options.map(o=>`<option value="${o[0]}" ${state[f.id][p.k]==o[0]?'selected':''}>${o[1]}</option>`).join('')}
                </select>
                <span class="val"></span>
              </label>`
-          : `<label class="row${p.env?' hasenv':''}">
+          : `<label class="row${p.env?' hasenv':''}" data-fx="${f.id}" data-param="${p.k}">
                <span class="k">${p.label}</span>
                <input type="range" min="${p.min}" max="${p.max}" step="${p.step}"
                       value="${state[f.id][p.k]}" data-fx="${f.id}" data-k="${p.k}">
@@ -117,6 +117,7 @@ function buildUI(){
     s.addEventListener('change', ()=>{
       state[s.dataset.fx][s.dataset.k] = parseInt(s.value, 10);
       if (s.dataset.fx==='png') schedulePng();
+      if (s.dataset.fx==='mask') updateMaskRows();
     });
   });
   controls.querySelectorAll('.envchk').forEach(c=>{
@@ -138,6 +139,18 @@ function buildUI(){
       names.map(n=>`<option value="${n}">${n}</option>`).join('')+`</optgroup>`).join('');
   presetSel.addEventListener('change', ()=>{ if (presetSel.value) applyPreset(presetSel.value); });
   presetsEl.appendChild(lab); presetsEl.appendChild(presetSel);
+  updateMaskRows();
+}
+function updateMaskRows(){
+  const source=state.mask.source|0, roam=(state.mask.mode|0)===1;
+  controls.querySelectorAll('label[data-fx="mask"]').forEach(row=>{
+    const key=row.dataset.param;
+    let visible=true;
+    if (['mode','x0','x1','y0','y1'].includes(key)) visible=source===0;
+    if (key==='threshold') visible=source!==0;
+    if (key==='interval') visible=(source===0&&roam)||source===5;
+    row.hidden=!visible;
+  });
 }
 function applyPreset(name){
   const p = PRESETS[name];
@@ -160,6 +173,7 @@ function syncUI(){
     const locked = !!state[button.dataset.fx]._locked;
     button.classList.toggle('active', locked); button.textContent = locked ? '🔒' : '🔓';
   });
+  updateMaskRows();
   if (state.jpeg.on) scheduleJpeg(); else jpegReady = false;
   if (state.png.on)  schedulePng();  else pngReady  = false;
   if (state.webp.on) scheduleWebp(); else webpReady = false;
