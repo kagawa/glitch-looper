@@ -564,7 +564,7 @@ const FX = [
     { k:'mode',   label:'Mode', type:'select', def:0, options:[[0,'Drip'],[1,'Wrap']] },
     { k:'spread', label:'Spread', min:0, max:1, step:.01, def:.5 },
     { k:'curve',  label:'Curve', type:'select', def:1,
-      options:[[1,'Peak'],[2,'Pulse'],[3,'Build → Drop'],[4,'Stutter']] },
+      options:[[1,'Peak'],[2,'Pulse'],[3,'Build → Drop'],[4,'Stutter'],[5,'Swell'],[6,'Drop → Build'],[7,'Bounce'],[8,'Wander']] },
     { k:'rate',   label:'Rate', min:1, max:8, step:1, def:2 },
   ]},
   { id:'emboss', name:'Emboss', hint:'directional relief — carved / raised metal look', on:false, open:false, params:[
@@ -600,7 +600,7 @@ const FX = [
   ]},
   { id:'motion', name:'Envelope', hint:'makes destruction breathe over the loop (pick targets via ⓔ)', on:false, open:false, params:[
     { k:'mode', label:'Curve', type:'select', def:1,
-      options:[[0,'Constant'],[1,'Peak (crash mid)'],[2,'Pulse'],[3,'Build → Drop'],[4,'Stutter']] },
+      options:[[0,'Constant'],[1,'Peak (crash mid)'],[2,'Pulse'],[3,'Build → Drop'],[4,'Stutter'],[5,'Swell'],[6,'Drop → Build'],[7,'Bounce'],[8,'Wander']] },
     { k:'depth', label:'Depth', min:0, max:1, step:.01, def:.7 },
     { k:'rate',  label:'Rate / Count', min:1, max:12, step:1, def:3 },
   ]},
@@ -1155,6 +1155,12 @@ function envCurve(phase, mode, rate){
     case 3: { const b=0.82;                                  // build → drop — accelerating build, eased release
       const t=phase/b; return phase<b ? t*t*t : 1-sm((phase-b)/(1-b)); }
     case 4: return rand(Math.floor(phase*rate*4)+0.5);       // stutter — stepped random
+    case 5: return phase<0.25 ? sm(phase/0.25) : phase>0.75 ? sm((1-phase)/0.25) : 1;  // swell — plateau peak
+    case 6: { const b=0.18;                                  // drop → build — release then re-build (starts/ends high)
+      return phase<b ? 1-sm(phase/b) : (t=>t*t*t)((phase-b)/(1-b)); }
+    case 7: return Math.abs(Math.sin(Math.PI*phase*rate)) * hump(phase);   // bounce — decaying bounces within a peak
+    case 8: { const N=Math.max(1,rate*3), seg=phase*N, i=Math.floor(seg)%N, j=(i+1)%N, t=seg-Math.floor(seg);
+      const a=rand(i+0.5); return a+(rand(j+0.5)-a)*sm(t); }              // wander — smooth random
     default: return hump(phase);
   }
 }
