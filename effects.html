@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GLITCH LOOPER — Effect Reference</title>
+<meta name="description" content="Every effect in GLITCH LOOPER, explained (EN / 日本語).">
+<style>
+  :root{ --bg:#0d0d10; --panel:#16161c; --panel2:#1e1e26; --line:#2c2c38;
+         --fg:#e6e6ee; --muted:#8a8a9a; --accent:#6cf; --accent2:#f6c; }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{ background:var(--bg); color:var(--fg); line-height:1.6;
+        font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans JP",sans-serif;
+        -webkit-font-smoothing:antialiased; }
+  a{ color:var(--accent); text-decoration:none } a:hover{ text-decoration:underline }
+  .wrap{ max-width:920px; margin:0 auto; padding:28px 20px 80px }
+  header{ display:flex; flex-wrap:wrap; align-items:center; gap:12px 18px; margin-bottom:6px }
+  h1{ font-size:26px; letter-spacing:.02em; margin:0; font-weight:800 }
+  h1 small{ color:var(--muted); font-weight:500; font-size:13px; letter-spacing:.06em; text-transform:uppercase }
+  .back{ font-size:13px; color:var(--muted) }
+  .lead{ color:var(--muted); font-size:15px; margin:10px 0 22px }
+  .lead .jp{ display:block; margin-top:4px }
+  .langbar{ margin-left:auto; display:flex; gap:6px; background:var(--panel2); padding:4px; border-radius:10px; border:1px solid var(--line) }
+  .langbar button{ font:inherit; font-size:13px; color:var(--muted); background:none; border:0; padding:5px 12px; border-radius:7px; cursor:pointer }
+  .langbar button.on{ background:var(--accent); color:#001018; font-weight:700 }
+
+  .cat{ margin:30px 0 10px }
+  .cat h2{ font-size:14px; letter-spacing:.12em; text-transform:uppercase; color:var(--accent2);
+           border-bottom:1px solid var(--line); padding-bottom:8px; margin:0 0 4px }
+  .fx{ padding:16px 0; border-bottom:1px solid var(--line) }
+  .fx:last-child{ border-bottom:0 }
+  .fx h3{ margin:0 0 6px; font-size:17px; font-weight:700 }
+  .fx .en{ margin:2px 0 }
+  .fx .jp{ margin:2px 0; color:#c9c9d6 }
+  .params{ margin:8px 0 0; font-size:13px; color:var(--muted) }
+  .params b{ color:var(--fg); font-weight:600 }
+  .tag{ font-size:11px; letter-spacing:.05em; text-transform:uppercase; padding:2px 7px; border-radius:20px; margin-left:8px; vertical-align:middle }
+  .tag.real{ background:rgba(102,204,255,.15); color:var(--accent) }
+  .tag.sim{ background:rgba(255,102,204,.13); color:var(--accent2) }
+
+  body.lang-en .jp{ display:none } body.lang-jp .en{ display:none }
+  h2 .jp, h2 .en{ font-weight:inherit }
+
+  .refs{ margin-top:34px }
+  .refs h2{ font-size:14px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--line); padding-bottom:8px }
+  .refs ul{ margin:10px 0; padding-left:20px; font-size:14px; color:var(--muted) }
+  .refs li{ margin:4px 0 }
+  footer{ margin-top:36px; color:var(--muted); font-size:13px }
+</style>
+</head>
+<body class="lang-both">
+<div class="wrap">
+  <header>
+    <h1>GLITCH LOOPER <small>Effect Reference</small></h1>
+    <div class="langbar" role="group" aria-label="language">
+      <button data-lang="both" class="on">Both</button>
+      <button data-lang="en">EN</button>
+      <button data-lang="jp">日本語</button>
+    </div>
+  </header>
+  <p class="back"><a href="./">← back to the app</a></p>
+  <p class="lead">
+    <span class="en">Every effect turns a still image into a seamless looping video, entirely in your browser — nothing is uploaded. Effects stack; the <b>Envelope</b> makes them breathe over the loop. Tags: <span class="tag real">real</span> genuinely corrupts encoded file bytes; <span class="tag sim">sim</span> mimics the look with pixel processing.</span>
+    <span class="jp">各エフェクトは静止画をシームレスなループ動画に変換します。処理はすべてブラウザ内で完結し、画像はアップロードされません。効果は重ねがけでき、<b>Envelope</b> でループ内の抑揚を付けられます。タグ: <span class="tag real">real</span>＝エンコード済みバイトを実際に破壊、<span class="tag sim">sim</span>＝ピクセル処理で見た目を模倣。</span>
+  </p>
+
+  <main id="doc"></main>
+
+  <section class="refs">
+    <h2>References <span class="jp">／ 参考文献</span></h2>
+    <ul id="refs"></ul>
+  </section>
+
+  <footer>
+    Made by <a href="https://x.com/kagawa">@kagawa</a>. Runs on canvas + MediaRecorder, no AI, no server.
+  </footer>
+</div>
+
+<script>
+const GROUPS = [
+  ['Databend (real)', [
+    ['JPEG databend','real','Re-encodes the frame as JPEG, corrupts bytes after the SOS marker (headers/EOI kept), and decodes the broken data — genuine DCT-block melt and colour drift. A pool of frames is cycled for seamless animation.','フレームをJPEGに再エンコードし、SOSマーカー以降のバイトを破壊（ヘッダ/EOIは維持）して再デコード。本物のDCTブロック崩れと色ずれ。複数フレームを巡回してシームレスにアニメ化。','Amount · Quality · Frames'],
+    ['PNG glitch','real','Rebuilds valid PNG scanlines with a real filter per band (Sub/Up/Average/Paeth), corrupts filter & pixel bytes, then re-deflates. Corruption bleeds horizontally / vertically / diagonally depending on each band’s filter.','走査線を帯ごとに実フィルタ（Sub/Up/Average/Paeth）で再構築し、フィルタ/画素バイトを破壊して再deflate。破壊は帯のフィルタ方向に沿って横/縦/斜めに滲む。','Bleed · Noise · Dir · Frames'],
+    ['WebP Databend','real','Re-encodes to low-quality WebP, corrupts the VP8 payload, and decodes. VP8’s intra-block prediction chains give a texture different from JPEG. Fragile — undecodable frames are dropped, and it needs a browser that can encode WebP.','低画質WebPに再エンコードしVP8ペイロードを破壊して再デコード。VP8のブロック内予測が連鎖しJPEGと違う質感。壊れやすくデコード失敗フレームは自動除外、WebPエンコード対応ブラウザが必要。','Corruption · Quality · Frames'],
+  ]],
+  ['Glitch (sim)', [
+    ['Slice','sim','Horizontal slice displacement plus an RGB split. A visual glitch — not real data corruption.','水平スライスのずらし＋RGB分離。見た目のグリッチで実データ破壊ではない。','Amount · Slices · Shift · RGB'],
+    ['Datamosh (fake)','sim','Block smear + pixel sort + channel corruption that mimic the look of gif/video moshing (removed I-frames), without touching real data.','ブロック塗り＋ピクセルソート＋チャンネル破壊で、gif/動画のmoshing（Iフレーム除去）の見た目を模倣。実データは触らない。','Intensity · Blocks · Sort · Chaos · Rate'],
+    ['Compression','sim','A heavy low-quality-JPEG look built in-canvas: 8×8 block flatten toward the mean, luma quantisation (banding), and chroma subsampling.','キャンバス内で作る重い低画質JPEG風。8×8ブロックを平均へ平坦化＋輝度量子化（バンディング）＋色間引き。','Amount · Chroma Bleed · Block'],
+    ['Pixel Sort','sim','Sorts contiguous bright spans by luminance along rows and/or columns — the classic “pixels pour” glitch-art look.','明るい連続スパンを輝度順に行/列でソート。「ピクセルが流れる」グリッチアートの定番。','Amount · Threshold · Direction · Max Length'],
+    ['Databend Shift','sim','Per-row horizontal wrap (a stride/byte-stride error → diagonal shear) plus occasional packet-break jumps with RGB desync (rainbow).','行ごとの横ラップ（ストライド誤差＝斜めシア）＋確率的なパケット破断でRGB分離（レインボー）。','Amount · Skew · Scramble · Speed'],
+    ['Indexed / GIF','sim','Quantises to a cached global palette (median-cut) with ordered dither, then a palette glitch: scramble, colour-cycle, or per-band index streaks.','グローバルパレット（median-cut）に量子化＋規則ディザ後、パレット破壊/カラーサイクル/帯ごとのインデックスずれ。','Colours · Dither · Palette FX · FX Amount'],
+    ['Sonify','sim','Treats the raw RGBA byte stream as audio and applies an audio effect: Echo (delay), Reverse (mirror blocks), Reverb (diffuse tail), Tremolo (rolling bands). Delays that aren’t a multiple of 4 roll the colour channels.','生のRGBAバイト列を音とみなし音声エフェクトを適用。Echo（ディレイ）/Reverse（ブロック反転）/Reverb（拡散残響）/Tremolo（流れる明暗）。4の倍数でないディレイは色チャンネルを回す。','Effect · Amount · Delay / Rate (ⓔ)'],
+    ['Byte Shift','sim','Raw reinterpret: a smooth per-row diagonal shear (stride error) with an RGB channel roll (RGB→GBR/BRG = hue rotation).','生バイト再解釈。行ごとの滑らかな斜めシア（ストライド誤差）＋RGBチャンネルロール（RGB→GBR/BRG＝色相回転）。','Shift · Channel Roll · Skew'],
+    ['Bit-plane','sim','Splits each channel at a bit boundary and displaces, XORs, or drops the low bit-planes for banded, ghosted glitch.','各チャンネルをビット境界で分割し、下位プレーンをずらす/XOR/欠落させ、帯状＋ゴースト状のグリッチに。','Mode · Amount · Bit Split'],
+  ]],
+  ['Analog / Tape', [
+    ['VHS','sim','Chroma shift (aberration), scanlines, horizontal bleed, tracking noise, and screen wobble with a selectable pattern (wave/pulse/jitter/step/drift).','色ずれ（アバレーション）、走査線、横にじみ、トラッキングノイズ、揺れ（波/パルス/ジッタ/ステップ/ドリフト選択）。','Aberration · Scanlines · Bleed · Tracking · Wobble · Pattern'],
+    ['Signal / Sync','sim','Horizontal-sync instability: per-scanline diagonal skew that drifts and snaps back, flagging (top-of-frame bend + head-switch noise band), and intermittent bad-contact bursts.','水平同期の乱れ。走査線ごとの斜め歪みが流れて再ロック、フラッギング（上端の折れ＋ヘッドスイッチのノイズ帯）、断続的な接触不良。','H-Sync · Flagging · Bad Contact'],
+    ['Roll','sim','Wrap-around scroll (vertical and/or horizontal) with a dark tear band at the seam — a mistracked tape rolling.','ラップスクロール（縦/横）＋継ぎ目の暗いティア帯。トラッキングの外れたテープの転がり。','H-Speed · H-Step · V-Speed · Band'],
+    ['Film 8mm','sim','Old-film grain of dust, scratches, sepia and burn/flicker. (Frame shake is now VHS → Wobble.)','古いフィルムの埃・傷・セピア・焼け/明滅。（フレームの揺れは VHS の Wobble に統合）','Dust · Scratches · Sepia · Burn/Flicker'],
+    ['Noise','sim','Film-style luminance grain plus brightness flicker.','フィルム風の輝度粒子＋明るさの明滅。','Grain · Flicker'],
+    ['Ghosting','sim','Multipath echo — faint offset duplicate(s), with an optional pre-echo. Drift emits a continuous, one-way stream of ghosts that slide outward and fade (crossfaded so opacity stays constant).','マルチパスのゴースト（薄い複製）＋前方エコー。Drift で外へ流れて消える一方通行のゴーストを連続放出（クロスフェードで濃さ一定）。','Amount · Offset · Echoes · Pre-echo · Drift · Rate'],
+    ['Dot Crawl','sim','Composite cross-colour: a rainbow checkerboard that shimmers and crawls along vertical colour edges — the classic composite-video artifact.','コンポジットのクロスカラー。縦の色境界に沿って虹色のチェッカーが這うコンポジット映像特有のノイズ。','Amount · Dot Size · Crawl'],
+    ['Hum Bar','sim','A soft dark band from mains hum, slowly rolling up the screen.','電源ハム由来の柔らかい暗帯が画面をゆっくり上へ流れる。','Darkness · Band Width · Roll Speed'],
+    ['Herringbone','sim','RF interference — a moving diagonal weave overlaid on the picture.','RF干渉の斜めの織り模様が画面上を動く。','Amount · Density · Drift'],
+  ]],
+  ['Screen / Optics', [
+    ['CRT','sim','A cathode-ray-tube (ブラウン管) simulation: barrel curvature, an RGB phosphor mask (aperture grille / shadow mask / slot mask), scanlines, beam convergence error, corner darkening, phosphor glow and a bezel.','ブラウン管シミュレーション。樽型湾曲、RGB蛍光体マスク（アパーチャーグリル/シャドウマスク/スロットマスク）、走査線、コンバージェンスずれ、周辺減光、蛍光体発光、ベゼル。','Curvature · Screen Bulge · Corner Dark · Bezel · Phosphor · Mask Depth · Scanlines · Convergence · Glow'],
+    ['Degauss','sim','A magnetised CRT: rainbow colour-purity patches shimmer and settle. It breaks colour (electron beams hitting the wrong phosphors), not geometry.','磁化したCRT。虹色の色純度パッチが揺れて収束。形ではなく色が壊れる（電子ビームが誤った蛍光体に当たる）。','Amount · Shimmer · Rainbow'],
+    ['Halftone','sim','Dot-matrix rendering — LED-panel or newsprint dots.','ドットマトリクス表現。LEDパネル/新聞印刷風のドット。','Cell Size · Background'],
+    ['HUD / Text','sim','On-screen overlays: REC ●, camcorder, security cam, and TV/VCR OSD text (channel, STEREO, PLAY, tape counter, ON AIR, 音声多重, NO SIGNAL).','画面表示のオーバーレイ。REC●、カムコーダ、防犯カメラ、TV/VCRのOSD（チャンネル、STEREO、PLAY、テープカウンター、ON AIR、音声多重、NO SIGNAL）。','Layout · Text Color · Size · Opacity'],
+    ['Bloom','sim','Glow / light bleed on the highlights.','ハイライトの発光/光のにじみ。','Amount · Radius'],
+  ]],
+  ['Distort', [
+    ['Warp','sim','Per-row horizontal displacement with a selectable pattern: wave, pulse, jitter, step, drift, twist (shear), beat (interference), zigzag.','行ごとの水平変位。パターン選択: 波・パルス・ジッタ・ステップ・ドリフト・ツイスト（せん断）・うなり・ジグザグ。','Amplitude · Frequency · Speed · Pattern'],
+    ['Melt','sim','Pixels drip downward; the drip breathes over the loop.','ピクセルが下へ垂れる。垂れ具合がループで呼吸する。','Amount'],
+    ['Feedback Zoom','sim','A Droste feedback tunnel that zooms, spins and pulses over the loop.','ドロステのフィードバックトンネル。ループ内でズーム・回転・脈動。','Amount · Zoom · Twist · Spin · Pulse'],
+    ['Pixelate','sim','Mosaic / retro blocks; the Envelope can pulse the block size.','モザイク/レトロブロック。Envelopeでブロックサイズを脈動可能。','Size'],
+  ]],
+  ['Colour / Tone', [
+    ['Color','sim','Base grade: saturation, contrast, hue rotation, warm/cool tint, and vignette.','基本の色調整。彩度・コントラスト・色相回転・暖色/寒色ティント・周辺減光。','Saturate · Contrast · Hue · Tint · Vignette'],
+    ['Duotone','sim','Maps brightness onto a two-colour gradient (several palettes).','明暗を2色グラデーションにマップ（複数パレット）。','Palette · Amount'],
+    ['Solarize','sim','Inverts tones past a threshold — the Sabattier effect.','しきい値を超えた階調を反転（サバチエ効果）。','Threshold · Amount'],
+    ['Posterize','sim','Reduces the number of colours into flat bands, with optional dithering.','色数を減らして平坦なバンドに。ディザリング可。','Levels · Dither'],
+    ['Emboss','sim','Directional relief — a carved or raised-metal look; can keep some colour.','方向性レリーフ。彫り込み/金属の浮き出し風。色を残すことも可能。','Amount · Light angle · Keep colour'],
+  ]],
+  ['Global', [
+    ['Zoom','sim','A centre zoom-in applied LAST, after every other effect (so slices etc. render at normal scale first). Also crops the minimal overscan that hides wobble wrap-seams.','最終段（全エフェクト後）で中央ズーム。Sliceなどは等倍で処理された後に拡大される。wobbleの継ぎ目を隠す最小オーバースキャンも兼ねる。','Amount'],
+    ['Region Mask','sim','Confines every effect to a rectangle; outside it the untouched original shows through. Fixed or roaming region, invertable, with a feathered edge. Excluded from Random (set a region, then reroll within it).','全エフェクトを矩形に限定し、外側は素の原画を表示。固定/移動、反転、縁ぼかし対応。ランダム対象外（範囲を決めてからリロール）。','Mode · X/Y start-end · Invert · Roam Steps · Feather'],
+    ['Envelope','sim','Modulates the other effects over the loop (constant / peak / pulse / build-drop / stutter). Tick the ⓔ box on any supported parameter to make it breathe.','他のエフェクトをループ内で変調（一定/ピーク/パルス/ビルド→ドロップ/スタッター）。対応パラメータの ⓔ をオンにすると抑揚が付く。','Curve · Depth · Rate / Count'],
+  ]],
+];
+
+const REFS = [
+  ['CRT shadow mask / aperture grille','https://en.wikipedia.org/wiki/Shadow_mask'],
+  ['CRT shader masks — filthypants','http://filthypants.blogspot.com/2020/02/crt-shader-masks.html'],
+  ['CRT appearance: TV vs monitor — nyanpasu64','https://nyanpasu64.gitlab.io/blog/crt-appearance-tv-monitor/'],
+  ['Dot crawl (composite cross-colour)','https://en.wikipedia.org/wiki/Dot_crawl'],
+  ['Time base correction / VHS flagging','https://en.wikipedia.org/wiki/Time_base_correction'],
+  ['Time base error — bavc/avaa','https://github.com/bavc/avaa/blob/master/_artifacts/time_base_error.md'],
+  ['WTF is degaussing? — Hackaday','https://hackaday.com/2016/05/25/wtf-is-degaussing/'],
+  ['The Art of PNG Glitch — ucnv','https://ucnv.github.io/pnglitch/'],
+  ['Databending & glitch-art primer / sonification — stAllio!','http://blog.animalswithinanimals.com/2008/09/databending-and-glitch-art-primer-part.html'],
+  ['Databending 101 — Nick Briz','https://nickbriz.com/databending101/bmp.html'],
+  ['What’s In A GIF — LZW image data','https://giflib.sourceforge.net/whatsinagif/lzw_image_data.html'],
+];
+
+const doc = document.getElementById('doc');
+for (const [group, items] of GROUPS){
+  const sec = document.createElement('section'); sec.className='cat';
+  sec.innerHTML = `<h2>${group}</h2>`;
+  for (const [name, tag, en, jp, params] of items){
+    const el = document.createElement('div'); el.className='fx';
+    el.innerHTML = `<h3>${name}<span class="tag ${tag}">${tag}</span></h3>`+
+      `<div class="en">${en}</div><div class="jp">${jp}</div>`+
+      `<div class="params"><b>Params:</b> ${params}</div>`;
+    sec.appendChild(el);
+  }
+  doc.appendChild(sec);
+}
+const refs = document.getElementById('refs');
+refs.innerHTML = REFS.map(([t,u])=>`<li><a href="${u}" target="_blank" rel="noopener">${t}</a></li>`).join('');
+
+document.querySelectorAll('.langbar button').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.body.className = 'lang-'+b.dataset.lang;
+    document.querySelectorAll('.langbar button').forEach(x=>x.classList.toggle('on', x===b));
+  });
+});
+</script>
+</body>
+</html>
