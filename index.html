@@ -988,20 +988,29 @@ async function buildGifgFrames(){
   const lzwPos=[]; let p=lzwStart;
   while (p<base.length-1){ const len=base[p]; if(len===0) break; for(let q=p+1;q<=p+len && q<base.length;q++) lzwPos.push(q); p+=len+1; }
   const nFrames=Math.max(1, Math.round(gg.frames)), out=[];
-  // palette corruption ALWAYS decodes (colour table = plain RGB) and reliably wrecks the colours.
-  // LZW corruption gives index streaks but heavy amounts make the whole GIF undecodable — keep it few.
-  const makeFrame = async (withLZW)=>{
-    const copy=base.slice();
-    const chits=Math.max(1, Math.round(gg.amount*ctLen*0.5));     // up to ~half the colour table
-    for (let k=0;k<chits;k++) copy[ctStart+Math.floor(Math.random()*ctLen)]=Math.floor(Math.random()*256);
-    if (withLZW && lzwPos.length){
-      const lhits=Math.round(gg.amount*gg.amount*40);             // squared → gentle (≤40), keeps it decodable
-      for (let k=0;k<lhits;k++) copy[lzwPos[Math.floor(Math.random()*lzwPos.length)]]=Math.floor(Math.random()*256);
+  const lateStart=Math.floor(lzwPos.length*0.35);   // bias LZW hits to the later stream so the top decodes
+  const decode = copy => createImageBitmap(new Blob([copy], {type:'image/gif'})).catch(()=>null);
+  // Each frame: strong palette corruption (always valid) + as much LZW corruption as still DECODES.
+  // The browser's GIF decoder rejects heavily-broken LZW, so we back off the hit count and retry —
+  // fewer, later-placed hits garble the lower part of the image (the classic databend tear) yet decode.
+  const makeFrame = async ()=>{
+    const pal=[]; const chits=Math.max(1, Math.round(gg.amount*ctLen*0.5));
+    for (let k=0;k<chits;k++) pal.push([ctStart+Math.floor(Math.random()*ctLen), Math.floor(Math.random()*256)]);
+    let hits=Math.round(1 + gg.amount*30);
+    for (let attempt=0; attempt<5; attempt++){
+      const copy=base.slice();
+      for (const [pos,v] of pal) copy[pos]=v;                                     // palette
+      if (hits>0 && lzwPos.length>lateStart){
+        for (let k=0;k<hits;k++){ const pos=lzwPos[lateStart+Math.floor(Math.random()*(lzwPos.length-lateStart))]; copy[pos]=Math.floor(Math.random()*256); }
+      }
+      const bmp=await decode(copy);
+      if (bmp) return bmp;                                                        // decoded (with whatever LZW survived)
+      hits=Math.floor(hits/2);                                                    // back off: fewer LZW hits, retry
     }
-    try { return await createImageBitmap(new Blob([copy], {type:'image/gif'})); } catch(e){ return null; }
+    const copy=base.slice(); for (const [pos,v] of pal) copy[pos]=v;              // guaranteed fallback: palette only
+    return await decode(copy);
   };
-  for (let f=0; f<nFrames; f++){ const b=await makeFrame(true); if(b) out.push(b); }
-  if (!out.length){ for (let f=0; f<nFrames; f++){ const b=await makeFrame(false); if(b) out.push(b); } }  // fallback: palette-only (always decodes)
+  for (let f=0; f<nFrames; f++){ const b=await makeFrame(); if(b) out.push(b); }
   if (myToken!==gifgToken) return;
   if (out.length){ gifgFrames=out; gifgReady=true; } else gifgReady=false;
 }
