@@ -204,3 +204,67 @@ if (bpl.on){
   }
 }
 }
+// ---------- datamosh: block smear + pixel sort + channel corruption ----------
+// seed varies per frame; higher chaos = seed jumps more => different breakage each frame
+function applyMosh(w,h,fseed,em=1){
+  const m = state.mosh;
+  const intensity = m.intensity*em;
+  const seed = Math.floor(fseed*(1+m.chaos*4)) + 1;
+  const id = ctx.getImageData(0,0,w,h);
+  const d = id.data;
+  const src = new Uint8ClampedArray(d);        // snapshot to read from
+
+  // 1) block displacement (datamosh smear)
+  if (m.blocks>0){
+    const n = Math.floor(1 + m.blocks*10*intensity);
+    for (let k=0;k<n;k++){
+      const bw = Math.max(4, Math.floor((0.08+0.35*rand(seed*3.1+k))*w));
+      const bh = Math.max(2, Math.floor((0.02+0.14*rand(seed*5.7+k))*h));
+      const sx = Math.floor(rand(seed*9.3+k)*(w-bw));
+      const sy = Math.floor(rand(seed*1.7+k)*(h-bh));
+      const dxo = Math.floor((rand(seed*2.2+k)-0.5)*w*intensity);
+      for (let y=0;y<bh;y++){
+        for (let x=0;x<bw;x++){
+          const tx = sx+x+dxo;
+          if (tx<0||tx>=w) continue;
+          const si=((sy+y)*w+sx+x)*4, ti=((sy+y)*w+tx)*4;
+          d[ti]=src[si]; d[ti+1]=src[si+1]; d[ti+2]=src[si+2];
+        }
+      }
+    }
+  }
+
+  // 2) pixel sort (random horizontal bands sorted by luminance)
+  if (m.sort>0){
+    const segs = Math.floor(1 + m.sort*7*intensity);
+    for (let k=0;k<segs;k++){
+      const y0 = Math.floor(rand(seed*4.4+k)*h);
+      const band = 2 + Math.floor(rand(seed*6.1+k)*4);
+      const x0 = Math.floor(rand(seed*6.6+k)*w*0.6);
+      const x1 = Math.min(w, x0 + Math.floor((0.2+0.5*rand(seed*8.8+k))*w));
+      for (let yy=y0; yy<Math.min(h,y0+band); yy++){
+        const arr=[];
+        for (let x=x0;x<x1;x++){ const i=(yy*w+x)*4; arr.push([d[i],d[i+1],d[i+2], d[i]*0.3+d[i+1]*0.59+d[i+2]*0.11]); }
+        arr.sort((a,b)=>a[3]-b[3]);
+        for (let x=x0;x<x1;x++){ const i=(yy*w+x)*4,p=arr[x-x0]; d[i]=p[0]; d[i+1]=p[1]; d[i+2]=p[2]; }
+      }
+    }
+  }
+
+  // 3) channel corruption (shift a single RGB channel on random rows)
+  const bands = Math.floor(m.chaos*6*intensity);
+  for (let k=0;k<bands;k++){
+    const y0 = Math.floor(rand(seed*7.7+k)*h);
+    const bh = Math.floor((0.01+0.05*rand(seed*3.9+k))*h)+1;
+    const ch = Math.floor(rand(seed*5.5+k)*3);
+    const sh = Math.floor((rand(seed*2.1+k)-0.5)*80);
+    for (let y=y0;y<Math.min(h,y0+bh);y++){
+      for (let x=0;x<w;x++){
+        const sx=Math.max(0,Math.min(w-1,x+sh));
+        d[(y*w+x)*4+ch]=src[(y*w+sx)*4+ch];
+      }
+    }
+  }
+
+  ctx.putImageData(id,0,0);
+}

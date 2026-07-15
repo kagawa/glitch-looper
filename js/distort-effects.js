@@ -91,3 +91,28 @@ if (ml.on && ml.amount>0){
   ctx.putImageData(out,0,0);
 }
 }
+function applyRgbShift(w,h,t,v){
+// RGB channel shift — VHS aberration = horizontal, Slice RGB = vertical (distinct axes)
+const gl = state.glitch;
+const hAb  = v.on ? P('vhs','aberration')*(0.7+0.3*Math.sin(t)) : 0;   // horizontal shift (VHS)
+const vRGB = gl.on ? P('glitch','rgb') : 0;                            // vertical shift (Slice)
+if (hAb > 0.5 || vRGB > 0.5){
+  const base = ctx.getImageData(0,0,w,h);
+  const out = ctx.createImageData(w,h);
+  const bd = base.data, od = out.data;
+  const hs = Math.round(hAb), vs = Math.round(vRGB);
+  for (let y=0;y<h;y++){
+    for (let x=0;x<w;x++){
+      const i=(y*w+x)*4;
+      const rx = Math.min(w-1, x+hs), bx = Math.max(0, x-hs);   // R right / B left
+      const ry = Math.min(h-1, y+vs), by = Math.max(0, y-vs);   // R down  / B up
+      od[i]   = bd[(ry*w+rx)*4];      // R: horizontal + vertical
+      od[i+1] = bd[i+1];             // G stays
+      od[i+2] = bd[(by*w+bx)*4+2];   // B: opposite on both axes
+      od[i+3] = 255;
+    }
+  }
+  ctx.putImageData(out,0,0);
+}
+  return gl;
+}
