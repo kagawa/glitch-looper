@@ -21,12 +21,13 @@ async function buildJpegFrames(){
   const nFrames = Math.max(1, Math.round(j.frames));
   const out = [];
   for (let f=0; f<nFrames; f++){
+    const R = makeRng(RNG_TAG.jpeg + f*101);        // per-frame stream: frames differ, but deterministically
     const copy = buf.slice();
     const hits = 1 + Math.floor(j.amount * 40);
     for (let k=0;k<hits;k++){
-      const pos = start + Math.floor(Math.random()*span);
+      const pos = start + Math.floor(R()*span);
       if (copy[pos]===0xFF || copy[pos-1]===0xFF) continue;  // don't fake a marker
-      let v = Math.floor(Math.random()*255);
+      let v = Math.floor(R()*255);
       copy[pos] = v===0xFF ? 0xFE : v;
     }
     try { out.push(await createImageBitmap(new Blob([copy], {type:'image/jpeg'}))); }
@@ -58,9 +59,10 @@ async function buildWebpFrames(){
   const nFrames = Math.max(1, Math.round(wp.frames));
   const out = [];
   for (let f=0; f<nFrames; f++){
+    const R = makeRng(RNG_TAG.webp + f*101);
     const copy = buf.slice();
     const hits = 1 + Math.floor(wp.amount * 12);      // keep it low — VP8 desyncs easily
-    for (let k=0;k<hits;k++){ const pos = start + Math.floor(Math.random()*span); copy[pos] = Math.floor(Math.random()*256); }
+    for (let k=0;k<hits;k++){ const pos = start + Math.floor(R()*span); copy[pos] = Math.floor(R()*256); }
     try { out.push(await createImageBitmap(new Blob([copy], {type:'image/webp'}))); } catch(e){}
   }
   if (myToken!==webpToken) return;
@@ -114,7 +116,7 @@ async function buildGifgFrames(){
   // point stays low in the frame → the top of the picture survives on strict decoders too).
   const passes = 1 + Math.round(gg.data*3);                    // 1–4 gentle iterative passes
   const nFrames=Math.max(1, Math.round(gg.frames)), out=[];
-  const corrupt = (enc)=>{
+  const corrupt = (enc, R)=>{
     const { base, ctStart, ctLen, lzwPos } = enc;
     const lateStart=Math.floor(lzwPos.length*(0.85 - gg.data*0.4));  // Data 0 → last 15%, Data 1 → last 55%
     const palHits=Math.round(gg.palette*ctLen*0.12);           // light per pass → accumulates over passes
@@ -122,23 +124,24 @@ async function buildGifgFrames(){
     return async ()=>{                                          // per-pass back-off (falls to palette-only)
       for (let t=0;t<4;t++){
         const copy=base.slice();
-        for (let k=0;k<palHits;k++) copy[ctStart+Math.floor(Math.random()*ctLen)]=Math.floor(Math.random()*256);
-        if (lz>0 && lzwPos.length>lateStart) for (let k=0;k<lz;k++){ const pos=lzwPos[lateStart+Math.floor(Math.random()*(lzwPos.length-lateStart))]; copy[pos]=Math.floor(Math.random()*256); }
+        for (let k=0;k<palHits;k++) copy[ctStart+Math.floor(R()*ctLen)]=Math.floor(R()*256);
+        if (lz>0 && lzwPos.length>lateStart) for (let k=0;k<lz;k++){ const pos=lzwPos[lateStart+Math.floor(R()*(lzwPos.length-lateStart))]; copy[pos]=Math.floor(R()*256); }
         const bmp=await gifDecode(copy); if (bmp) return bmp;
         lz=Math.floor(lz/2);                                    // t=... eventually lz=0 → palette-only, always decodes
       }
       return null;
     };
   };
-  const makeFrame = async ()=>{
+  const makeFrame = async (f)=>{
+    const R = makeRng(RNG_TAG.gifg + f*101);                     // one stream per frame, shared across its passes
     let cur=img, result=null;
     for (let p=0; p<passes; p++){
-      const bmp=await corrupt(gifEncodeBase(cur,64))();          // re-encode previous result, corrupt, decode
+      const bmp=await corrupt(gifEncodeBase(cur,64), R)();        // re-encode previous result, corrupt, decode
       if (bmp){ result=bmp; cur=bmp; }                           // success → accumulate; fail → skip, keep going
     }
     return result || await gifDecode(gifEncodeBase(img,64).base.slice());   // fallback: clean re-encode
   };
-  for (let f=0; f<nFrames; f++){ const b=await makeFrame(); if(b) out.push(b); }
+  for (let f=0; f<nFrames; f++){ const b=await makeFrame(f); if(b) out.push(b); }
   if (myToken!==gifgToken) return;
   if (out.length){ gifgFrames=out; gifgReady=true; } else gifgReady=false;
 }
@@ -185,17 +188,18 @@ async function buildPngFrames(){
   const nFrames=Math.max(1,Math.round(p.frames));
   const out=[];
   for(let f=0;f<nFrames;f++){
+    const R = makeRng(RNG_TAG.png + f*101);   // filter choice, band runs and hits all come off this stream
     const g=new Uint8Array(rawLen);
     // encode scanlines with a filter chosen per horizontal band (run of rows).
     // Sub=horizontal / Up=vertical / Average・Paeth=diagonal — corruption bleeds in mixed directions.
     const dir=p.dir|0;   // 0=mix 1=horizontal(Sub) 2=vertical(Up) 3=diagonal(Paeth/Avg)
     let y=0;
     while(y<h){
-      const ft = dir===1 ? (Math.random()<0.85?1:0)
-               : dir===2 ? (Math.random()<0.85?2:0)
-               : dir===3 ? (Math.random()<0.5?4:3)
-               :           Math.floor(Math.random()*5);
-      const run=4+Math.floor(Math.random()*Math.max(1,h*0.25));
+      const ft = dir===1 ? (R()<0.85?1:0)
+               : dir===2 ? (R()<0.85?2:0)
+               : dir===3 ? (R()<0.5?4:3)
+               :           Math.floor(R()*5);
+      const run=4+Math.floor(R()*Math.max(1,h*0.25));
       for(let r=0;r<run && y<h; r++,y++){
         const o=y*(1+stride), rb=y*stride, ab=(y-1)*stride;
         g[o]=ft;
@@ -220,14 +224,14 @@ async function buildPngFrames(){
     const amt=p.amount*p.amount, noi=p.noise*p.noise;
     const dhits=Math.floor(amt*rawLen*0.0004*dm);
     for(let k=0;k<dhits;k++){
-      const ry=Math.floor(Math.random()*h), ri=Math.floor(Math.random()*stride);
-      g[ry*(1+stride)+1+ri]=Math.floor(Math.random()*256);
+      const ry=Math.floor(R()*h), ri=Math.floor(R()*stride);
+      g[ry*(1+stride)+1+ri]=Math.floor(R()*256);
     }
     // extra chaos: scramble filter bytes + heavier random noise
     const fhits=Math.floor(noi*h*0.08);
-    for(let k=0;k<fhits;k++) g[Math.floor(Math.random()*h)*(1+stride)]=Math.floor(Math.random()*5);
+    for(let k=0;k<fhits;k++) g[Math.floor(R()*h)*(1+stride)]=Math.floor(R()*5);
     const nhits=Math.floor(noi*rawLen*0.001*dm);
-    for(let k=0;k<nhits;k++) g[Math.floor(Math.random()*rawLen)]=Math.floor(Math.random()*256);
+    for(let k=0;k<nhits;k++) g[Math.floor(R()*rawLen)]=Math.floor(R()*256);
     // keep every scanline's filter byte a VALID type (0-4) — an out-of-range value makes the
     // whole PNG un-decodable (createImageBitmap rejects it), which is why glitching sometimes
     // produced no frames at all. The corruption still shows via changed (but valid) filter types.

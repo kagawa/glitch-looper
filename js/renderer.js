@@ -30,6 +30,19 @@ function ensureGifPalette(n){
 let randomSeed = Math.floor(Math.random()*1_000_000), seedLocked = false;
 function rand(seed){ const x = Math.sin((seed+randomSeed)*12.9898)*43758.5453; return x - Math.floor(x); }
 
+// stream PRNG (mulberry32) for the real-byte codecs. rand() is a stateless hash meant for
+// per-pixel/per-row lookups; the codecs instead consume a long *sequence* of numbers, so each
+// build takes its own generator seeded off randomSeed + a tag. Same seed + same params ->
+// byte-identical corruption, so a fixed Pattern Seed now holds the databending too.
+const RNG_TAG = { jpeg:1, png:2, webp:3, gifg:4 };
+function makeRng(tag){
+  let s = (randomSeed + Math.imul(tag, 2654435761)) >>> 0;
+  return ()=>{ s = (s + 0x6D2B79F5)|0;
+    let t = Math.imul(s ^ (s>>>15), 1|s);
+    t = (t + Math.imul(t ^ (t>>>7), 61|t)) ^ t;
+    return ((t ^ (t>>>14))>>>0) / 4294967296; };
+}
+
 // draw an image tiled so any offset wraps around (right edge re-enters from left)
 function drawWrap(src, ox, oy, w, h){
   ox = ((ox % w) + w) % w;

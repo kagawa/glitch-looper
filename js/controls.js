@@ -77,10 +77,10 @@ seedInput.addEventListener('change', ()=>{
   const raw=seedInput.value.trim(), value=Number(raw);
   if(raw==='' || !Number.isFinite(value) || value<0) seedLocked=false;
   else { randomSeed=Math.min(2147483647,Math.floor(value)); seedLocked=true; }
-  syncSeedUI();
+  syncSeedUI(); rebuildCodecs();     // the databending is seeded too — re-corrupt on a new seed
 });
 newSeedBtn.onclick=()=>{
-  randomSeed=Math.floor(Math.random()*1_000_000); seedLocked=true; syncSeedUI();
+  randomSeed=Math.floor(Math.random()*1_000_000); seedLocked=true; syncSeedUI(); rebuildCodecs();
 };
 syncSeedUI();
 // sliders: auto-reroll interval + param-drift amount

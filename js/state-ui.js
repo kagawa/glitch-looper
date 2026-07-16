@@ -179,11 +179,16 @@ function syncUI(){
     button.classList.toggle('active', locked); button.textContent = locked ? '🔒' : '🔓';
   });
   updateMaskRows();
+  rebuildCodecs();
+  updateCatCounts();
+}
+// (re)build the real-byte codec frame pools for whatever is enabled. Their corruption is seeded off
+// randomSeed, so this must also run whenever the Pattern Seed changes — not just on a param change.
+function rebuildCodecs(){
   if (state.jpeg.on) scheduleJpeg(); else jpegReady = false;
   if (state.png.on)  schedulePng();  else pngReady  = false;
   if (state.webp.on) scheduleWebp(); else webpReady = false;
   if (state.gifg.on) scheduleGifg(); else gifgReady = false;
-  updateCatCounts();
 }
 // envelope multiplier for destructive effects — makes the glitch "breathe" over the loop
 function motionMul(phase){
