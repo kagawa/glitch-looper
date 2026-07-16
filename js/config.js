@@ -12,7 +12,10 @@ const FX = [
   { id:'glitch', name:'Slice', hint:'horizontal slice shift + RGB split (visual, not real corruption)', on:false, open:false, params:[
     { k:'amount',   label:'Amount', min:0, max:1, step:.01, def:.4, env:1, envd:1 },
     { k:'slices',   label:'Slices', min:1, max:40, step:1, def:14 },
+    { k:'jitter',   label:'Uneven', min:0, max:1, step:.01, def:0 },
     { k:'shift',    label:'Shift', min:0, max:120, step:1, def:40, env:1, envd:1 },
+    { k:'edge',     label:'Edge', type:'select', def:0, options:[[0,'Hard'],[1,'Ramp'],[2,'Overshoot']] },
+    { k:'edgew',    label:'Edge (px)', min:2, max:40, step:1, def:12, show:s=> (s.edge|0)!==0 },
     { k:'rgb',      label:'RGB Split (V)', min:0, max:30, step:.5, def:8, env:1, envd:1 },
   ]},
   { id:'noise', name:'Noise', hint:'grain', on:false, open:false, params:[
@@ -289,9 +292,11 @@ const FX = [
   { id:'synctear', name:'Sync Tear', hint:'horizontal hold failure — the picture steps sideways at the tear', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:1, env:1 },
     { k:'tears',  label:'Tears', min:1, max:6, step:1, def:3 },
-    { k:'shift',  label:'Slip (px)', min:0, max:120, step:2, def:40 },
+    { k:'shift',  label:'Slip (px)', min:0, max:64, step:2, def:36 },
     { k:'delay',  label:'Lag (frames)', min:0, max:12, step:1, def:3 },
-    { k:'rate',   label:'Re-tear Rate (per loop)', min:1, max:30, step:1, def:8 },
+    { k:'rate',   label:'Re-tear Rate (per loop)', min:1, max:12, step:1, def:6 },
+    { k:'edge',   label:'Edge', type:'select', def:0, options:[[0,'Hard'],[1,'Ramp'],[2,'Overshoot']] },
+    { k:'edgew',  label:'Edge (px)', min:2, max:40, step:1, def:14, show:s=> (s.edge|0)!==0 },
   ]},
   { id:'interlace', name:'Interlace', hint:'two fields scanned a moment apart — combing on anything that moved', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:1, env:1 },

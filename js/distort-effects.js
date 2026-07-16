@@ -30,21 +30,55 @@ if (wp.on && wp.amp>0){
 }
 }
 
+// Shape of a displacement across an edge, t in [0,1]. Hard steps; Ramp is a slow-fast-slow
+// S-curve (smootherstep); Overshoot dips the opposite way first, then past the target and back —
+// the anticipation an animator would put on a hard move. Overshoot can return <0 or >1 on purpose.
+function edgeEase(t, mode){
+  if (t<=0) return 0; if (t>=1) return 1;
+  if ((mode|0)===2){ const c=1.70158*1.525;                // easeInOutBack
+    return t<0.5 ? (Math.pow(2*t,2)*((c+1)*2*t-c))/2
+                 : (Math.pow(2*t-2,2)*((c+1)*(2*t-2)+c)+2)/2; }
+  if ((mode|0)===1) return t*t*t*(t*(t*6-15)+10);          // smootherstep
+  return t<0.5 ? 0 : 1;                                    // hard
+}
+
 function applySliceGlitch(w,h,phase,gl){
 // ---- glitch: horizontal slice displacement ----
 if (gl.on && gl.amount>0){
-  const slices = gl.slices;
+  const slices = gl.slices, edge = gl.edge|0, ew = Math.max(1, gl.edgew|0);
+  const step = Math.floor(phase*slices*2);             // changes over loop, wraps
+  const amt = Math.min(1, P('glitch','amount')), maxOff = P('glitch','shift');
+  const jit = gl.jitter;                               // uneven slice heights
+  // slice boundaries: even, or jittered around the even spacing (seed steps with the loop → seamless)
+  const ys=[0];
+  for (let i=1;i<slices;i++){
+    let y = h*i/slices;
+    if (jit>0) y += (rand(i*4.7+step*1.3)-0.5)*(h/slices)*jit*0.9;
+    ys.push(Math.max(1, Math.min(h-1, Math.round(y))));
+  }
+  ys.push(h); ys.sort((a,b)=>a-b);
+  const useScratch = edge!==0;
+  if (useScratch){ sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h); sctx.drawImage(canvas,0,0); }
   for (let i=0;i<slices;i++){
-    // loop-seamless randomness: seed by slice + quantized phase steps
-    const step = Math.floor(phase*slices*2);           // changes over loop, wraps
-    const r = rand(i*7.1 + step);
-    if (r > 1-Math.min(1, P('glitch','amount'))){
-      const sy = Math.floor(h*i/slices);
-      const sh = Math.ceil(h/slices)+1;
-      const off = (rand(i*3.3+step)-0.5)*2*P('glitch','shift');
+    if (rand(i*7.1 + step) <= 1-amt) continue;
+    const sy=ys[i], sh=ys[i+1]-sy; if (sh<=0) continue;
+    const off=(rand(i*3.3+step)-0.5)*2*maxOff;
+    if (edge===0){                                     // hard block — the original path, unchanged
       const slice = ctx.getImageData(0,sy,w,sh);
       ctx.clearRect(0,sy,w,sh);
-      ctx.putImageData(slice, off, sy);
+      ctx.putImageData(slice, Math.round(off), sy);
+      continue;
+    }
+    // ease the shift in over the top edge and back out over the bottom, so the slice doesn't
+    // jump to full offset in one line — a hump that returns to the neighbours at both edges
+    const e = Math.min(0.49, ew/sh);
+    ctx.clearRect(0,sy,w,sh);
+    for (let yy=0; yy<sh; yy++){
+      const t=(yy+0.5)/sh;
+      const prof=Math.min(edgeEase(Math.min(1,t/e),edge), edgeEase(Math.min(1,(1-t)/e),edge));
+      const shf=((Math.round(off*prof)%w)+w)%w, y=sy+yy;
+      ctx.drawImage(sc, 0,y,w-shf,1, shf,y,w-shf,1);
+      if (shf>0) ctx.drawImage(sc, w-shf,y,shf,1, 0,y,shf,1);
     }
   }
 }

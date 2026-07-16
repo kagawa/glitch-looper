@@ -282,14 +282,39 @@ function draw(phase){
       const sh  = Math.round((rand(pat*8.9+i*0.53)*2-1)*maxS*amt);
       band.push({ y0:ys[i], y1:ys[i+1], lag, sh });
     }
+    const edge = sy.edge|0, ew = Math.max(1, sy.edgew|0);
     sacc.width=w; sacc.height=h; sax.clearRect(0,0,w,h);
-    for (const lag of [...new Set(band.map(b=>b.lag))]){              // render each distinct lag once
-      footage(f-lag);
-      for (const b of band){
-        const bh=b.y1-b.y0; if (b.lag!==lag || bh<=0) continue;
-        const shf=((b.sh%w)+w)%w;                                     // horizontal slide, wrapped
-        sax.drawImage(canvas, 0,b.y0,w-shf,bh, shf,b.y0,w-shf,bh);
-        if (shf>0) sax.drawImage(canvas, w-shf,b.y0,shf,bh, 0,b.y0,shf,bh);
+    if (edge===0){
+      for (const lag of [...new Set(band.map(b=>b.lag))]){            // render each distinct lag once
+        footage(f-lag);
+        for (const b of band){
+          const bh=b.y1-b.y0; if (b.lag!==lag || bh<=0) continue;
+          const shf=((b.sh%w)+w)%w;                                   // hard sideways step, wrapped
+          sax.drawImage(canvas, 0,b.y0,w-shf,bh, shf,b.y0,w-shf,bh);
+          if (shf>0) sax.drawImage(canvas, w-shf,b.y0,shf,bh, 0,b.y0,shf,bh);
+        }
+      }
+    } else {
+      // ease the sideways step across each tear instead of snapping in one line. The frame content
+      // (lag) still switches sharply at the boundary; only the horizontal slip is smoothed, so the
+      // picture slides into the tear rather than jumping. Overshoot slips the opposite way first.
+      const bandOf=new Int32Array(h), rowShift=new Float32Array(h);
+      for (let i=0;i<nT;i++) for (let y=band[i].y0;y<band[i].y1;y++) bandOf[y]=i;
+      for (let y=0;y<h;y++){
+        const bi=bandOf[y], b=band[bi]; let sh=b.sh;
+        const dTop=y-b.y0, dBot=b.y1-1-y;
+        if (bi>0 && dTop<ew && dTop<=dBot)      sh = band[bi-1].sh + (b.sh-band[bi-1].sh)*edgeEase((dTop+0.5)/ew, edge);
+        else if (bi<nT-1 && dBot<ew)            sh = band[bi+1].sh + (b.sh-band[bi+1].sh)*edgeEase((dBot+0.5)/ew, edge);
+        rowShift[y]=sh;
+      }
+      for (const lag of [...new Set(band.map(b=>b.lag))]){
+        footage(f-lag);
+        for (let y=0;y<h;y++){
+          if (band[bandOf[y]].lag!==lag) continue;
+          const shf=((Math.round(rowShift[y])%w)+w)%w;
+          sax.drawImage(canvas, 0,y,w-shf,1, shf,y,w-shf,1);
+          if (shf>0) sax.drawImage(canvas, w-shf,y,shf,1, 0,y,shf,1);
+        }
       }
     }
     ctx.clearRect(0,0,w,h); ctx.drawImage(sacc,0,0);
