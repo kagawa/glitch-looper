@@ -117,10 +117,8 @@ function buildUI(){
     s.addEventListener('change', ()=>{
       state[s.dataset.fx][s.dataset.k] = parseInt(s.value, 10);
       if (s.dataset.fx==='png') schedulePng();
-      if (s.dataset.fx==='mask'){
-        if (s.dataset.k==='source') state.mask.mode=(state.mask.source|0)===6?1:0;
-        updateMaskRows();
-      }
+      if (s.dataset.fx==='mask' && s.dataset.k==='source') state.mask.mode=(state.mask.source|0)===6?1:0;
+      updateRows();          // any select can gate rows, not just the mask's
     });
   });
   controls.querySelectorAll('.envchk').forEach(c=>{
@@ -142,18 +140,17 @@ function buildUI(){
       names.map(n=>`<option value="${n}">${n}</option>`).join('')+`</optgroup>`).join('');
   presetSel.addEventListener('change', ()=>{ if (presetSel.value) applyPreset(presetSel.value); });
   presetsEl.appendChild(lab); presetsEl.appendChild(presetSel);
-  updateMaskRows();
+  updateRows();
 }
-function updateMaskRows(){
-  const source=state.mask.source|0;
-  controls.querySelectorAll('label[data-fx="mask"]').forEach(row=>{
-    const key=row.dataset.param;
-    let visible=true;
-    if (key==='mode') visible=false;
-    if (['x0','x1','y0','y1'].includes(key)) visible=source===0;
-    if (key==='threshold') visible=source!==0&&source!==6;
-    if (key==='interval') visible=source===5||source===6;
-    row.hidden=!visible;
+// Hide the knobs the current selects render inert — a param declares a `show(state)` predicate in
+// FX and the row follows it. Purely cosmetic: a hidden param keeps its value and still renders,
+// so nothing here can change the picture.
+function updateRows(){
+  const byId = {}; FX.forEach(f=> byId[f.id]=f);
+  controls.querySelectorAll('label.row[data-fx]').forEach(row=>{
+    const f = byId[row.dataset.fx]; if (!f) return;
+    const p = f.params.find(q=> q.k===row.dataset.param); if (!p) return;
+    row.hidden = p.show ? !p.show(state[f.id]) : false;
   });
 }
 function applyPreset(name){
@@ -184,7 +181,7 @@ function syncUI(){
     const locked = !!state[button.dataset.fx]._locked;
     button.classList.toggle('active', locked); button.textContent = locked ? '🔒' : '🔓';
   });
-  updateMaskRows();
+  updateRows();
   rebuildCodecs();
   updateCatCounts();
 }

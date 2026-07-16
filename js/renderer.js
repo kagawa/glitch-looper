@@ -55,7 +55,11 @@ function drawWrap(src, ox, oy, w, h){
 
 
 
-function draw(phase){         // phase in [0,1)
+// Render one frame of the loop. Pure in the sense that matters: hand it a phase and it paints that
+// phase, with no memory of the frame before it. Everything downstream leans on that — the preview
+// jumps to whatever phase the wall clock says, and the exporters walk their own frame grids.
+// Nothing outside should call this directly; call draw() below.
+function drawFrame(phase){    // phase in [0,1)
   if (!img) return;
   const w = canvas.width, h = canvas.height;
   const t = phase * Math.PI * 2;
@@ -145,4 +149,13 @@ function draw(phase){         // phase in [0,1)
   if (state.hud.on) drawHUD(w,h,phase);
 
   applyCrtBezel(w,h,cr);
+}
+
+// What everything else calls. It is a plain pass-through today; it exists as the one place a
+// temporal effect can live — frame drop, trails, a starved-bitrate hold — because those need to
+// reach across frames and drawFrame() deliberately cannot. Putting them inside drawFrame would
+// recurse; putting them in each caller would mean the preview, the MP4 and the GIF each doing it
+// their own way, on three different frame grids (rAF / 30fps / 20fps).
+function draw(phase){
+  drawFrame(phase);
 }

@@ -71,9 +71,10 @@ const FX = [
     { k:'ivl',    label:'Interval', type:'select', def:0,
       options:[[0,'Threshold'],[1,'Random'],[2,'Edges'],[3,'Waves'],[4,'Whole line']] },
     { k:'chance', label:'Sort Chance', min:0, max:1, step:.01, def:1 },
-    { k:'thresh', label:'Threshold / Edge', min:0, max:1, step:.01, def:.5 },
+    // Threshold only feeds the two intervals that cut on the picture; Whole line has no run length
+    { k:'thresh', label:'Threshold / Edge', min:0, max:1, step:.01, def:.5, show:s=> s.ivl===0 || s.ivl===2 },
     { k:'dir',    label:'Direction', type:'select', def:0, options:[[0,'Rows →'],[1,'Columns ↓'],[2,'Both']] },
-    { k:'len',    label:'Max Length', min:0, max:1, step:.01, def:.6 },
+    { k:'len',    label:'Max Length', min:0, max:1, step:.01, def:.6, show:s=> s.ivl!==4 },
   ]},
   { id:'databend', name:'Databend Shift', hint:'raw-byte / stride error — diagonal shear + rainbow', on:false, open:false, params:[
     { k:'amount',   label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
@@ -126,12 +127,14 @@ const FX = [
     { k:'color',  label:'Rainbow', min:0, max:1, step:.01, def:.7 },
     { k:'curve',  label:'Curve', type:'select', def:1,
       options:[[0,'Constant (never settles)'],[1,'Peak (settles)'],[2,'Pulse'],[3,'Build → Drop'],[4,'Stutter'],[5,'Swell'],[6,'Drop → Build'],[7,'Bounce'],[8,'Wander']] },
-    { k:'rate',   label:'Rate', min:1, max:8, step:1, def:2 },
+    { k:'rate',   label:'Rate', min:1, max:8, step:1, def:2, show:s=> [2,4,7,8].includes(s.curve|0) },
   ]},
   { id:'warp', name:'Warp', hint:'horizontal displacement — heat-haze / underwater / shear', on:false, open:false, params:[
     { k:'amp',   label:'Amplitude', min:0, max:10, step:.25, def:5, env:1 },
-    { k:'freq',  label:'Frequency', min:1, max:20, step:1, def:6 },
-    { k:'speed', label:'Speed', min:0, max:6, step:1, def:2 },
+    // Jitter/Step have no spatial wave to set a frequency on, and Twist shears the whole frame;
+    // Pulse swells in place, so it never reads a speed
+    { k:'freq',  label:'Frequency', min:1, max:20, step:1, def:6, show:s=> ![2,3,5].includes(s.warpmode|0) },
+    { k:'speed', label:'Speed', min:0, max:6, step:1, def:2, show:s=> (s.warpmode|0)!==1 },
     { k:'warpmode', label:'Pattern', type:'select', def:0,
       options:[[0,'Wave'],[1,'Pulse'],[2,'Jitter'],[3,'Step'],[4,'Drift'],[5,'Twist'],[6,'Beat'],[7,'Zigzag']] },
   ]},
@@ -140,7 +143,7 @@ const FX = [
     { k:'mix',  label:'Mix', min:0, max:1, step:.01, def:1, env:1 },
     { k:'fade',  label:'Fade', type:'select', def:0,
       options:[[0,'Even'],[1,'Right'],[2,'Left'],[3,'Bottom'],[4,'Top'],[5,'Bright areas'],[6,'Dark areas']] },
-    { k:'cover', label:'Coverage', min:0, max:1, step:.01, def:.5, env:1 },
+    { k:'cover', label:'Coverage', min:0, max:1, step:.01, def:.5, env:1, show:s=> s.fade!==0 },
   ]},
   { id:'hud', name:'HUD / Text', hint:'REC ● · camcorder · TV / VCR on-screen text', on:false, open:false, params:[
     { k:'layout',  label:'Layout', type:'select', def:3,
@@ -161,7 +164,7 @@ const FX = [
     { k:'mix',  label:'Mix', min:0, max:1, step:.01, def:1, env:1 },
     { k:'fade',  label:'Fade', type:'select', def:0,
       options:[[0,'Even'],[1,'Right'],[2,'Left'],[3,'Bottom'],[4,'Top'],[5,'Bright areas'],[6,'Dark areas']] },
-    { k:'cover', label:'Coverage', min:0, max:1, step:.01, def:.5, env:1 },
+    { k:'cover', label:'Coverage', min:0, max:1, step:.01, def:.5, env:1, show:s=> s.fade!==0 },
   ]},
   { id:'crt', name:'CRT', hint:'tube curve · RGB phosphor mask · scanlines · convergence · glow', on:false, open:false, params:[
     { k:'amount',   label:'Curvature',     min:0, max:1, step:.01, def:.3 },
@@ -220,7 +223,7 @@ const FX = [
     { k:'spread', label:'Spread', min:0, max:1, step:.01, def:.5 },
     { k:'curve',  label:'Curve', type:'select', def:1,
       options:[[1,'Peak'],[2,'Pulse'],[3,'Build → Drop'],[4,'Stutter'],[5,'Swell'],[6,'Drop → Build'],[7,'Bounce'],[8,'Wander']] },
-    { k:'rate',   label:'Rate', min:1, max:8, step:1, def:2 },
+    { k:'rate',   label:'Rate', min:1, max:8, step:1, def:2, show:s=> [2,4,7,8].includes(s.curve|0) },
   ]},
   { id:'emboss', name:'Emboss', hint:'directional relief — carved / raised metal look', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.7, env:1 },
@@ -245,21 +248,21 @@ const FX = [
   ]},
   { id:'mask', name:'Region Mask', hint:'confine effects to a rectangle — fixed / roaming / invertable', on:false, open:false, params:[
     { k:'source',   label:'Mask Source', type:'select', def:0, options:[[0,'Rectangle'],[6,'Roaming Rectangle'],[1,'Shadows'],[2,'Midtones'],[3,'Highlights'],[4,'Edges'],[5,'Noise']] },
-    { k:'threshold',label:'Threshold', min:0, max:1, step:.01, def:.5 },
-    { k:'mode',     label:'Mode', type:'select', def:0, options:[[0,'Fixed'],[1,'Roam']] },
-    { k:'x0',       label:'X start %', min:0, max:100, step:1, def:20 },
-    { k:'x1',       label:'X end %',   min:0, max:100, step:1, def:80 },
-    { k:'y0',       label:'Y start %', min:0, max:100, step:1, def:20 },
-    { k:'y1',       label:'Y end %',   min:0, max:100, step:1, def:80 },
+    { k:'threshold',label:'Threshold', min:0, max:1, step:.01, def:.5, show:s=> s.source!==0 && s.source!==6 },
+    { k:'mode',     label:'Mode', type:'select', def:0, options:[[0,'Fixed'],[1,'Roam']], show:()=>false },  // legacy: kept so old links still decode
+    { k:'x0',       label:'X start %', min:0, max:100, step:1, def:20, show:s=> s.source===0 },
+    { k:'x1',       label:'X end %',   min:0, max:100, step:1, def:80, show:s=> s.source===0 },
+    { k:'y0',       label:'Y start %', min:0, max:100, step:1, def:20, show:s=> s.source===0 },
+    { k:'y1',       label:'Y end %',   min:0, max:100, step:1, def:80, show:s=> s.source===0 },
     { k:'invert',   label:'Invert', type:'select', def:0, options:[[0,'Effects inside'],[1,'Effects outside']] },
-    { k:'interval', label:'Roam Steps', min:1, max:12, step:1, def:4 },
+    { k:'interval', label:'Roam Steps', min:1, max:12, step:1, def:4, show:s=> s.source===5 || s.source===6 },
     { k:'feather',  label:'Feather', min:0, max:1, step:.01, def:.08 },
   ]},
   { id:'motion', name:'Envelope', hint:'makes destruction breathe over the loop (pick targets via ⓔ)', on:false, open:false, params:[
     { k:'mode', label:'Curve', type:'select', def:1,
       options:[[0,'Constant'],[1,'Peak (crash mid)'],[2,'Pulse'],[3,'Build → Drop'],[4,'Stutter'],[5,'Swell'],[6,'Drop → Build'],[7,'Bounce'],[8,'Wander']] },
     { k:'depth', label:'Depth', min:0, max:1, step:.01, def:.7 },
-    { k:'rate',  label:'Rate / Count', min:1, max:12, step:1, def:3 },
+    { k:'rate',  label:'Rate / Count', min:1, max:12, step:1, def:3, show:s=> [2,4,7,8].includes(s.mode|0) },
   ]},
 ];
 
