@@ -200,9 +200,11 @@ const FX = [
     { k:'freq',   label:'Density', min:1, max:10, step:1, def:5 },
     { k:'speed',  label:'Drift', min:1, max:8, step:1, def:2 },
   ]},
-  { id:'feedback', name:'Feedback Zoom', hint:'droste tunnel · spins/pulses over the loop', on:false, open:false, params:[
-    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5 },
-    { k:'zoom',   label:'Zoom', min:1.01, max:1.4, step:.01, def:1.12 },
+  { id:'feedback', name:'Feedback Zoom', hint:'droste tunnel — nested copies that flow over the loop', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
+    { k:'zoom',   label:'Zoom (under 1 = nested)', min:.6, max:1.4, step:.01, def:.82 },
+    { k:'copies', label:'Copies', min:2, max:8, step:1, def:5 },
+    { k:'flow',   label:'Flow', min:-3, max:3, step:1, def:0 },
     { k:'rotate', label:'Twist', min:-15, max:15, step:.5, def:0 },
     { k:'speed',  label:'Spin/loop', min:-4, max:4, step:1, def:0 },
     { k:'pulse',  label:'Zoom Pulse', min:0, max:1, step:.01, def:0 },
@@ -314,7 +316,7 @@ const PRESETS = {
   'Newsprint':   { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.1,flicker:.05}, color:{on:1,saturate:.9,contrast:1.2,hue:0,tint:.05,vignette:.3}, halftone:{on:1,cell:6,bg:1} },
   'Dream Bloom': { vhs:{on:1,aberration:8,scanline:.1,bleed:6,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.03}, color:{on:1,saturate:1.3,contrast:.95,hue:0,tint:-.2,vignette:.4}, bloom:{on:1,amount:.6,size:10} },
   'Heat Haze':   { vhs:{on:1,aberration:5,scanline:.1,bleed:3,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.07,flicker:.05}, color:{on:1,saturate:1.15,contrast:1.05,hue:15,tint:.25,vignette:.4}, warp:{on:1,amp:6,freq:4,speed:2} },
-  'Wormhole':    { vhs:{on:1,aberration:10,scanline:.15,bleed:4,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.03}, color:{on:1,saturate:1.5,contrast:1.05,hue:-60,tint:0,vignette:.5}, feedback:{on:1,amount:.6,zoom:1.18,rotate:2,speed:2,pulse:.5} },
+  'Wormhole':    { vhs:{on:1,aberration:10,scanline:.15,bleed:4,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.03}, color:{on:1,saturate:1.5,contrast:1.05,hue:-60,tint:0,vignette:.5}, feedback:{on:1,amount:.6,zoom:.84,copies:6,flow:1,rotate:2,speed:2,pulse:.5} },
   // ---- Art ----
   'Cinematic':   { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.05,flicker:.02}, color:{on:1,saturate:1.0,contrast:1.1,hue:0,tint:0,vignette:.45}, bloom:{on:1,amount:.3,size:8}, duotone:{on:1,preset:0,amount:.7} },
   'Acid':        { vhs:{on:1,aberration:6,scanline:.1,bleed:2,tracking:.1,wobble:2}, glitch:{on:1,amount:.25,slices:16,shift:20,rgb:8}, noise:{on:1,grain:.06,flicker:.05}, color:{on:1,saturate:1.5,contrast:1.1,hue:40,tint:0,vignette:.3}, solarize:{on:1,threshold:.5,amount:.85} },

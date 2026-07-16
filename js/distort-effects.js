@@ -52,19 +52,45 @@ if (gl.on && gl.amount>0){
 
 function applyFeedbackZoom(w,h,phase){
 // ---- feedback zoom: composite scaled copies of the current frame (droste tunnel) ----
+//      Zoom under 1 is where a tunnel is actually legible: each copy is smaller than the frame, so
+//      they nest as distinct rings. At 1 and over every copy still fills the frame, so they all
+//      overlap completely and only blend — a look, but not a tunnel.
+//      Flow slides the whole stack along the zoom ladder over the loop. Advancing by exactly one
+//      rung lands each copy where the next one was, so with an integer Flow and a window that fades
+//      copies in at one end of the ladder and out at the other, the tunnel travels forever and
+//      still meets itself at the loop point.
 const fb = state.feedback;
 if (fb.on && fb.amount>0){
+  const amt = P('feedback','amount');
+  if (amt<=0) return;
   sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h); sctx.drawImage(canvas,0,0);
+  const N = Math.max(2, fb.copies|0), flow = fb.flow|0;
+  const frac = flow ? ((phase*flow)%1+1)%1 : 0;             // position between rungs, wraps each step
   const spin = fb.speed*360*phase;                          // whole tunnel rotation (integer → seamless)
   const pulse = 1 + fb.pulse*0.12*Math.sin(phase*Math.PI*2); // breathing zoom (seamless)
-  for (let i=1;i<=5;i++){
+  const items=[]; let W=0;
+  for (let j=0;j<N;j++){
+    const s = j+frac;                                       // rung on the zoom ladder
+    const wt = Math.max(0, Math.sin(Math.PI*s/N));          // zero at both ends of the ladder
+    W += wt;
+    items.push({ s, wt, z: Math.pow(fb.zoom,s)*pulse });
+  }
+  if (W<=0) return;
+  // Amount is how much of the frame the tunnel takes: the copies' alphas are set so what shows
+  // through underneath is exactly (1-Amount), whatever Copies is — otherwise stacking more copies
+  // just buried the picture.
+  const keep = Math.max(0.02, 1-amt);
+  items.sort((a,b)=> b.z-a.z);                              // paint far → near so the rings nest
+  for (const it of items){
+    if (it.wt<=0) continue;
     ctx.save();
-    ctx.globalAlpha = fb.amount*Math.pow(0.75,i-1);
-    ctx.translate(w/2,h/2); ctx.rotate((fb.rotate*i + spin)*Math.PI/180);
-    const z=Math.pow(fb.zoom,i)*pulse; ctx.scale(z,z); ctx.translate(-w/2,-h/2);
+    ctx.globalAlpha = 1-Math.pow(keep, it.wt/W);
+    ctx.translate(w/2,h/2); ctx.rotate((fb.rotate*it.s + spin)*Math.PI/180);
+    ctx.scale(it.z,it.z); ctx.translate(-w/2,-h/2);
     ctx.drawImage(sc,0,0);
     ctx.restore();
   }
+  ctx.globalAlpha = 1;
 }
 }
 
