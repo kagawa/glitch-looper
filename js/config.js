@@ -285,9 +285,10 @@ const FX = [
   { id:'stale', name:'Stale Blocks', hint:'a starved stream — blocks stuck on an older frame', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
     { k:'block',  label:'Block Size', min:8, max:48, step:4, def:16 },
-    { k:'age',    label:'Max Age (frames)', min:1, max:12, step:1, def:6 },
+    { k:'age',    label:'Max Age (frames)', min:1, max:12, step:1, def:6, show:s=> (s.gop|0)===0 },
     { k:'steps',  label:'Age Steps (a render each)', min:1, max:3, step:1, def:2 },
-    { k:'rate',   label:'Re-roll Rate (per loop)', min:1, max:30, step:1, def:6 },
+    { k:'gop',    label:'Keyframe (GOP, frames)', min:0, max:45, step:1, def:0 },
+    { k:'rate',   label:'Re-roll Rate (per loop)', min:1, max:30, step:1, def:6, show:s=> (s.gop|0)===0 },
   ]},
   { id:'synctear', name:'Sync Tear', hint:'horizontal hold failure — the picture steps sideways at the tear', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:1, env:1 },
@@ -352,7 +353,7 @@ const PRESETS = {
   'Datamosh':    { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.08,flicker:0}, color:{on:1,saturate:1.3,contrast:1.1,hue:0,tint:0,vignette:.2}, roll:{on:0}, film:{on:0}, mosh:{on:1,intensity:.75,blocks:.65,bloom:3,sort:.55,chaos:.85,rate:12} },
   // a starved low-framerate stream: a slow Warp gives the temporal effects something to break, then
   // blocks freeze (Stale), the picture macroblocks (Compression), colour lags (Chroma) and it stutters (Time)
-  'Dead Stream': { vhs:{on:1,aberration:3,scanline:.08,bleed:2,tracking:.15,wobble:2}, warp:{on:1,amp:4,freq:4,speed:1,warpmode:4}, glitch:{on:0}, noise:{on:1,grain:.09,flicker:.05}, color:{on:1,saturate:.85,contrast:1.15,hue:0,tint:-.05,vignette:.35}, compress:{on:1,amount:.7,chroma:.7,ring:.3,block:16}, stale:{on:1,amount:.5,block:16,age:6,steps:2,rate:4}, chroma:{on:1,amount:.7,delay:5,mode:0}, time:{on:1,hold:3,drop:.15,trail:0,gap:5,trailn:3} },
+  'Dead Stream': { vhs:{on:1,aberration:3,scanline:.08,bleed:2,tracking:.15,wobble:2}, warp:{on:1,amp:4,freq:4,speed:1,warpmode:4}, glitch:{on:0}, noise:{on:1,grain:.09,flicker:.05}, color:{on:1,saturate:.85,contrast:1.15,hue:0,tint:-.05,vignette:.35}, compress:{on:1,amount:.7,chroma:.7,ring:.3,block:16}, stale:{on:1,amount:.6,block:16,age:6,steps:2,gop:30,rate:4}, chroma:{on:1,amount:.7,delay:5,mode:0}, time:{on:1,hold:3,drop:.15,trail:0,gap:5,trailn:3} },
   'JPEG Databend':{ vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.05}, color:{on:0}, roll:{on:0}, film:{on:0}, mosh:{on:0}, jpeg:{on:1,amount:.35,quality:.3,frames:8}, png:{on:0} },
   'PNG Glitch':  { vhs:{on:0}, glitch:{on:0}, noise:{on:0}, color:{on:0}, roll:{on:0}, film:{on:0}, mosh:{on:0}, jpeg:{on:0}, png:{on:1,amount:.3,noise:.15,dir:0,frames:8} },
   'Roll Break':  { vhs:{on:1,aberration:6,scanline:.3,bleed:2,tracking:.5,wobble:4}, glitch:{on:1,amount:.22,slices:16,shift:18,rgb:6}, noise:{on:1,grain:.15,flicker:.1}, color:{on:0}, roll:{on:1,hspeed:1.5,hstep:.4,vspeed:.5,band:.5}, film:{on:0}, mosh:{on:0} },

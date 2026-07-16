@@ -263,19 +263,36 @@ function draw(phase){
     const amt = pv('stale','amount',1);
     const bs = Math.max(4, st.block|0), steps = Math.max(1, Math.min(3, st.steps|0));
     const age = Math.max(1, st.age|0);
-    const pat = Math.floor((((f%NF)+NF)%NF) * Math.max(1,st.rate|0) / NF);   // which re-roll we are in
     const nbx = Math.ceil(w/bs), nby = Math.ceil(h/bs);
-    // which lag each block is stuck at: 0 = keeping up, 1..steps = that many ages behind
-    const lvl = new Uint8Array(nbx*nby);
-    for (let by=0;by<nby;by++) for (let bx=0;bx<nbx;bx++){
-      if (rand(pat*7.1 + bx*0.37 + by*2.13) >= amt) continue;     // this block is keeping up
-      lvl[by*nbx+bx] = 1 + Math.floor(rand(pat*3.3 + bx*1.7 + by*0.91)*steps);
+    const gop = Math.max(0, st.gop|0);           // >0 = GOP mode: damage grows then a keyframe resets it
+    // lvl[block] = 0 keeping up, 1..steps = that many ages behind. srcOf[l] = the frame level l reads.
+    const lvl = new Uint8Array(nbx*nby), srcOf=[];
+    if (gop>0){
+      // A real starved stream degrades across the GOP and snaps clean at each keyframe. A block, once
+      // it loses sync, holds the frame it froze on until the keyframe — so damage accumulates and
+      // resets. Stateless: a block's fixed threshold decides WHEN in the GOP it drops out, and it has
+      // been frozen ever since. Quantise the freeze point to `steps` so the render count stays bounded.
+      const wf=(((f%NF)+NF)%NF), kf=Math.floor(wf/gop)*gop, p=(wf-kf)/gop;   // p: 0 at keyframe → ~1 before next
+      for (let l=1;l<=steps;l++) srcOf[l] = kf + Math.round((l-0.5)/steps * gop * p);   // when this bucket froze
+      for (let by=0;by<nby;by++) for (let bx=0;bx<nbx;bx++){
+        const r = rand(bx*0.37 + by*2.13 + 0.5);
+        if (r >= amt*p) continue;                // hasn't dropped out yet this GOP
+        const crossP = r/amt;                    // fraction of the GOP at which it froze
+        lvl[by*nbx+bx] = 1 + Math.min(steps-1, Math.floor((crossP/Math.max(1e-6,p))*steps));
+      }
+    } else {
+      const pat = Math.floor((((f%NF)+NF)%NF) * Math.max(1,st.rate|0) / NF);   // which re-roll we are in
+      for (let l=1;l<=steps;l++) srcOf[l] = f - Math.round(age*l/steps);
+      for (let by=0;by<nby;by++) for (let bx=0;bx<nbx;bx++){
+        if (rand(pat*7.1 + bx*0.37 + by*2.13) >= amt) continue;   // this block is keeping up
+        lvl[by*nbx+bx] = 1 + Math.floor(rand(pat*3.3 + bx*1.7 + by*0.91)*steps);
+      }
     }
     moment(f);                                   // the blocks that are keeping up
     bacc.width=w; bacc.height=h; bax.clearRect(0,0,w,h); bax.drawImage(canvas,0,0);
     for (let l=1;l<=steps;l++){
       if (!lvl.includes(l)) continue;            // nothing is stuck this far back — skip the render
-      moment(f - Math.round(age*l/steps));
+      moment(srcOf[l]);
       for (let by=0;by<nby;by++) for (let bx=0;bx<nbx;bx++){
         if (lvl[by*nbx+bx]!==l) continue;
         const x=bx*bs, y=by*bs, bw=Math.min(bs,w-x), bh=Math.min(bs,h-y);
