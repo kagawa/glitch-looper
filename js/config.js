@@ -194,6 +194,7 @@ const FX = [
   { id:'melt', name:'Melt', hint:'pixel drip (breathes over the loop) — Drip or vertical Wrap', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.4, env:1 },
     { k:'mode',   label:'Mode', type:'select', def:0, options:[[0,'Drip'],[1,'Wrap']] },
+    { k:'width',  label:'Drip Width', min:1, max:64, step:1, def:1 },
     { k:'spread', label:'Spread', min:0, max:1, step:.01, def:.5 },
     { k:'curve',  label:'Curve', type:'select', def:1,
       options:[[1,'Peak'],[2,'Pulse'],[3,'Build → Drop'],[4,'Stutter'],[5,'Swell'],[6,'Drop → Build'],[7,'Bounce'],[8,'Wander']] },

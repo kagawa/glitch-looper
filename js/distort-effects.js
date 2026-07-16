@@ -69,18 +69,37 @@ if (fb.on && fb.amount>0){
 }
 
 function applyMelt(w,h,phase){
-// ---- melt: per-column pixel drip, breathes 0→max→0 over the loop (seamless) ----
+// ---- melt: pixel drip in bands, breathes 0→max→0 over the loop (seamless) ----
 //      Drip = pixels smear down (top stretches); Wrap = drips off the bottom and re-enters the top,
 //      offsets exceed the height so columns can travel a full loop and come back.
+//      Drip Width groups columns into bands so a blob of liquid falls together rather than
+//      each 1px column falling on its own (which reads as sand, not liquid).
 const ml = state.melt;
 if (ml.on && ml.amount>0){
   const amt=P('melt','amount'), wrap=(ml.mode|0)===1;
   const breathe = Math.max(0, envCurve(phase, ml.curve|0, ml.rate));   // Curve: how the melt evolves over the loop
   const span = amt*h*(wrap?1.0:0.6)*breathe;                   // Wrap can travel a full height and loop back
-  const sexp = 0.3 + ml.spread*3;  // Spread: how the drip amount varies per column (low = uniform, high = a few long drips)
+  const sexp = 0.3 + ml.spread*3;  // Spread: how the drip amount varies per band (low = uniform, high = a few long drips)
+  // map each column to a band + its position inside that band. Band widths vary around the set
+  // average, otherwise evenly spaced drips look like a comb. Width 1 = one band per column
+  // (identical to the original per-column drip).
+  const bwAvg = Math.max(1, ml.width|0);
+  const bandOf = new Int32Array(w), bandT = new Float32Array(w);
+  if (bwAvg===1){ for (let x=0;x<w;x++){ bandOf[x]=x; bandT[x]=0.5; } }
+  else {
+    for (let bi=0, x0=0; x0<w; bi++){
+      const bw = Math.max(1, Math.round(bwAvg*(0.5+rand(bi*2.7))));   // 0.5x–1.5x → averages bwAvg
+      const x1 = Math.min(w, x0+bw);
+      for (let x=x0;x<x1;x++){ bandOf[x]=bi; bandT[x]=(x-x0+0.5)/(x1-x0); }
+      x0=x1;
+    }
+  }
   const src=ctx.getImageData(0,0,w,h), out=ctx.createImageData(w,h), sd=src.data, od=out.data;
   for (let x=0;x<w;x++){
-    const off=Math.floor(Math.pow(rand(x*0.13), sexp)*span);
+    // surface tension: the middle of a band runs furthest, the edges lag — a rounded droplet
+    // instead of a square-ended slab. At width 1 the band centre is the column itself (no change).
+    const e = 2*bandT[x]-1, bulge = 1-e*e;
+    const off=Math.floor(Math.pow(rand(bandOf[x]*0.13), sexp)*span*(0.55+0.45*bulge));
     for (let y=0;y<h;y++){
       let sy = y - off;
       sy = wrap ? ((sy%h)+h)%h : (sy>=0?sy:0);                 // Wrap: mod h  ·  Drip: clamp to top
