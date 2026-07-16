@@ -64,6 +64,24 @@ if (fb.on && fb.amount>0){
   const amt = P('feedback','amount');
   if (amt<=0) return;
   sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h); sctx.drawImage(canvas,0,0);
+  // Under zoom 1 a copy is smaller than the frame, so its rectangular border sits in plain sight.
+  // Every copy is drawn from this one snapshot, so fading the snapshot's edges once softens all of
+  // them. destination-in multiplies the alpha already there, so four one-sided ramps compound into
+  // a soft border with rounded corners.
+  const fth = fb.feather;
+  if (fth>0){
+    const F = Math.max(1, Math.min(w,h)*0.35*fth);
+    sctx.globalCompositeOperation='destination-in';
+    const ramp = (x0,y0,x1,y1)=>{                 // transparent at (x0,y0) → opaque at (x1,y1)
+      const g=sctx.createLinearGradient(x0,y0,x1,y1);
+      g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,1)');
+      sctx.fillStyle=g; sctx.fillRect(0,0,w,h);
+    };
+    // the far ends anchor on w-1 / h-1: the last pixel, not one past it, or that column keeps
+    // a sliver of opacity and the very edge stays visible
+    ramp(0,0,F,0); ramp(w-1,0,w-1-F,0); ramp(0,0,0,F); ramp(0,h-1,0,h-1-F);
+    sctx.globalCompositeOperation='source-over';
+  }
   const N = Math.max(2, fb.copies|0), flow = fb.flow|0;
   const frac = flow ? ((phase*flow)%1+1)%1 : 0;             // position between rungs, wraps each step
   const spin = fb.speed*360*phase;                          // whole tunnel rotation (integer → seamless)

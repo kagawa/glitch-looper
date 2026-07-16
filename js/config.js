@@ -207,6 +207,7 @@ const FX = [
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
     { k:'zoom',   label:'Zoom (under 1 = nested)', min:.6, max:1.4, step:.01, def:.82 },
     { k:'copies', label:'Copies', min:2, max:8, step:1, def:5 },
+    { k:'feather',label:'Edge Feather', min:0, max:1, step:.01, def:.35 },
     { k:'flow',   label:'Flow', min:-3, max:3, step:1, def:0 },
     { k:'rotate', label:'Twist', min:-15, max:15, step:.5, def:0 },
     { k:'speed',  label:'Spin/loop', min:-4, max:4, step:1, def:0 },
