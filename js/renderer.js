@@ -9,6 +9,8 @@ const htile = document.createElement('canvas');              // small tile for h
 const htx = htile.getContext('2d');
 const gsrc = document.createElement('canvas');               // small sampler for GIF palette
 const gctx = gsrc.getContext('2d', { willReadFrequently:true });
+const tacc = document.createElement('canvas');               // Time: trail accumulator (draw() only,
+const tax = tacc.getContext('2d');                           //   so drawFrame can't clobber it)
 const mshape = document.createElement('canvas');             // region-mask alpha shape
 const msx = mshape.getContext('2d');
 const mclean = document.createElement('canvas');             // region-mask clean plate (base, pre-glitch)
@@ -153,11 +155,54 @@ function drawFrame(phase){    // phase in [0,1)
   applyCrtBezel(w,h,cr);
 }
 
-// What everything else calls. It is a plain pass-through today; it exists as the one place a
-// temporal effect can live — frame drop, trails, a starved-bitrate hold — because those need to
-// reach across frames and drawFrame() deliberately cannot. Putting them inside drawFrame would
-// recurse; putting them in each caller would mean the preview, the MP4 and the GIF each doing it
-// their own way, on three different frame grids (rAF / 30fps / 20fps).
+// ---- Time: the one stage that works on the footage rather than on a frame ----
+// Which frame a given moment actually shows, once frames have been held and dropped. Deliberately a
+// function of the frame index alone and nothing else: no memory, no accumulator. That is what lets
+// the preview (rAF), the MP4 (30fps) and the GIF (20fps) all agree — each samples this same 90-frame
+// grid at its own rate and gets the same answer, where anything stateful would drift apart.
+function timeFrame(fi, NF){
+  const tm = state.time;
+  const wrap = k => ((k % NF) + NF) % NF;
+  let e = wrap(fi);
+  const hold = Math.max(1, tm.hold|0);
+  if (hold>1) e -= e % hold;                  // hold divides NF, so no short group at the seam
+  if (tm.drop>0){
+    // Walk back to the last frame that wasn't dropped. Seeded on the WRAPPED index, or the pattern
+    // would break where the loop meets itself — rand(-1) is not rand(89). The guard has to span the
+    // whole loop: cut it short and every frame walks back the same fixed number of steps, which is
+    // a bijection — the footage just shifts in time instead of losing anything. Drop tops out below
+    // 1 so the walk terminates on merit rather than on the guard.
+    const slots = Math.ceil(NF/hold);
+    let k=e, guard=0;
+    while (rand(wrap(k)*3.7+0.5) < tm.drop && guard++ < slots) k -= hold;
+    e = wrap(k);
+  }
+  return e;
+}
+// What everything else calls: drawFrame plus the Time stage. A temporal effect cannot live inside
+// drawFrame (it would recurse) and should not live in the callers (the preview, the MP4 and the GIF
+// would each do it their own way, on three different frame grids).
 function draw(phase){
-  drawFrame(phase);
+  const tm = state.time;
+  if (!tm.on || (tm.hold<=1 && tm.drop<=0 && tm.trail<=0)){ drawFrame(phase); return; }
+  const NF = Math.round(LOOP_MS/1000*30);
+  const fi = Math.floor(phase*NF);
+  const K = tm.trail>0 ? Math.max(2, tm.trailn|0) : 1;
+  if (K<=1){ drawFrame(timeFrame(fi,NF)/NF); return; }
+  // Trails as a plain weighted average of the last K frames — no running buffer. Costs K renders,
+  // but it needs no warm-up, it is the same on every frame grid, and it closes the loop by itself
+  // because the frames it reaches back to simply wrap.
+  const w = canvas.width, h = canvas.height;
+  const wts=[]; for (let k=0;k<K;k++) wts.push(Math.pow(tm.trail,k));   // newest 1, older decaying
+  tacc.width=w; tacc.height=h; tax.clearRect(0,0,w,h);
+  let S=0;
+  for (let k=K-1;k>=0;k--){                   // oldest first, folding each into a running average
+    drawFrame(timeFrame(fi-k,NF)/NF);
+    S += wts[k];
+    tax.globalAlpha = wts[k]/S;               // incremental weighted mean → alpha 1 on the first
+    tax.drawImage(canvas,0,0);
+  }
+  tax.globalAlpha = 1;
+  ctx.clearRect(0,0,w,h);
+  ctx.drawImage(tacc,0,0);
 }

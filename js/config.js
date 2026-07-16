@@ -266,6 +266,14 @@ const FX = [
     { k:'interval', label:'Roam Steps', min:1, max:12, step:1, def:4, show:s=> s.source===5 || s.source===6 },
     { k:'feather',  label:'Feather', min:0, max:1, step:.01, def:.08 },
   ]},
+  { id:'time', name:'Time', hint:'frame drop · stutter · trails — acts on the footage, not the frame', on:false, open:false, params:[
+    // every hold divides the loop's 90 frames, so the last group is full length and the loop closes
+    { k:'hold',   label:'Frame Hold', type:'select', def:1,
+      options:[[1,'Off'],[2,'2 frames'],[3,'3'],[5,'5'],[6,'6'],[9,'9'],[10,'10'],[15,'15'],[18,'18'],[30,'30'],[45,'45']] },
+    { k:'drop',   label:'Random Drop', min:0, max:.9, step:.01, def:0 },
+    { k:'trail',  label:'Trails', min:0, max:1, step:.01, def:0 },
+    { k:'trailn', label:'Trail Frames (a render each)', min:2, max:4, step:1, def:3, show:s=> s.trail>0 },
+  ]},
   { id:'motion', name:'Envelope', hint:'makes destruction breathe over the loop (pick targets via ⓔ)', on:false, open:false, params:[
     { k:'mode', label:'Curve', type:'select', def:1,
       options:[[0,'Constant'],[1,'Peak (crash mid)'],[2,'Pulse'],[3,'Build → Drop'],[4,'Stutter'],[5,'Swell'],[6,'Drop → Build'],[7,'Bounce'],[8,'Wander']] },
@@ -282,6 +290,7 @@ const FX_GROUPS = [
   ['Screen / Optics', ['crt','degauss','halftone','hud','bloom']],
   ['Distort',         ['warp','melt','extrude','feedback','pixelate']],
   ['Colour / Tone',   ['color','duotone','solarize','posterize','emboss']],
+  ['Video',           ['time']],          // acts on the footage, not on any one frame
   ['Global',          ['zoom','mask','motion']],
 ];
 
