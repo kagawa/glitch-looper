@@ -207,7 +207,8 @@ function envCurve(phase, mode, rate){
     case 2: return hump((phase*rate)%1);                     // pulse — eased repeating humps
     case 3: { const b=0.82;                                  // build → drop — accelerating build, eased release
       const t=phase/b; return phase<b ? t*t*t : 1-sm((phase-b)/(1-b)); }
-    case 4: return rand(Math.floor(phase*rate*4)+0.5);       // stutter — stepped random
+    case 4: { const N=Math.max(1,Math.round(rate*4));         // stutter — stepped random
+      return rand(Math.floor(phase*N)%N + 0.5); }             // %N: step 0 again at the loop point
     case 5: return phase<0.25 ? sm(phase/0.25) : phase>0.75 ? sm((1-phase)/0.25) : 1;  // swell — plateau peak
     case 6: { const b=0.18;                                  // drop → build — release then re-build (starts/ends high)
       return phase<b ? 1-sm(phase/b) : (t=>t*t*t)((phase-b)/(1-b)); }

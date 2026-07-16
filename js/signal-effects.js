@@ -3,16 +3,19 @@ function applyDegauss(w,h,phase){
 //      while the colour goes impure (beams landing on the wrong phosphors), then it settles.
 //      Screen Ripple moves all three channels together (geometry); on top of that R and B are
 //      pulled apart (colour). At Screen Ripple 0 only the colour breaks and the picture holds
-//      perfectly still. ----
+//      perfectly still. Curve is how the disturbance runs over the loop — the shared Envelope
+//      curves, so it can settle like a real degauss, never settle, or come in waves.
+//      Every oscillator below is an integer multiple of the loop, because Constant holds the
+//      strength up at both ends of the loop where a non-repeating one would visibly jump. ----
 const dg = state.degauss;
 if (dg.on){
   const amt = P('degauss','amount');
   if (amt>0){
     const TAU=Math.PI*2;
-    const amp = Math.sin(phase*Math.PI);              // disturbance rises then settles — 0 at both ends
+    const amp = Math.max(0, envCurve(phase, dg.curve|0, dg.rate));
     const str = amt*amp;
     if (str>0.004){
-      const wob = phase*TAU*dg.freq;                  // shimmer / buzz
+      const wob = phase*TAU*dg.freq;                  // shimmer / buzz (integer freq → repeats)
       const maxShift = str*(10 + 18*(0.4+0.6*dg.color));   // per-blob channel misconvergence (px)
       const sway = str*P('degauss','sway')*34;             // whole-picture ripple (px)
       const a=TAU*2.5/w, b=TAU*1.9/h, cc=TAU*1.7/w, dd=TAU*2.7/h;
@@ -20,7 +23,7 @@ if (dg.on){
       const src=ctx.getImageData(0,0,w,h), out=ctx.createImageData(w,h), sd=src.data, od=out.data;
       for (let y=0;y<h;y++){
         for (let x=0;x<w;x++){
-          const fx=Math.sin(x*a + y*b + wob), fy=Math.sin(x*cc - y*dd - wob*0.8);
+          const fx=Math.sin(x*a + y*b + wob), fy=Math.sin(x*cc - y*dd - wob*2);
           const di=(y*w+x)*4;
           const ox=fx*sway, oy=fy*sway;      // the ripple every channel rides
           const gX=cX((x+ox)|0), gY=cY((y+oy)|0);
@@ -36,10 +39,10 @@ if (dg.on){
       if (dg.color>0){                        // moving rainbow hue patches ("acid" purity error)
         ctx.save(); ctx.globalCompositeOperation='overlay';
         for (let k=0;k<3;k++){
-          const bx=w*(0.15+0.7*(0.5+0.5*Math.sin(wob*0.7+k*2.1)));
-          const by=h*(0.15+0.7*(0.5+0.5*Math.cos(wob*0.9+k*1.7)));
+          const bx=w*(0.15+0.7*(0.5+0.5*Math.sin(wob+k*2.1)));
+          const by=h*(0.15+0.7*(0.5+0.5*Math.cos(wob*2+k*1.7)));
           const rad=Math.max(w,h)*(0.3+0.1*k);
-          const hue=Math.round(phase*300 + k*120 + wob*24)%360;
+          const hue=(Math.round(phase*720 + k*120 + Math.sin(wob)*40)%360+360)%360;
           const g=ctx.createRadialGradient(bx,by,0,bx,by,rad);
           g.addColorStop(0,`hsla(${hue},100%,50%,${0.45*str*dg.color})`);
           g.addColorStop(1,'hsla(0,0%,50%,0)');

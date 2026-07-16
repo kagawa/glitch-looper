@@ -124,6 +124,9 @@ const FX = [
     { k:'sway',   label:'Screen Ripple', min:0, max:1, step:.01, def:.5, env:1 },
     { k:'freq',   label:'Shimmer', min:1, max:8, step:1, def:4 },
     { k:'color',  label:'Rainbow', min:0, max:1, step:.01, def:.7 },
+    { k:'curve',  label:'Curve', type:'select', def:1,
+      options:[[0,'Constant (never settles)'],[1,'Peak (settles)'],[2,'Pulse'],[3,'Build → Drop'],[4,'Stutter'],[5,'Swell'],[6,'Drop → Build'],[7,'Bounce'],[8,'Wander']] },
+    { k:'rate',   label:'Rate', min:1, max:8, step:1, def:2 },
   ]},
   { id:'warp', name:'Warp', hint:'horizontal displacement — heat-haze / underwater / shear', on:false, open:false, params:[
     { k:'amp',   label:'Amplitude', min:0, max:10, step:.25, def:5, env:1 },
