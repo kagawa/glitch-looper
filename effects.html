@@ -117,7 +117,7 @@ const GROUPS = [
   ]],
   ['Distort', [
     ['Warp','sim','Per-row horizontal displacement with a selectable pattern: wave, pulse, jitter, step, drift, twist (shear), beat (interference), zigzag.','行ごとの水平変位。パターン選択: 波・パルス・ジッタ・ステップ・ドリフト・ツイスト（せん断）・うなり・ジグザグ。','Amplitude · Frequency · Speed · Pattern'],
-    ['Melt','sim','Pixels drip downward; the drip breathes over the loop. Drip mode stretches the top; Wrap mode drips off the bottom and re-enters the top (a column can travel a full height and loop back). Spread varies the drip amount per column (low = even melt, high = a few long icicles); Curve is how the melt evolves over the loop — Peak, Pulse, Build→Drop or Stutter (eased, like the Envelope), with its own Rate.','ピクセルが下へ垂れる。Drip は上端が伸び、Wrap は下に消えて上から出る（一周して戻る）。Spread は列ごとの垂れ量（低＝均一、高＝つらら）、Curve はループ内での溶け方（Peak/Pulse/Build→Drop/Stutter＝Envelope式のイージング）を Rate 付きで指定。','Amount · Mode · Spread · Curve · Rate'],
+    ['Melt','sim','Pixels drip downward; the drip breathes over the loop. Drip mode stretches the top; Wrap mode drips off the bottom and re-enters the top (a column can travel a full height and loop back). Spread varies the drip amount per column (low = even melt, high = a few long icicles); Curve is how the melt evolves over the loop — Peak, Pulse, Build→Drop, Stutter, Swell, Drop→Build, Bounce or Wander (eased, like the Envelope), with its own Rate.','ピクセルが下へ垂れる。Drip は上端が伸び、Wrap は下に消えて上から出る（一周して戻る）。Spread は列ごとの垂れ量（低＝均一、高＝つらら）、Curve はループ内での溶け方（Peak/Pulse/Build→Drop/Stutter/Swell/Drop→Build/Bounce/Wander＝Envelope式のイージング）を Rate 付きで指定。','Amount · Mode · Spread · Curve · Rate'],
     ['Feedback Zoom','sim','A Droste feedback tunnel that zooms, spins and pulses over the loop.','ドロステのフィードバックトンネル。ループ内でズーム・回転・脈動。','Amount · Zoom · Twist · Spin · Pulse'],
     ['Pixelate','sim','Mosaic / retro blocks; the Envelope can pulse the block size.','モザイク/レトロブロック。Envelopeでブロックサイズを脈動可能。','Size'],
   ]],
@@ -131,7 +131,7 @@ const GROUPS = [
   ['Global', [
     ['Zoom','sim','A centre zoom-in applied LAST, after every other effect (so slices etc. render at normal scale first). Also crops the minimal overscan that hides wobble wrap-seams.','最終段（全エフェクト後）で中央ズーム。Sliceなどは等倍で処理された後に拡大される。wobbleの継ぎ目を隠す最小オーバースキャンも兼ねる。','Amount'],
     ['Region Mask','sim','Confines every effect using a fixed or roaming rectangle, shadows, midtones, highlights, edges or seeded noise. Non-rectangle masks have a threshold; all masks are invertable and feathered.','全エフェクトを固定/移動矩形・暗部・中間調・明部・エッジ・Seed付きノイズへ限定。矩形以外はしきい値を調整でき、反転と縁ぼかしに対応。','Mask Source · Threshold · X/Y · Invert · Steps · Feather'],
-    ['Envelope','sim','Modulates the other effects over the loop (constant / peak / pulse / build-drop / stutter). Tick the ⓔ box on any supported parameter to make it breathe.','他のエフェクトをループ内で変調（一定/ピーク/パルス/ビルド→ドロップ/スタッター）。対応パラメータの ⓔ をオンにすると抑揚が付く。','Curve · Depth · Rate / Count'],
+    ['Envelope','sim','Modulates the other effects over the loop with eased curves: constant / peak / pulse / build→drop / stutter / swell (plateau peak) / drop→build / bounce / wander (smooth random). Tick the ⓔ box on any supported parameter to make it breathe.','他のエフェクトをループ内でイージング付きカーブで変調：一定／ピーク／パルス／ビルド→ドロップ／スタッター／スウェル（山が平ら）／ドロップ→ビルド／バウンス／ワンダー（滑らかなランダム）。対応パラメータの ⓔ をオンにすると抑揚が付く。','Curve · Depth · Rate / Count'],
   ]],
 ];
 
