@@ -173,13 +173,13 @@ function timeFrame(fi, NF, drop){
   // Playback order: reshuffle which moment each display frame reads. It stays a pure function of the
   // frame index, so all three grids agree and the loop still closes; the reorder progresses forward
   // segment to segment, glitching only inside a segment, so the wrap point stays clean.
-  const ord = tm.order|0;
+  const pb = state.playback, ord = pb.on ? (pb.order|0) : 0;
   if (ord>0){
     if (ord===4){                                // Jitter: swap the odd frame of a flagged pair
       const pair=e>>1;
       if (rand(pair*4.3+0.5)<0.5) e = wrap((e&1) ? e-1 : e+1);
     } else {
-      const L=Math.max(2,tm.olen|0), seg=Math.floor(e/L), s=seg*L;
+      const L=Math.max(2,pb.olen|0), seg=Math.floor(e/L), s=seg*L;
       const segLen=Math.min(L, NF-s), local=e-s;
       let lo=local;
       if (rand(seg*3.7+0.5) < 0.6){              // ~60% of segments glitch, the rest play straight
@@ -191,7 +191,7 @@ function timeFrame(fi, NF, drop){
       e = wrap(s+lo);
     }
   }
-  const hold = Math.max(1, tm.hold|0);
+  const hold = tm.on ? Math.max(1, tm.hold|0) : 1;   // Time's transport only when Time is on
   if (hold>1) e -= e % hold;                  // hold divides NF, so no short group at the seam
   if (drop>0){
     // Walk back to the last frame that wasn't dropped. Seeded on the WRAPPED index, or the pattern
@@ -212,8 +212,8 @@ function timeFrame(fi, NF, drop){
 function draw(phase){
   const NF = Math.round(LOOP_MS/1000*30);
   const tm = state.time, il = state.interlace, st = state.stale;
-  const sy0 = state.synctear, cd = state.chroma;
-  const timeOn  = tm.on && (tm.hold>1 || tm.drop>0 || tm.trail>0 || (tm.order|0)!==0);
+  const sy0 = state.synctear, cd = state.chroma, pb = state.playback;
+  const timeOn  = (tm.on && (tm.hold>1 || tm.drop>0 || tm.trail>0)) || (pb.on && (pb.order|0)!==0);
   const ilOn    = il.on && il.amount>0;
   const staleOn = st.on && st.amount>0;
   const syncOn0 = sy0.on && sy0.amount>0;
@@ -227,8 +227,8 @@ function draw(phase){
   const env = state.motion.on ? motionMul(phase) : 1;
   const pv = (fx,k,hi) => Math.max(0, Math.min(hi, state[fx][k] * (state[fx][k+'_env'] ? env : 1)));
   const fi = Math.floor(phase*NF);
-  const drop  = timeOn ? pv('time','drop', .9) : 0;
-  const trail = timeOn ? pv('time','trail', 1) : 0;
+  const drop  = tm.on ? pv('time','drop', .9) : 0;    // Time's knobs, independent of Playback
+  const trail = tm.on ? pv('time','trail', 1) : 0;
   const w = canvas.width, h = canvas.height;
   // The footage at one display frame: Time's transport, plus its trails. Anything that needs a
   // second moment in time just asks for another one — no history buffer, because drawFrame will
