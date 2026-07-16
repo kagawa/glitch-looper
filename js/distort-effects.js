@@ -84,7 +84,11 @@ if (fb.on && fb.amount>0){
   }
   const N = Math.max(2, fb.copies|0), flow = fb.flow|0;
   const frac = flow ? ((phase*flow)%1+1)%1 : 0;             // position between rungs, wraps each step
-  const spin = fb.speed*360*phase;                          // whole tunnel rotation (integer → seamless)
+  // Spin turns the whole stack at once, so the loop only closes on a whole number of turns — the
+  // slowest it can go is one turn per loop, which is fast. Slow rotation comes from Twist with
+  // Flow instead: each ring turns as it travels the ladder, and the ring leaving one end is
+  // replaced by the one arriving at the other, so the pattern repeats at any angle per rung.
+  const spin = fb.speed*360*phase;
   const pulse = 1 + fb.pulse*0.12*Math.sin(phase*Math.PI*2); // breathing zoom (seamless)
   const items=[]; let W=0;
   for (let j=0;j<N;j++){
