@@ -9,10 +9,12 @@ function mixWithOriginal(w,h,before,mix,fade,cover){
   if (mix>=1 && fade===0) return;
   const after = ctx.getImageData(0,0,w,h), ad = after.data, bd = before.data;
   const c = cover;
-  // the linear ramps only vary along one axis, so precompute them once instead of per pixel
-  // ramp: nothing until Coverage is reached from the chosen side, then up to full at that edge.
-  // Guarded at 0, or the division would hand the far edge full strength however low Coverage went.
-  const ramp = c<=0 ? (()=>0) : (t => Math.min(1, Math.max(0, (t-(1-c))/c)));
+  // the linear ramps only vary along one axis, so precompute them once instead of per pixel.
+  // The ramp hits full strength at 1-c/2 (the centre when Coverage is maxed) and reaches zero
+  // c further out, which puts the far edge at ~50% rather than nothing when Coverage is maxed —
+  // a low Coverage still confines the effect to a strip near its own side.
+  // Guarded at 0, or the division would hand the near edge full strength however low Coverage went.
+  const ramp = c<=0 ? (()=>0) : (t => Math.min(1, Math.max(0, (t-1+1.5*c)/c)));
   let gx=null, gy=null;
   if (fade===1||fade===2){ gx=new Float32Array(w); for(let x=0;x<w;x++){ const t=w>1?x/(w-1):1; gx[x]=ramp(fade===1?t:1-t); } }
   else if (fade===3||fade===4){ gy=new Float32Array(h); for(let y=0;y<h;y++){ const t=h>1?y/(h-1):1; gy[y]=ramp(fade===3?t:1-t); } }
