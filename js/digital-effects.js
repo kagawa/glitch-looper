@@ -59,9 +59,11 @@ if (ps.on){
     : key===4 ? i => Math.min(d[i],d[i+1],d[i+2])                    // Min RGB
     :           lum;                                                 // Lightness
     // Sort Chance leaves a share of the runs alone. Threshold and Edges cut on the picture itself,
-    // so they skip the flat parts for free — but Random, Waves and Whole line tile the whole line
-    // and would otherwise sort every last pixel of it. 1 = sort every run.
-    const chance = ps.chance;
+    // so they skip the flat parts for free and the knob can stay linear — but Random, Waves and
+    // Whole line tile the line end to end and start out sorting every last pixel of it, so there
+    // the knob is squared to push the usable range up into the middle of the travel.
+    // 1 = sort every run, either way.
+    const chance = (ivl===0||ivl===2) ? ps.chance : ps.chance*ps.chance;
     const take = (lineSeed,j)=> chance>=1 || rand(lineSeed*0.73+j*5.9+0.5) < chance;
     const sortSpan = (idx,s,e)=>{
       const arr=[];
