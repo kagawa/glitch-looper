@@ -61,8 +61,14 @@ function loadSample(){
   const ramp = x.createLinearGradient(0,0,W,0);     // luma ramp (banding / posterise)
   ramp.addColorStop(0,'#000'); ramp.addColorStop(1,'#fff');
   x.fillStyle = ramp; x.fillRect(0, H-56, W, 56);
-  x.fillStyle = '#fff'; x.font = 'bold 64px system-ui, sans-serif'; x.textBaseline='middle';
-  x.fillText('GLITCH', W*0.06, H*0.34);
+  // the sample carries the drop-zone hint, so it stays visible even once the drop zone is hidden
+  x.textBaseline='middle'; x.textAlign='center';
+  x.fillStyle='rgba(0,0,0,.45)'; x.fillRect(W*0.12, H*0.30, W*0.76, 108);
+  x.fillStyle='#fff'; x.font='bold 40px system-ui, sans-serif';
+  x.fillText('Drop an image', W/2, H*0.30+34);
+  x.font='500 22px system-ui, sans-serif'; x.fillStyle='#e8e8ea';
+  x.fillText('or tap to choose  ·  PNG · JPG · WEBP', W/2, H*0.30+74);
+  x.textAlign='left';
   commitImage(c, W, H);
 }
 
