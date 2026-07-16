@@ -93,6 +93,19 @@ autoMsRange.addEventListener('input', ()=>{
 driftAmtRange.addEventListener('input', ()=>{
   driftAmt = parseInt(driftAmtRange.value)/100; driftAmtVal.textContent = driftAmtRange.value+'%';
 });
+// sliders: how many effects a random roll may turn on (min never above max, and vice versa)
+const randMinRange = document.getElementById('randMinRange'), randMinVal = document.getElementById('randMinVal');
+const randMaxRange = document.getElementById('randMaxRange'), randMaxVal = document.getElementById('randMaxVal');
+randMinRange.addEventListener('input', ()=>{
+  randMin = parseInt(randMinRange.value);
+  if (randMin > randMax){ randMax = randMin; randMaxRange.value = randMax; randMaxVal.textContent = randMax; }
+  randMinVal.textContent = randMin;
+});
+randMaxRange.addEventListener('input', ()=>{
+  randMax = parseInt(randMaxRange.value);
+  if (randMax < randMin){ randMin = randMax; randMinRange.value = randMin; randMinVal.textContent = randMin; }
+  randMaxVal.textContent = randMax;
+});
 const statusEl = document.getElementById('status');
 function setStatus(s){ statusEl.innerHTML = s; }
 
@@ -106,8 +119,10 @@ const RAND_PROB = { png:.12, jpeg:.15, warp:.18, halftone:.12, feedback:.12, mel
                     extrude:.12, time:.1, playback:.1, interlace:.1, stale:.1, synctear:.1, chroma:.12,   // these re-render the frame — keep them rare
                     // colour-mapping / stylise effects: keep them occasional, emboss rarest
                     duotone:.14, solarize:.14, posterize:.14, emboss:.04 };
-// three strength levels: prob = on-probability scale, str = how far params stray from their default
-const RAND_LEVELS = { normal:{prob:.5, str:.4}, strong:{prob:1, str:1}, wild:{prob:1.7, str:1} };
+// three strength levels: prob = on-probability scale, str = how far params stray from their default.
+// str stays low at Normal so params sit near their (gentle) defaults instead of jumping to extremes.
+const RAND_LEVELS = { normal:{prob:.5, str:.22}, strong:{prob:.9, str:.55}, wild:{prob:1.4, str:1} };
+let randMin = 1, randMax = 5;              // clamp how many effects a roll turns on (UI: random popover)
 function randomizeFX(){
   const lv = RAND_LEVELS[randLevelVal] || RAND_LEVELS.normal;
   if (!seedLocked){ randomSeed = Math.floor(Math.random()*1_000_000); syncSeedUI(); }
@@ -138,11 +153,31 @@ function randomizeFX(){
   }
   // Envelope/Zoom/Mask render nothing on their own — and the Video effects only rework what another
   // effect already moved, so a roll of nothing-but-Video is a blank frame. Guarantee at least one
-  // effect that actually puts something on screen.
-  const PASSIVE = ['motion','zoom','mask','time','stale','synctear','interlace'];
-  if (!FX.some(f=> !PASSIVE.includes(f.id) && state[f.id].on)){
+  // effect that actually puts something on screen, BEFORE the count clamp so the clamp can protect it.
+  const PASSIVE = ['motion','zoom','mask','time','playback','stale','synctear','interlace','chroma'];
+  const isDrawer = id => !PASSIVE.includes(id);
+  if (!FX.some(f=> isDrawer(f.id) && state[f.id].on)){
     const candidates = ['vhs','glitch','noise','color'].filter(id=>!state[id]._locked);
     if (candidates.length) state[candidates[Math.floor(Math.random()*candidates.length)]].on = true;
+  }
+  // Clamp how many effects are on to [min, max]. Motion/Zoom/Mask never count (Envelope is always on;
+  // Zoom/Mask are left as set). Trim the excess or top up at random, never touching a lock, and never
+  // removing the last drawer — so max is exact (a min of 0 still yields 1, the guaranteed drawer).
+  const UNCOUNTED = ['motion','zoom','mask'];
+  const countable = FX.filter(f=> !UNCOUNTED.includes(f.id));
+  const lo = Math.min(randMin, randMax), hi = Math.max(randMin, randMax);
+  let on = countable.filter(f=> state[f.id].on);
+  while (on.length > hi){
+    const drawers = on.filter(f=> isDrawer(f.id)).length;   // don't cut the last one that draws
+    const cut = on.filter(f=> !state[f.id]._locked && !(isDrawer(f.id) && drawers<=1));
+    if (!cut.length) break;
+    const pick = cut[Math.floor(Math.random()*cut.length)];
+    state[pick.id].on = false; on = on.filter(x=>x!==pick);
+  }
+  let off = countable.filter(f=> !state[f.id].on && !state[f.id]._locked);
+  while (on.length < lo && off.length){
+    const f = off.splice(Math.floor(Math.random()*off.length),1)[0];
+    state[f.id].on = true; on.push(f);           // its params were already randomised in the pass above
   }
   // (Zoom is left untouched above; the wobble's own zoom is handled by the base overscan that
   //  hides its wrap seam — no separate Zoom-effect coupling.)
