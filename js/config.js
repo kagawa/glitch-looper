@@ -279,6 +279,12 @@ const FX = [
     { k:'gap',    label:'Trail Gap (frames)', min:1, max:12, step:1, def:5, show:s=> s.trail>0 },
     { k:'trailn', label:'Trail Frames (a render each)', min:2, max:4, step:1, def:3, show:s=> s.trail>0 },
   ]},
+  { id:'interlace', name:'Interlace', hint:'two fields scanned a moment apart — combing on anything that moved', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:1, env:1 },
+    { k:'delay',  label:'Field Delay (frames)', min:1, max:12, step:1, def:2 },
+    { k:'thick',  label:'Field Height (lines)', min:1, max:8, step:1, def:1 },
+    { k:'swap',   label:'Field Order', type:'select', def:0, options:[[0,'Odd lines lag'],[1,'Even lines lag']] },
+  ]},
   { id:'motion', name:'Envelope', hint:'makes destruction breathe over the loop (pick targets via ⓔ)', on:false, open:false, params:[
     { k:'mode', label:'Curve', type:'select', def:1,
       options:[[0,'Constant'],[1,'Peak (crash mid)'],[2,'Pulse'],[3,'Build → Drop'],[4,'Stutter'],[5,'Swell'],[6,'Drop → Build'],[7,'Bounce'],[8,'Wander']] },
@@ -295,7 +301,7 @@ const FX_GROUPS = [
   ['Screen / Optics', ['crt','degauss','halftone','hud','bloom']],
   ['Distort',         ['warp','melt','extrude','feedback','pixelate']],
   ['Colour / Tone',   ['color','duotone','solarize','posterize','emboss']],
-  ['Video',           ['time']],          // acts on the footage, not on any one frame
+  ['Video',           ['time','interlace']],          // acts on the footage, not on any one frame
   ['Global',          ['zoom','mask','motion']],
 ];
 

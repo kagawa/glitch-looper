@@ -11,6 +11,8 @@ const gsrc = document.createElement('canvas');               // small sampler fo
 const gctx = gsrc.getContext('2d', { willReadFrequently:true });
 const tacc = document.createElement('canvas');               // Time: trail accumulator (draw() only,
 const tax = tacc.getContext('2d');                           //   so drawFrame can't clobber it)
+const iacc = document.createElement('canvas');               // Interlace: the lagging field's moment
+const iax = iacc.getContext('2d');
 const mshape = document.createElement('canvas');             // region-mask alpha shape
 const msx = mshape.getContext('2d');
 const mclean = document.createElement('canvas');             // region-mask clean plate (base, pre-glitch)
@@ -183,34 +185,60 @@ function timeFrame(fi, NF, drop){
 // drawFrame (it would recurse) and should not live in the callers (the preview, the MP4 and the GIF
 // would each do it their own way, on three different frame grids).
 function draw(phase){
-  const tm = state.time;
-  if (!tm.on || (tm.hold<=1 && tm.drop<=0 && tm.trail<=0)){ drawFrame(phase); return; }
   const NF = Math.round(LOOP_MS/1000*30);
-  const fi = Math.floor(phase*NF);
+  const tm = state.time, il = state.interlace;
+  const timeOn = tm.on && (tm.hold>1 || tm.drop>0 || tm.trail>0);
+  const ilOn   = il.on && il.amount>0;
+  if (!timeOn && !ilOn){ drawFrame(phase); return; }   // untouched — keep the raw, unquantised phase
   // P() reads the ENV that drawFrame sets for the frame it is painting — the wrong one to ask here,
   // and for trails it belongs to a frame further back in time. Take the envelope for the moment
   // being shown instead. Clamped because motionMul peaks above 1: an unclamped Trails would weigh
   // the older frames heavier than the newest and run the smear backwards.
   const env = state.motion.on ? motionMul(phase) : 1;
-  const pv = (k,hi) => Math.max(0, Math.min(hi, tm[k] * (tm[k+'_env'] ? env : 1)));
-  const drop = pv('drop', .9), trail = pv('trail', 1);
-  const K = trail>0 ? Math.max(2, tm.trailn|0) : 1;
-  if (K<=1){ drawFrame(timeFrame(fi,NF,drop)/NF); return; }
-  // Trails as a plain weighted average of the last K frames — no running buffer. Costs K renders,
-  // but it needs no warm-up, it is the same on every frame grid, and it closes the loop by itself
-  // because the frames it reaches back to simply wrap.
+  const pv = (fx,k,hi) => Math.max(0, Math.min(hi, state[fx][k] * (state[fx][k+'_env'] ? env : 1)));
+  const fi = Math.floor(phase*NF);
+  const drop  = timeOn ? pv('time','drop', .9) : 0;
+  const trail = timeOn ? pv('time','trail', 1) : 0;
   const w = canvas.width, h = canvas.height;
-  const gap = Math.max(1, tm.gap|0);          // how far back each step reaches, in frames
-  const wts=[]; for (let k=0;k<K;k++) wts.push(Math.pow(trail,k));      // newest 1, older decaying
-  tacc.width=w; tacc.height=h; tax.clearRect(0,0,w,h);
-  let S=0;
-  for (let k=K-1;k>=0;k--){                   // oldest first, folding each into a running average
-    drawFrame(timeFrame(fi-k*gap,NF,drop)/NF);
-    S += wts[k];
-    tax.globalAlpha = wts[k]/S;               // incremental weighted mean → alpha 1 on the first
-    tax.drawImage(canvas,0,0);
+  // The footage at one display frame: Time's transport, plus its trails. Anything that needs a
+  // second moment in time just asks for another one — no history buffer, because drawFrame will
+  // paint any phase on demand. The price is a render, which is why these stack multiplicatively.
+  const moment = (f)=>{
+    if (!timeOn){ drawFrame((((f%NF)+NF)%NF)/NF); return; }
+    const K = trail>0 ? Math.max(2, tm.trailn|0) : 1;
+    if (K<=1){ drawFrame(timeFrame(f,NF,drop)/NF); return; }
+    // Trails as a plain weighted average — no running buffer. It needs no warm-up, it is the same
+    // on every frame grid, and it closes the loop by itself because the frames it reaches wrap.
+    const gap = Math.max(1, tm.gap|0);        // how far back each step reaches, in frames
+    const wts=[]; for (let k=0;k<K;k++) wts.push(Math.pow(trail,k));    // newest 1, older decaying
+    tacc.width=w; tacc.height=h; tax.clearRect(0,0,w,h);
+    let S=0;
+    for (let k=K-1;k>=0;k--){                 // oldest first, folding each into a running average
+      drawFrame(timeFrame(f-k*gap,NF,drop)/NF);
+      S += wts[k];
+      tax.globalAlpha = wts[k]/S;             // incremental weighted mean → alpha 1 on the first
+      tax.drawImage(canvas,0,0);
+    }
+    tax.globalAlpha = 1;
+    ctx.clearRect(0,0,w,h); ctx.drawImage(tacc,0,0);
+  };
+  if (!ilOn){ moment(fi); return; }
+  // ---- Interlace: the two fields were never scanned at the same instant ----
+  // A field carries every other line and is grabbed a moment after the other, so anything that
+  // moved between them lands in a different place on each — which is why the tell is teeth along
+  // moving edges, and why a still part of the picture stays perfectly clean. Paint both moments
+  // and weave them.
+  const amt = pv('interlace','amount',1);
+  moment(fi - Math.max(1, il.delay|0));       // the field that lags
+  iacc.width=w; iacc.height=h; iax.clearRect(0,0,w,h); iax.drawImage(canvas,0,0);
+  moment(fi);                                 // the field that leads
+  const th = Math.max(1, il.thick|0);
+  const lagParity = (il.swap|0)===0 ? 1 : 0;
+  ctx.globalAlpha = amt;
+  for (let y=0;y<h;y+=th){
+    if ((((y/th)|0) & 1) !== lagParity) continue;
+    const bh = Math.min(th, h-y);
+    ctx.drawImage(iacc, 0,y,w,bh, 0,y,w,bh);
   }
-  tax.globalAlpha = 1;
-  ctx.clearRect(0,0,w,h);
-  ctx.drawImage(tacc,0,0);
+  ctx.globalAlpha = 1;
 }
