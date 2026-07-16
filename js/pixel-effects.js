@@ -1,27 +1,36 @@
 // Halftone and Pixelate replace the picture outright — that is why they were all-or-nothing.
 // Mix blends the result back toward how the picture looked before the effect ran, and Fade ramps
-// that blend across the frame so the effect can wash in from a side, the edges or the centre.
+// that blend across the frame, either from a side or by the brightness of the picture itself.
+// Coverage is how far the Fade reaches: a fraction of the frame for the directional ramps, and the
+// brightness cutoff for Bright/Dark. It is written so that raising it always means "more of the
+// picture gets the effect", whichever Fade is chosen.
 // Mix 1 + Fade Even leaves the frame untouched, so it costs nothing when it isn't used.
-function mixWithOriginal(w,h,before,mix,fade){
+function mixWithOriginal(w,h,before,mix,fade,cover){
   if (mix>=1 && fade===0) return;
   const after = ctx.getImageData(0,0,w,h), ad = after.data, bd = before.data;
+  const c = cover;
   // the linear ramps only vary along one axis, so precompute them once instead of per pixel
+  // ramp: nothing until Coverage is reached from the chosen side, then up to full at that edge.
+  // Guarded at 0, or the division would hand the far edge full strength however low Coverage went.
+  const ramp = c<=0 ? (()=>0) : (t => Math.min(1, Math.max(0, (t-(1-c))/c)));
   let gx=null, gy=null;
-  if (fade===1||fade===2){ gx=new Float32Array(w); for(let x=0;x<w;x++){ const t=w>1?x/(w-1):1; gx[x]=fade===1?t:1-t; } }
-  else if (fade===3||fade===4){ gy=new Float32Array(h); for(let y=0;y<h;y++){ const t=h>1?y/(h-1):1; gy[y]=fade===3?t:1-t; } }
-  const radial = fade===5||fade===6;
+  if (fade===1||fade===2){ gx=new Float32Array(w); for(let x=0;x<w;x++){ const t=w>1?x/(w-1):1; gx[x]=ramp(fade===1?t:1-t); } }
+  else if (fade===3||fade===4){ gy=new Float32Array(h); for(let y=0;y<h;y++){ const t=h>1?y/(h-1):1; gy[y]=ramp(fade===3?t:1-t); } }
+  const tonal = fade===5||fade===6;
+  const BAND = 0.18;                                  // soft edge on the cutoff, or it looks cut out
   for (let y=0;y<h;y++){
-    const ty = h>1 ? (y/(h-1)-0.5)*2 : 0, gyv = gy?gy[y]:1;
+    const gyv = gy?gy[y]:1;
     for (let x=0;x<w;x++){
+      const i=(y*w+x)*4;
       let g = gx ? gx[x] : gyv;
-      if (radial){
-        const tx = w>1 ? (x/(w-1)-0.5)*2 : 0;
-        const r = Math.min(1, Math.sqrt(tx*tx+ty*ty));
-        g = fade===5 ? r : 1-r;                       // 5: strong at the edges · 6: strong in the middle
+      if (tonal){
+        // judged on the picture as it was before the effect ran, not on the effect's own output
+        const l = (bd[i]*0.299+bd[i+1]*0.587+bd[i+2]*0.114)/255;
+        const dist = fade===5 ? l-(1-c) : c-l;        // 5: the bright parts · 6: the dark parts
+        g = Math.min(1, Math.max(0, dist/BAND));
       }
       const a = mix*g;
       if (a>=1) continue;
-      const i=(y*w+x)*4;
       ad[i]  =bd[i]  +(ad[i]  -bd[i]  )*a;
       ad[i+1]=bd[i+1]+(ad[i+1]-bd[i+1])*a;
       ad[i+2]=bd[i+2]+(ad[i+2]-bd[i+2])*a;
@@ -38,13 +47,14 @@ if (px2.on && px2.size>1){
   if (s>1){
     const mix=P('pixelate','mix'), fade=px2.fade|0;
     const before = (mix<1||fade) ? ctx.getImageData(0,0,w,h) : null;
+    const cover = px2.cover;
     const pw=Math.max(1,Math.round(w/s)), ph=Math.max(1,Math.round(h/s));
     sc.width=pw; sc.height=ph; sctx.imageSmoothingEnabled=false;
     sctx.clearRect(0,0,pw,ph); sctx.drawImage(canvas,0,0,w,h,0,0,pw,ph);
     ctx.imageSmoothingEnabled=false; ctx.clearRect(0,0,w,h);
     ctx.drawImage(sc,0,0,pw,ph,0,0,w,h);
     ctx.imageSmoothingEnabled=true;
-    if (before) mixWithOriginal(w,h,before,mix,fade);
+    if (before) mixWithOriginal(w,h,before,mix,fade,cover);
   }
 }
 }
@@ -68,7 +78,7 @@ if (ht.on){
       ctx.beginPath(); ctx.arc(cx+cell/2, cy+cell/2, rad, 0, 7); ctx.fill();
     }
   }
-  mixWithOriginal(w,h,before,P('halftone','mix'),ht.fade|0);
+  mixWithOriginal(w,h,before,P('halftone','mix'),ht.fade|0,ht.cover);
 }
 }
 

@@ -134,8 +134,9 @@ const FX = [
   { id:'pixelate', name:'Pixelate', hint:'mosaic / retro blocks (Envelope can pulse block size)', on:false, open:false, params:[
     { k:'size', label:'Block Size', min:1, max:48, step:1, def:8, env:1 },
     { k:'mix',  label:'Mix', min:0, max:1, step:.01, def:1, env:1 },
-    { k:'fade', label:'Fade', type:'select', def:0,
-      options:[[0,'Even'],[1,'Right'],[2,'Left'],[3,'Bottom'],[4,'Top'],[5,'Edges'],[6,'Centre']] },
+    { k:'fade',  label:'Fade', type:'select', def:0,
+      options:[[0,'Even'],[1,'Right'],[2,'Left'],[3,'Bottom'],[4,'Top'],[5,'Bright areas'],[6,'Dark areas']] },
+    { k:'cover', label:'Coverage', min:0, max:1, step:.01, def:.5, env:1 },
   ]},
   { id:'hud', name:'HUD / Text', hint:'REC ● · camcorder · TV / VCR on-screen text', on:false, open:false, params:[
     { k:'layout',  label:'Layout', type:'select', def:3,
@@ -154,8 +155,9 @@ const FX = [
     { k:'cell', label:'Cell Size', min:3, max:20, step:1, def:6 },
     { k:'bg',   label:'Background', type:'select', def:0, options:[[0,'Dark (LED)'],[1,'Light (print)']] },
     { k:'mix',  label:'Mix', min:0, max:1, step:.01, def:1, env:1 },
-    { k:'fade', label:'Fade', type:'select', def:0,
-      options:[[0,'Even'],[1,'Right'],[2,'Left'],[3,'Bottom'],[4,'Top'],[5,'Edges'],[6,'Centre']] },
+    { k:'fade',  label:'Fade', type:'select', def:0,
+      options:[[0,'Even'],[1,'Right'],[2,'Left'],[3,'Bottom'],[4,'Top'],[5,'Bright areas'],[6,'Dark areas']] },
+    { k:'cover', label:'Coverage', min:0, max:1, step:.01, def:.5, env:1 },
   ]},
   { id:'crt', name:'CRT', hint:'tube curve · RGB phosphor mask · scanlines · convergence · glow', on:false, open:false, params:[
     { k:'amount',   label:'Curvature',     min:0, max:1, step:.01, def:.3 },
