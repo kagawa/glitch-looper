@@ -160,13 +160,13 @@ function drawFrame(phase){    // phase in [0,1)
 // function of the frame index alone and nothing else: no memory, no accumulator. That is what lets
 // the preview (rAF), the MP4 (30fps) and the GIF (20fps) all agree — each samples this same 90-frame
 // grid at its own rate and gets the same answer, where anything stateful would drift apart.
-function timeFrame(fi, NF){
+function timeFrame(fi, NF, drop){
   const tm = state.time;
   const wrap = k => ((k % NF) + NF) % NF;
   let e = wrap(fi);
   const hold = Math.max(1, tm.hold|0);
   if (hold>1) e -= e % hold;                  // hold divides NF, so no short group at the seam
-  if (tm.drop>0){
+  if (drop>0){
     // Walk back to the last frame that wasn't dropped. Seeded on the WRAPPED index, or the pattern
     // would break where the loop meets itself — rand(-1) is not rand(89). The guard has to span the
     // whole loop: cut it short and every frame walks back the same fixed number of steps, which is
@@ -174,7 +174,7 @@ function timeFrame(fi, NF){
     // 1 so the walk terminates on merit rather than on the guard.
     const slots = Math.ceil(NF/hold);
     let k=e, guard=0;
-    while (rand(wrap(k)*3.7+0.5) < tm.drop && guard++ < slots) k -= hold;
+    while (rand(wrap(k)*3.7+0.5) < drop && guard++ < slots) k -= hold;
     e = wrap(k);
   }
   return e;
@@ -187,18 +187,25 @@ function draw(phase){
   if (!tm.on || (tm.hold<=1 && tm.drop<=0 && tm.trail<=0)){ drawFrame(phase); return; }
   const NF = Math.round(LOOP_MS/1000*30);
   const fi = Math.floor(phase*NF);
-  const K = tm.trail>0 ? Math.max(2, tm.trailn|0) : 1;
-  if (K<=1){ drawFrame(timeFrame(fi,NF)/NF); return; }
+  // P() reads the ENV that drawFrame sets for the frame it is painting — the wrong one to ask here,
+  // and for trails it belongs to a frame further back in time. Take the envelope for the moment
+  // being shown instead. Clamped because motionMul peaks above 1: an unclamped Trails would weigh
+  // the older frames heavier than the newest and run the smear backwards.
+  const env = state.motion.on ? motionMul(phase) : 1;
+  const pv = (k,hi) => Math.max(0, Math.min(hi, tm[k] * (tm[k+'_env'] ? env : 1)));
+  const drop = pv('drop', .9), trail = pv('trail', 1);
+  const K = trail>0 ? Math.max(2, tm.trailn|0) : 1;
+  if (K<=1){ drawFrame(timeFrame(fi,NF,drop)/NF); return; }
   // Trails as a plain weighted average of the last K frames — no running buffer. Costs K renders,
   // but it needs no warm-up, it is the same on every frame grid, and it closes the loop by itself
   // because the frames it reaches back to simply wrap.
   const w = canvas.width, h = canvas.height;
   const gap = Math.max(1, tm.gap|0);          // how far back each step reaches, in frames
-  const wts=[]; for (let k=0;k<K;k++) wts.push(Math.pow(tm.trail,k));   // newest 1, older decaying
+  const wts=[]; for (let k=0;k<K;k++) wts.push(Math.pow(trail,k));      // newest 1, older decaying
   tacc.width=w; tacc.height=h; tax.clearRect(0,0,w,h);
   let S=0;
   for (let k=K-1;k>=0;k--){                   // oldest first, folding each into a running average
-    drawFrame(timeFrame(fi-k*gap,NF)/NF);
+    drawFrame(timeFrame(fi-k*gap,NF,drop)/NF);
     S += wts[k];
     tax.globalAlpha = wts[k]/S;               // incremental weighted mean → alpha 1 on the first
     tax.drawImage(canvas,0,0);
