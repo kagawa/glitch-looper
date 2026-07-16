@@ -235,20 +235,27 @@ function applyMosh(w,h,fseed,em=1){
   const src = new Uint8ClampedArray(d);        // snapshot to read from
 
   // 1) block displacement (datamosh smear)
+  //    Bloom mimics P-frame duplication: the same motion vector is applied over and over, so the
+  //    block content is dragged another step each time and leaves a copy behind at every stop —
+  //    the stretched, trailing look of a real datamosh. 1 = applied once (a plain displacement).
   if (m.blocks>0){
     const n = Math.floor(1 + m.blocks*10*intensity);
+    const reps = Math.max(1, m.bloom|0);
     for (let k=0;k<n;k++){
       const bw = Math.max(4, Math.floor((0.08+0.35*rand(seed*3.1+k))*w));
       const bh = Math.max(2, Math.floor((0.02+0.14*rand(seed*5.7+k))*h));
       const sx = Math.floor(rand(seed*9.3+k)*(w-bw));
       const sy = Math.floor(rand(seed*1.7+k)*(h-bh));
       const dxo = Math.floor((rand(seed*2.2+k)-0.5)*w*intensity);
-      for (let y=0;y<bh;y++){
-        for (let x=0;x<bw;x++){
-          const tx = sx+x+dxo;
-          if (tx<0||tx>=w) continue;
-          const si=((sy+y)*w+sx+x)*4, ti=((sy+y)*w+tx)*4;
-          d[ti]=src[si]; d[ti+1]=src[si+1]; d[ti+2]=src[si+2];
+      for (let p=1;p<=reps;p++){
+        const off = dxo*p;
+        for (let y=0;y<bh;y++){
+          for (let x=0;x<bw;x++){
+            const tx = sx+x+off;
+            if (tx<0||tx>=w) continue;
+            const si=((sy+y)*w+sx+x)*4, ti=((sy+y)*w+tx)*4;
+            d[ti]=src[si]; d[ti+1]=src[si+1]; d[ti+2]=src[si+2];
+          }
         }
       }
     }
@@ -282,6 +289,42 @@ function applyMosh(w,h,fseed,em=1){
       for (let x=0;x<w;x++){
         const sx=Math.max(0,Math.min(w-1,x+sh));
         d[(y*w+x)*4+ch]=src[(y*w+sx)*4+ch];
+      }
+    }
+  }
+
+  // 4) block noise — the macroblock look of a starved stream. Blocks sit on the screen grid rather
+  //    than at random positions, otherwise they read as plain noise instead of as broken blocks.
+  if (m.noise>0){
+    const np = Math.max(1, m.npix|0), nmode = m.nmode|0, amtN = m.noise*intensity;
+    const nbx = Math.ceil(w/np), nby = Math.ceil(h/np);
+    for (let by=0; by<nby; by++){
+      for (let bx=0; bx<nbx; bx++){
+        if (rand(seed*11.3 + bx*0.31 + by*7.7) >= amtN) continue;   // this block survived
+        const a = rand(seed*4.7 + bx*1.9 + by*0.53), b = rand(seed*8.3 + bx*0.77 + by*2.9);
+        const x0=bx*np, y0=by*np, x1=Math.min(w,x0+np), y1=Math.min(h,y0+np);
+        let nr=0, ng=0, nb=0, cb=0, cr=0;
+        if (nmode===0){                       // Replace: a flat block of a fully saturated hue
+          const hh=a*6, i6=Math.floor(hh)%6, f=hh-Math.floor(hh);
+          const seg=[[1,f,0],[1-f,1,0],[0,1,f],[0,1-f,1],[f,0,1],[1,0,1-f]][i6];
+          nr=seg[0]*255; ng=seg[1]*255; nb=seg[2]*255;
+        } else if (nmode===1){                // Chroma: keep the luma, blow out the colour difference
+          cb=(a*2-1)*180; cr=(b*2-1)*180;     // — the picture stays readable but the colour is wrong
+        } else {                              // Add: signed offset, keeps the texture underneath
+          const c = rand(seed*2.3 + bx*3.1 + by*1.7);
+          nr=(a*2-1)*140; ng=(b*2-1)*140; nb=(c*2-1)*140;
+        }
+        for (let y=y0;y<y1;y++){
+          for (let x=x0;x<x1;x++){
+            const i=(y*w+x)*4;
+            if (nmode===0){ d[i]=nr; d[i+1]=ng; d[i+2]=nb; }
+            else if (nmode===1){
+              const Y = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+              d[i]=Y+1.402*cr; d[i+1]=Y-0.344136*cb-0.714136*cr; d[i+2]=Y+1.772*cb;
+            }
+            else { d[i]+=nr; d[i+1]+=ng; d[i+2]+=nb; }
+          }
+        }
       }
     }
   }

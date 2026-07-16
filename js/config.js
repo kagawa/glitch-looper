@@ -41,8 +41,13 @@ const FX = [
   { id:'mosh', name:'Datamosh (fake)', hint:'mimics gif-corruption look (not real data corruption)', on:false, open:false, params:[
     { k:'intensity', label:'Intensity',   min:0, max:1, step:.01, def:.5, env:1, envd:1 },
     { k:'blocks',    label:'Blocks', min:0, max:1, step:.01, def:.5 },
+    { k:'bloom',     label:'Bloom (repeat)', min:1, max:8, step:1, def:1 },
     { k:'sort',      label:'Pixel Sort', min:0, max:1, step:.01, def:.3 },
     { k:'chaos',     label:'Jitter', min:0, max:1, step:.01, def:.6 },
+    { k:'noise',     label:'Block Noise', min:0, max:1, step:.01, def:0, env:1 },
+    { k:'npix',      label:'Noise Pixel Size', min:1, max:32, step:1, def:8 },
+    { k:'nmode',     label:'Noise Mode', type:'select', def:1,
+      options:[[0,'Replace'],[1,'Chroma (residual)'],[2,'Add']] },
     { k:'rate',      label:'Change Rate', min:1, max:30, step:1, def:10 },
   ]},
   { id:'jpeg', name:'JPEG databend', hint:'real byte corruption · DCT block melt', on:false, open:false, params:[
