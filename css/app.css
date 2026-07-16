@@ -53,6 +53,8 @@ header h1 em { font-style: normal; color: var(--accent2); margin-left: 2px; }
   position: sticky;            /* keep the image visible while scrolling the controls */
   top: 62px;
   align-self: start;
+  z-index: 2;                  /* sit above the panel, which comes later in the DOM — without this
+                                 the controls (e.g. the lock buttons) paint over the sticky image */
 }
 #drop {
   width: 100%;
