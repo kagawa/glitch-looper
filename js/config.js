@@ -63,9 +63,13 @@ const FX = [
     { k:'chroma', label:'Chroma Bleed', min:0, max:1, step:.01, def:.5 },
     { k:'block',  label:'Block', min:4, max:16, step:2, def:8 },
   ]},
-  { id:'pixsort', name:'Pixel Sort', hint:'sort pixels by brightness past a threshold (glitch-art staple)', on:false, open:false, params:[
+  { id:'pixsort', name:'Pixel Sort', hint:'reorder runs of pixels by a chosen key (glitch-art staple)', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.85, env:1 },
-    { k:'thresh', label:'Threshold', min:0, max:1, step:.01, def:.5 },
+    { k:'key',    label:'Sort By', type:'select', def:0,
+      options:[[0,'Lightness'],[1,'Hue'],[2,'Saturation'],[3,'Intensity'],[4,'Min RGB']] },
+    { k:'ivl',    label:'Interval', type:'select', def:0,
+      options:[[0,'Threshold'],[1,'Random'],[2,'Edges'],[3,'Waves'],[4,'Whole line']] },
+    { k:'thresh', label:'Threshold / Edge', min:0, max:1, step:.01, def:.5 },
     { k:'dir',    label:'Direction', type:'select', def:0, options:[[0,'Rows →'],[1,'Columns ↓'],[2,'Both']] },
     { k:'len',    label:'Max Length', min:0, max:1, step:.01, def:.6 },
   ]},

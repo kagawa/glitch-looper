@@ -34,7 +34,10 @@ if (cp.on){
 }
 
 function applyPixelSort(w,h){
-// ---- Pixel Sort: sort contiguous bright spans by luminance (rows / columns) ----
+// ---- Pixel Sort: reorder runs of pixels along rows / columns ----
+//      Two independent axes, the way the glitch-art lineage treats it: Sort By picks what the run
+//      is ordered on (Hue gives rainbow bands, nothing like Lightness), and Interval picks where
+//      the runs start and stop. Interval always cuts on brightness/edges regardless of Sort By.
 const ps = state.pixsort;
 if (ps.on){
   const amt = P('pixsort','amount');
@@ -43,21 +46,64 @@ if (ps.on){
     const lo = ps.thresh*255;
     const maxLen = Math.max(4, Math.round((ps.dir===1?h:w)*(0.05+ps.len*0.95)));
     const lum = i => d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114;
-    const sortLine = (idx,count)=>{
-      let s=0;
-      while (s<count){
-        if (lum(idx(s))<=lo){ s++; continue; }
-        let e=s; while (e<count && lum(idx(e))>lo && (e-s)<maxLen) e++;
-        const arr=[];
-        for (let k=s;k<e;k++){ const i=idx(k); arr.push([d[i],d[i+1],d[i+2],lum(i)]); }
-        arr.sort((a,b)=>a[3]-b[3]);
-        for (let k=s;k<e;k++){ const i=idx(k), a=arr[k-s];
-          d[i]+=(a[0]-d[i])*amt; d[i+1]+=(a[1]-d[i+1])*amt; d[i+2]+=(a[2]-d[i+2])*amt; }
-        s=e;
+    const key = ps.key|0, ivl = ps.ivl|0;
+    const sortVal =
+      key===1 ? i => { const r=d[i],g=d[i+1],b=d[i+2];               // Hue
+                       const mx=Math.max(r,g,b), c=mx-Math.min(r,g,b);
+                       if (c===0) return 0;
+                       const hh = mx===r ? ((g-b)/c)%6 : mx===g ? (b-r)/c+2 : (r-g)/c+4;
+                       return hh<0 ? hh*60+360 : hh*60; }
+    : key===2 ? i => { const mx=Math.max(d[i],d[i+1],d[i+2]);        // Saturation
+                       return mx===0 ? 0 : (mx-Math.min(d[i],d[i+1],d[i+2]))/mx*255; }
+    : key===3 ? i => d[i]+d[i+1]+d[i+2]                              // Intensity
+    : key===4 ? i => Math.min(d[i],d[i+1],d[i+2])                    // Min RGB
+    :           lum;                                                 // Lightness
+    const sortSpan = (idx,s,e)=>{
+      const arr=[];
+      for (let k=s;k<e;k++){ const i=idx(k); arr.push([d[i],d[i+1],d[i+2],sortVal(i)]); }
+      arr.sort((a,b)=>a[3]-b[3]);
+      for (let k=s;k<e;k++){ const i=idx(k), a=arr[k-s];
+        d[i]+=(a[0]-d[i])*amt; d[i+1]+=(a[1]-d[i+1])*amt; d[i+2]+=(a[2]-d[i+2])*amt; }
+    };
+    const sortLine = (idx,count,lineSeed)=>{
+      switch (ivl){
+        case 1: {                                  // Random — runs of scattered length
+          let s=0, j=0;
+          while (s<count){
+            const L = Math.max(2, Math.round(maxLen*(0.25+1.5*rand(lineSeed*1.7+j*3.1))));
+            const e = Math.min(count, s+L);
+            sortSpan(idx,s,e); s=e; j++;
+          }
+          break;
+        }
+        case 2: {                                  // Edges — runs break where the picture does, so
+          const th = 6 + ps.thresh*90;             // the subject's outline survives
+          let s=0;
+          for (let k=1;k<=count;k++){
+            if (k===count || Math.abs(lum(idx(k))-lum(idx(k-1)))>th || (k-s)>=maxLen){
+              if (k-s>1) sortSpan(idx,s,k);
+              s=k;
+            }
+          }
+          break;
+        }
+        case 3:                                    // Waves — evenly sized runs
+          for (let s=0;s<count;s+=maxLen) sortSpan(idx,s,Math.min(count,s+maxLen));
+          break;
+        case 4: sortSpan(idx,0,count); break;      // Whole line
+        default: {                                 // Threshold — runs of bright pixels
+          let s=0;
+          while (s<count){
+            if (lum(idx(s))<=lo){ s++; continue; }
+            let e=s; while (e<count && lum(idx(e))>lo && (e-s)<maxLen) e++;
+            sortSpan(idx,s,e);
+            s=e;
+          }
+        }
       }
     };
-    if (ps.dir===0||ps.dir===2){ for(let y=0;y<h;y++){ const r=y*w; sortLine(k=>(r+k)*4, w); } }
-    if (ps.dir===1||ps.dir===2){ for(let x=0;x<w;x++){ sortLine(k=>(k*w+x)*4, h); } }
+    if (ps.dir===0||ps.dir===2){ for(let y=0;y<h;y++){ const r=y*w; sortLine(k=>(r+k)*4, w, y+1); } }
+    if (ps.dir===1||ps.dir===2){ for(let x=0;x<w;x++){ sortLine(k=>(k*w+x)*4, h, 9973+x); } }
     ctx.putImageData(im,0,0);
   }
 }
