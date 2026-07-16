@@ -1,6 +1,9 @@
 function applyDegauss(w,h,phase){
-// ---- Degauss: magnetised CRT — rainbow colour-purity patches (beams hit wrong phosphors).
-//      Breaks COLOUR, not geometry: G (luma) stays put, R/B fringe in blotchy zones. ----
+// ---- Degauss: hit the degauss button and the coil throws the beams around — the picture ripples
+//      while the colour goes impure (beams landing on the wrong phosphors), then it settles.
+//      Screen Ripple moves all three channels together (geometry); on top of that R and B are
+//      pulled apart (colour). At Screen Ripple 0 only the colour breaks and the picture holds
+//      perfectly still. ----
 const dg = state.degauss;
 if (dg.on){
   const amt = P('degauss','amount');
@@ -11,6 +14,7 @@ if (dg.on){
     if (str>0.004){
       const wob = phase*TAU*dg.freq;                  // shimmer / buzz
       const maxShift = str*(10 + 18*(0.4+0.6*dg.color));   // per-blob channel misconvergence (px)
+      const sway = str*P('degauss','sway')*34;             // whole-picture ripple (px)
       const a=TAU*2.5/w, b=TAU*1.9/h, cc=TAU*1.7/w, dd=TAU*2.7/h;
       const cX=x=>x<0?0:x>=w?w-1:x, cY=y=>y<0?0:y>=h?h-1:y;
       const src=ctx.getImageData(0,0,w,h), out=ctx.createImageData(w,h), sd=src.data, od=out.data;
@@ -18,10 +22,12 @@ if (dg.on){
         for (let x=0;x<w;x++){
           const fx=Math.sin(x*a + y*b + wob), fy=Math.sin(x*cc - y*dd - wob*0.8);
           const di=(y*w+x)*4;
-          const rX=cX((x+fx*maxShift)|0), rY=cY((y+fy*maxShift)|0);
-          const bX=cX((x-fx*maxShift)|0), bY=cY((y-fy*maxShift)|0);
+          const ox=fx*sway, oy=fy*sway;      // the ripple every channel rides
+          const gX=cX((x+ox)|0), gY=cY((y+oy)|0);
+          const rX=cX((x+ox+fx*maxShift)|0), rY=cY((y+oy+fy*maxShift)|0);
+          const bX=cX((x+ox-fx*maxShift)|0), bY=cY((y+oy-fy*maxShift)|0);
           od[di]   = sd[(rY*w+rX)*4];        // R pulled one way
-          od[di+1] = sd[di+1];               // G stays → picture doesn't sway
+          od[di+1] = sd[(gY*w+gX)*4+1];      // G rides the ripple alone → the picture itself moves
           od[di+2] = sd[(bY*w+bX)*4+2];      // B pulled the other → rainbow fringing
           od[di+3] = 255;
         }

@@ -119,8 +119,9 @@ const FX = [
     { k:'palette', label:'Palette', min:0, max:1, step:.01, def:.4 },
     { k:'frames',  label:'Frames', min:1, max:12, step:1, def:6 },
   ]},
-  { id:'degauss', name:'Degauss', hint:'magnetised CRT — rainbow colour-purity patches (breaks colour, not geometry)', on:false, open:false, params:[
+  { id:'degauss', name:'Degauss', hint:'degaussing CRT — the picture ripples and the colour goes impure', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.6, env:1 },
+    { k:'sway',   label:'Screen Ripple', min:0, max:1, step:.01, def:.5, env:1 },
     { k:'freq',   label:'Shimmer', min:1, max:8, step:1, def:4 },
     { k:'color',  label:'Rainbow', min:0, max:1, step:.01, def:.7 },
   ]},
