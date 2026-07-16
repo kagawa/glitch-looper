@@ -69,27 +69,23 @@ if (fb.on && fb.amount>0){
 }
 
 // ---- melt: pixel drip, breathes 0→max→0 over the loop (seamless) ----
-//      Drip  = pixels smear down (top stretches)
-//      Wrap  = drips off the bottom and re-enters the top, so a column can travel a full height
-//      Drops = 2D beads of the picture ooze downward from scattered origins
+//      Drip = pixels smear down (top stretches)
+//      Wrap = drips off the bottom and re-enters the top, so a column can travel a full height
 function applyMelt(w,h,phase){
 const ml = state.melt;
 if (ml.on && ml.amount>0){
-  const amt=P('melt','amount'), mode=ml.mode|0, wrap=mode===1;
+  const amt=P('melt','amount'), wrap=(ml.mode|0)===1;
   const breathe = Math.max(0, envCurve(phase, ml.curve|0, ml.rate));   // Curve: how the melt evolves over the loop
   const span = amt*h*(wrap?1.0:0.6)*breathe;                   // Wrap can travel a full height and loop back
   const sexp = 0.3 + ml.spread*3;  // Spread: how the drip amount varies per band (low = uniform, high = a few long drips)
   const bwAvg = Math.max(1, ml.width|0);
   const src=ctx.getImageData(0,0,w,h), out=ctx.createImageData(w,h), sd=src.data, od=out.data;
-  if (mode===2) meltDrops(w,h,span,sexp,bwAvg,sd,od);
-  else meltBands(w,h,span,sexp,bwAvg,wrap,sd,od);
+  meltBands(w,h,span,sexp,bwAvg,wrap,sd,od);
   ctx.putImageData(out,0,0);
 }
 }
-// Bands: every column of a band is displaced downward by one amount, so the drip front can only
-// ever be a single smooth hump. Cheap and good for a whole-picture melt — for an actual bead with
-// a neck, see meltDrops (a per-column offset cannot make a shape that is wide at the tip and
-// narrow behind it).
+// Every column of a band is displaced downward by one amount, so the drip front is a smooth hump.
+// Bands stay narrow (max 16px) — past that the hump reads as a shape rather than as liquid.
 function meltBands(w,h,span,sexp,bwAvg,wrap,sd,od){
   // map each column to a band + its distance from that band's peak. Band widths and peak
   // positions vary, otherwise the humps line up into a comb. Width 1 = one band per column
@@ -118,45 +114,6 @@ function meltBands(w,h,span,sexp,bwAvg,wrap,sd,od){
       sy = wrap ? ((sy%h)+h)%h : (sy>=0?sy:0);                 // Wrap: mod h  ·  Drip: clamp to top
       const si=(sy*w+x)*4, di=(y*w+x)*4;
       od[di]=sd[si]; od[di+1]=sd[si+1]; od[di+2]=sd[si+2]; od[di+3]=255;
-    }
-  }
-}
-// Drops: the picture stays put and beads of it ooze downward from scattered origins. Each bead is
-// a real disc that pulls away from its origin, trailing a streak of the colour it left behind —
-// so at a small breathe it is a round blob sitting at its origin, and as the breathe grows the
-// blob descends and draws out a neck. The disc is what a per-column offset cannot produce.
-function meltDrops(w,h,span,sexp,bwAvg,sd,od){
-  od.set(sd);                                    // start from the untouched picture
-  for (let bi=0, x0=0; x0<w; bi++){
-    const bw = Math.max(4, Math.round(Math.max(4,bwAvg)*(0.5+rand(bi*2.7))));
-    const xc = x0 + bw/2, R = bw*0.5;
-    x0 += bw;
-    const D = Math.pow(rand(bi*0.13), sexp)*span;          // how far this bead has fallen
-    if (D < 1) continue;
-    const y0 = Math.floor((0.05+0.7*rand(bi*5.3))*h);      // where it oozes from
-    const yh = y0 + D;                                     // head centre
-    const Ry = R*(1+0.45*Math.min(1, D/(6*R)));            // a falling bead stretches out of round
-    const lean = (rand(bi*8.9)-0.5)*R*0.9;                 // and wanders sideways as it goes
-    for (let y=y0, yBot=Math.min(h-1, Math.round(yh+Ry)); y<=yBot; y++){
-      const dyh = (y-yh)/Ry;
-      const headHalf = Math.abs(dyh)<=1 ? R*Math.sqrt(1-dyh*dyh) : 0;
-      const u = (y-y0)/D;                                  // 0 at origin → 1 at head
-      // the trail is a thin thread, not a funnel — the bead is what should read as the shape
-      const tailHalf = (u>=0 && u<=1) ? R*(0.45-0.2*u) : 0;
-      const cxH = xc+lean, cxT = xc+lean*Math.min(1,u);     // the whole drip leans with the bead
-      const xs = Math.max(0, Math.ceil(Math.min(cxH-headHalf, cxT-tailHalf)));
-      const xe = Math.min(w-1, Math.floor(Math.max(cxH+headHalf, cxT+tailHalf)));
-      for (let x=xs; x<=xe; x++){
-        // inside the bead the picture is translated down by D (a disc of the origin area);
-        // in the thread it is smeared, so every row shows the origin row's colour
-        const inHead = headHalf>=0.5 && Math.abs(x-cxH) <= headHalf;
-        const inTail = tailHalf>=0.5 && Math.abs(x-cxT) <= tailHalf;
-        if (!inHead && !inTail) continue;
-        let sy = Math.round(y - (inHead ? D : y-y0));
-        if (sy<0) sy=0; else if (sy>=h) sy=h-1;
-        const si=(sy*w+x)*4, di=(y*w+x)*4;
-        od[di]=sd[si]; od[di+1]=sd[si+1]; od[di+2]=sd[si+2]; od[di+3]=255;
-      }
     }
   }
 }
