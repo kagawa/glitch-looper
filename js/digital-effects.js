@@ -234,6 +234,12 @@ function applyMosh(w,h,fseed,em=1){
   const d = id.data;
   const src = new Uint8ClampedArray(d);        // snapshot to read from
 
+  // Block Noise only breaks blocks that the displacement below actually dragged something into, so
+  // record which noise-grid cells each pasted block lands on. No displacement → no noise.
+  const np = Math.max(1, m.npix|0);
+  const nbx = Math.ceil(w/np), nby = Math.ceil(h/np);
+  const moshMask = m.noise>0 ? new Uint8Array(nbx*nby) : null;
+
   // 1) block displacement (datamosh smear)
   //    Bloom mimics P-frame duplication: the same motion vector is applied over and over, so the
   //    block content is dragged another step each time and leaves a copy behind at every stop —
@@ -249,6 +255,13 @@ function applyMosh(w,h,fseed,em=1){
       const dxo = Math.floor((rand(seed*2.2+k)-0.5)*w*intensity);
       for (let p=1;p<=reps;p++){
         const off = dxo*p;
+        if (moshMask){                          // mark where this paste lands
+          const tx0=Math.max(0,sx+off), tx1=Math.min(w-1,sx+off+bw-1);
+          if (tx1>=tx0){
+            const bx0=(tx0/np)|0, bx1=(tx1/np)|0, by0=(sy/np)|0, by1=((sy+bh-1)/np)|0;
+            for (let by=by0;by<=by1;by++) for (let bx=bx0;bx<=bx1;bx++) moshMask[by*nbx+bx]=1;
+          }
+        }
         for (let y=0;y<bh;y++){
           for (let x=0;x<bw;x++){
             const tx = sx+x+off;
@@ -295,11 +308,13 @@ function applyMosh(w,h,fseed,em=1){
 
   // 4) block noise — the macroblock look of a starved stream. Blocks sit on the screen grid rather
   //    than at random positions, otherwise they read as plain noise instead of as broken blocks.
+  //    Confined to the blocks the displacement dragged into, so the colour breaks up where the
+  //    mosh is, instead of speckling the untouched picture.
   if (m.noise>0){
-    const np = Math.max(1, m.npix|0), nmode = m.nmode|0, amtN = m.noise*intensity;
-    const nbx = Math.ceil(w/np), nby = Math.ceil(h/np);
+    const nmode = m.nmode|0, amtN = m.noise*intensity;
     for (let by=0; by<nby; by++){
       for (let bx=0; bx<nbx; bx++){
+        if (!moshMask[by*nbx+bx]) continue;                         // nothing was moshed here
         if (rand(seed*11.3 + bx*0.31 + by*7.7) >= amtN) continue;   // this block survived
         const a = rand(seed*4.7 + bx*1.9 + by*0.53), b = rand(seed*8.3 + bx*0.77 + by*2.9);
         const x0=bx*np, y0=by*np, x1=Math.min(w,x0+np), y1=Math.min(h,y0+np);
