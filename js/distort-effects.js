@@ -40,8 +40,10 @@ function edgeEase(t, mode){
     return t<0.5 ? (Math.pow(2*t,2)*((c+1)*2*t-c))/2
                  : (Math.pow(2*t-2,2)*((c+1)*(2*t-2)+c)+2)/2; }
   if (m===1) return t*t*t*(t*(t*6-15)+10);                 // smootherstep — a gentle S
-  if (m===3){ const u=(t-0.48)/0.04;                       // near-hard: flat until ~0.48, then ~80%
-    return u<=0?0 : u>=1?1 : u*u*u*(u*(u*6-15)+10); }      // of the swing across 0.49–0.51, still smooth
+  if (m===3){ const r=0.3, k=1/(1-r);                      // linear middle, rounded corners — moves at
+    if (t<r)     return 0.5*k/r*t*t;                       // a steady rate, not a slow-fast-slow S, with
+    if (t>1-r){ const s=1-t; return 1-0.5*k/r*s*s; }       // the start and stop filleted rather than kinked
+    return 0.5*k*r + k*(t-r); }
   return t<0.5 ? 0 : 1;                                    // hard
 }
 
