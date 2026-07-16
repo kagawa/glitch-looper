@@ -43,31 +43,32 @@ function loadImage(file){
 // A self-contained sample so the app renders something on first load. A test-card composition —
 // colour bars, gradients, hard-edged shapes — happens to be exactly what shows every effect off.
 function loadSample(){
-  const c = document.createElement('canvas'); c.width = 640; c.height = 480;
+  const c = document.createElement('canvas'); c.width = 720; c.height = 405;   // 16:9
   const x = c.getContext('2d'), W = c.width, H = c.height;
   const g = x.createLinearGradient(0,0,W,H);      // sky-ish backdrop (gradients → banding)
   g.addColorStop(0,'#1b2a4a'); g.addColorStop(1,'#c65b7c');
   x.fillStyle = g; x.fillRect(0,0,W,H);
   const bars = ['#fff','#ff0','#0ff','#0f0','#f0f','#f00','#00f'];   // colour bars strip
   const bw = W/bars.length;
-  bars.forEach((col,i)=>{ x.fillStyle = col; x.fillRect(i*bw, 0, bw+1, 90); });
+  bars.forEach((col,i)=>{ x.fillStyle = col; x.fillRect(i*bw, 0, bw+1, 74); });
   for (let i=0;i<4;i++){                            // concentric rings (curvature / ringing)
-    x.strokeStyle = `hsl(${i*60},80%,60%)`; x.lineWidth = 10;
-    x.beginPath(); x.arc(W*0.32, H*0.55, 40+i*34, 0, 7); x.stroke();
+    x.strokeStyle = `hsl(${i*60},80%,60%)`; x.lineWidth = 9;
+    x.beginPath(); x.arc(W*0.22, H*0.56, 30+i*26, 0, 7); x.stroke();
   }
   x.fillStyle = '#ffcf3a';                          // hard-edged shapes (slice / sort / blocking)
-  x.beginPath(); x.moveTo(W*0.68,H*0.3); x.lineTo(W*0.9,H*0.72); x.lineTo(W*0.5,H*0.72); x.closePath(); x.fill();
-  x.fillStyle = '#2ee6c0'; x.fillRect(W*0.6, H*0.34, 120, 120);
+  x.beginPath(); x.moveTo(W*0.74,H*0.24); x.lineTo(W*0.9,H*0.72); x.lineTo(W*0.58,H*0.72); x.closePath(); x.fill();
+  x.fillStyle = '#2ee6c0'; x.fillRect(W*0.62, H*0.30, 96, 96);
   const ramp = x.createLinearGradient(0,0,W,0);     // luma ramp (banding / posterise)
   ramp.addColorStop(0,'#000'); ramp.addColorStop(1,'#fff');
-  x.fillStyle = ramp; x.fillRect(0, H-56, W, 56);
+  x.fillStyle = ramp; x.fillRect(0, H-42, W, 42);
   // the sample carries the drop-zone hint, so it stays visible even once the drop zone is hidden
   x.textBaseline='middle'; x.textAlign='center';
-  x.fillStyle='rgba(0,0,0,.45)'; x.fillRect(W*0.12, H*0.30, W*0.76, 108);
-  x.fillStyle='#fff'; x.font='bold 40px system-ui, sans-serif';
-  x.fillText('Drop an image', W/2, H*0.30+34);
-  x.font='500 22px system-ui, sans-serif'; x.fillStyle='#e8e8ea';
-  x.fillText('or tap to choose  ·  PNG · JPG · WEBP', W/2, H*0.30+74);
+  const hy=H*0.36, hh=88;
+  x.fillStyle='rgba(0,0,0,.45)'; x.fillRect(W*0.20, hy, W*0.60, hh);
+  x.fillStyle='#fff'; x.font='bold 36px system-ui, sans-serif';
+  x.fillText('Drop an image', W/2, hy+30);
+  x.font='500 20px system-ui, sans-serif'; x.fillStyle='#e8e8ea';
+  x.fillText('or tap to choose  ·  PNG · JPG · WEBP', W/2, hy+62);
   x.textAlign='left';
   commitImage(c, W, H);
 }
