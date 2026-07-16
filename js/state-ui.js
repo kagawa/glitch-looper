@@ -101,6 +101,7 @@ function buildUI(){
       if (r.dataset.fx==='png')  schedulePng();
       if (r.dataset.fx==='webp') scheduleWebp();
       if (r.dataset.fx==='gifg') scheduleGifg();
+      updateRows();     // a show() can key off a slider too, not just a select
     });
   });
   controls.querySelectorAll('.fxtoggle').forEach(c=>{
@@ -145,10 +146,10 @@ function buildUI(){
 // Hide the knobs the current selects render inert — a param declares a `show(state)` predicate in
 // FX and the row follows it. Purely cosmetic: a hidden param keeps its value and still renders,
 // so nothing here can change the picture.
+const FX_BY_ID = {}; FX.forEach(f=> FX_BY_ID[f.id]=f);   // hoisted: updateRows runs on every drag
 function updateRows(){
-  const byId = {}; FX.forEach(f=> byId[f.id]=f);
   controls.querySelectorAll('label.row[data-fx]').forEach(row=>{
-    const f = byId[row.dataset.fx]; if (!f) return;
+    const f = FX_BY_ID[row.dataset.fx]; if (!f) return;
     const p = f.params.find(q=> q.k===row.dataset.param); if (!p) return;
     row.hidden = p.show ? !p.show(state[f.id]) : false;
   });

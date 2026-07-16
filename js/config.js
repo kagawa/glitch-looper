@@ -267,11 +267,16 @@ const FX = [
     { k:'feather',  label:'Feather', min:0, max:1, step:.01, def:.08 },
   ]},
   { id:'time', name:'Time', hint:'frame drop · stutter · trails — acts on the footage, not the frame', on:false, open:false, params:[
-    // every hold divides the loop's 90 frames, so the last group is full length and the loop closes
+    // every hold divides the loop's 90 frames, so the last group is full length and the loop closes.
+    // Stops at 10 (3fps): past that so few frames are left that it reads as a still, not a stutter.
     { k:'hold',   label:'Frame Hold', type:'select', def:1,
-      options:[[1,'Off'],[2,'2 frames'],[3,'3'],[5,'5'],[6,'6'],[9,'9'],[10,'10'],[15,'15'],[18,'18'],[30,'30'],[45,'45']] },
+      options:[[1,'Off'],[2,'2 frames'],[3,'3'],[5,'5'],[6,'6'],[9,'9'],[10,'10']] },
     { k:'drop',   label:'Random Drop', min:0, max:.9, step:.01, def:0 },
     { k:'trail',  label:'Trails', min:0, max:1, step:.01, def:0 },
+    // Reach, not count, is what makes a trail visible: neighbouring frames are 1/30s apart and
+    // nearly identical, so averaging them just gives the picture back. Gap sets how far apart the
+    // blended frames sit — 1 is a motion blur, high is separated echoes.
+    { k:'gap',    label:'Trail Gap (frames)', min:1, max:12, step:1, def:5, show:s=> s.trail>0 },
     { k:'trailn', label:'Trail Frames (a render each)', min:2, max:4, step:1, def:3, show:s=> s.trail>0 },
   ]},
   { id:'motion', name:'Envelope', hint:'makes destruction breathe over the loop (pick targets via ⓔ)', on:false, open:false, params:[

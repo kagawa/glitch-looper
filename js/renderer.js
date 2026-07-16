@@ -193,11 +193,12 @@ function draw(phase){
   // but it needs no warm-up, it is the same on every frame grid, and it closes the loop by itself
   // because the frames it reaches back to simply wrap.
   const w = canvas.width, h = canvas.height;
+  const gap = Math.max(1, tm.gap|0);          // how far back each step reaches, in frames
   const wts=[]; for (let k=0;k<K;k++) wts.push(Math.pow(tm.trail,k));   // newest 1, older decaying
   tacc.width=w; tacc.height=h; tax.clearRect(0,0,w,h);
   let S=0;
   for (let k=K-1;k>=0;k--){                   // oldest first, folding each into a running average
-    drawFrame(timeFrame(fi-k,NF)/NF);
+    drawFrame(timeFrame(fi-k*gap,NF)/NF);
     S += wts[k];
     tax.globalAlpha = wts[k]/S;               // incremental weighted mean → alpha 1 on the first
     tax.drawImage(canvas,0,0);
