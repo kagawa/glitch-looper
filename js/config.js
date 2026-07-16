@@ -69,6 +69,7 @@ const FX = [
       options:[[0,'Lightness'],[1,'Hue'],[2,'Saturation'],[3,'Intensity'],[4,'Min RGB']] },
     { k:'ivl',    label:'Interval', type:'select', def:0,
       options:[[0,'Threshold'],[1,'Random'],[2,'Edges'],[3,'Waves'],[4,'Whole line']] },
+    { k:'chance', label:'Sort Chance', min:0, max:1, step:.01, def:1 },
     { k:'thresh', label:'Threshold / Edge', min:0, max:1, step:.01, def:.5 },
     { k:'dir',    label:'Direction', type:'select', def:0, options:[[0,'Rows →'],[1,'Columns ↓'],[2,'Both']] },
     { k:'len',    label:'Max Length', min:0, max:1, step:.01, def:.6 },

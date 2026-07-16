@@ -58,6 +58,11 @@ if (ps.on){
     : key===3 ? i => d[i]+d[i+1]+d[i+2]                              // Intensity
     : key===4 ? i => Math.min(d[i],d[i+1],d[i+2])                    // Min RGB
     :           lum;                                                 // Lightness
+    // Sort Chance leaves a share of the runs alone. Threshold and Edges cut on the picture itself,
+    // so they skip the flat parts for free — but Random, Waves and Whole line tile the whole line
+    // and would otherwise sort every last pixel of it. 1 = sort every run.
+    const chance = ps.chance;
+    const take = (lineSeed,j)=> chance>=1 || rand(lineSeed*0.73+j*5.9+0.5) < chance;
     const sortSpan = (idx,s,e)=>{
       const arr=[];
       for (let k=s;k<e;k++){ const i=idx(k); arr.push([d[i],d[i+1],d[i+2],sortVal(i)]); }
@@ -72,32 +77,36 @@ if (ps.on){
           while (s<count){
             const L = Math.max(2, Math.round(maxLen*(0.25+1.5*rand(lineSeed*1.7+j*3.1))));
             const e = Math.min(count, s+L);
-            sortSpan(idx,s,e); s=e; j++;
+            if (take(lineSeed,j)) sortSpan(idx,s,e);
+            s=e; j++;
           }
           break;
         }
         case 2: {                                  // Edges — runs break where the picture does, so
           const th = 6 + ps.thresh*90;             // the subject's outline survives
-          let s=0;
+          let s=0, j=0;
           for (let k=1;k<=count;k++){
             if (k===count || Math.abs(lum(idx(k))-lum(idx(k-1)))>th || (k-s)>=maxLen){
-              if (k-s>1) sortSpan(idx,s,k);
-              s=k;
+              if (k-s>1 && take(lineSeed,j)) sortSpan(idx,s,k);
+              s=k; j++;
             }
           }
           break;
         }
         case 3:                                    // Waves — evenly sized runs
-          for (let s=0;s<count;s+=maxLen) sortSpan(idx,s,Math.min(count,s+maxLen));
+          for (let s=0,j=0;s<count;s+=maxLen,j++)
+            if (take(lineSeed,j)) sortSpan(idx,s,Math.min(count,s+maxLen));
           break;
-        case 4: sortSpan(idx,0,count); break;      // Whole line
+        case 4:                                    // Whole line — one run, so one coin per line
+          if (take(lineSeed,0)) sortSpan(idx,0,count);
+          break;
         default: {                                 // Threshold — runs of bright pixels
-          let s=0;
+          let s=0, j=0;
           while (s<count){
             if (lum(idx(s))<=lo){ s++; continue; }
             let e=s; while (e<count && lum(idx(e))>lo && (e-s)<maxLen) e++;
-            sortSpan(idx,s,e);
-            s=e;
+            if (take(lineSeed,j)) sortSpan(idx,s,e);
+            s=e; j++;
           }
         }
       }
