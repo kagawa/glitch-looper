@@ -212,13 +212,14 @@ function timeFrame(fi, NF, drop){
 function draw(phase){
   const NF = Math.round(LOOP_MS/1000*30);
   const tm = state.time, il = state.interlace, st = state.stale;
-  const sy0 = state.synctear;
-  const timeOn  = tm.on && (tm.hold>1 || tm.drop>0 || tm.trail>0);
+  const sy0 = state.synctear, cd = state.chroma;
+  const timeOn  = tm.on && (tm.hold>1 || tm.drop>0 || tm.trail>0 || (tm.order|0)!==0);
   const ilOn    = il.on && il.amount>0;
   const staleOn = st.on && st.amount>0;
   const syncOn0 = sy0.on && sy0.amount>0;
+  const chromaOn = cd.on && cd.amount>0;
   // nothing temporal is on → keep the raw, unquantised phase rather than snapping to the frame grid
-  if (!timeOn && !ilOn && !staleOn && !syncOn0){ drawFrame(phase); return; }
+  if (!timeOn && !ilOn && !staleOn && !syncOn0 && !chromaOn){ drawFrame(phase); return; }
   // P() reads the ENV that drawFrame sets for the frame it is painting — the wrong one to ask here,
   // and for trails it belongs to a frame further back in time. Take the envelope for the moment
   // being shown instead. Clamped because motionMul peaks above 1: an unclamped Trails would weigh
@@ -340,23 +341,43 @@ function draw(phase){
     }
     ctx.clearRect(0,0,w,h); ctx.drawImage(sacc,0,0);
   };
-  if (!ilOn){ torn(fi); return; }
-  // ---- Interlace: the two fields were never scanned at the same instant ----
-  // A field carries every other line and is grabbed a moment after the other, so anything that
-  // moved between them lands in a different place on each — which is why the tell is teeth along
-  // moving edges, and why a still part of the picture stays perfectly clean. Paint both moments
-  // and weave them.
-  const amt = pv('interlace','amount',1);
-  torn(fi - Math.max(1, il.delay|0));         // the field that lags
-  iacc.width=w; iacc.height=h; iax.clearRect(0,0,w,h); iax.drawImage(canvas,0,0);
-  torn(fi);                                   // the field that leads
-  const th = Math.max(1, il.thick|0);
-  const lagParity = (il.swap|0)===0 ? 1 : 0;
-  ctx.globalAlpha = amt;
-  for (let y=0;y<h;y+=th){
-    if ((((y/th)|0) & 1) !== lagParity) continue;
-    const bh = Math.min(th, h-y);
-    ctx.drawImage(iacc, 0,y,w,bh, 0,y,w,bh);
+  // The whole displayed frame at moment f: the torn footage, woven into fields if Interlace is on.
+  // Anything above this (Chroma Persistence) that wants a second whole frame just asks for one.
+  const assembled = (f)=>{
+    if (!ilOn){ torn(f); return; }
+    // ---- Interlace: the two fields were never scanned at the same instant ----
+    // A field carries every other line, grabbed a moment after the other, so anything that moved
+    // between them lands in a different place on each — teeth along moving edges, a still part clean.
+    const amt = pv('interlace','amount',1);
+    torn(f - Math.max(1, il.delay|0));          // the field that lags
+    iacc.width=w; iacc.height=h; iax.clearRect(0,0,w,h); iax.drawImage(canvas,0,0);
+    torn(f);                                    // the field that leads
+    const th = Math.max(1, il.thick|0), lagParity = (il.swap|0)===0 ? 1 : 0;
+    ctx.globalAlpha = amt;
+    for (let y=0;y<h;y+=th){
+      if ((((y/th)|0) & 1) !== lagParity) continue;
+      ctx.drawImage(iacc, 0,y,w,Math.min(th,h-y), 0,y,w,Math.min(th,h-y));
+    }
+    ctx.globalAlpha = 1;
+  };
+  if (!chromaOn){ assembled(fi); return; }
+  // ---- Chroma Persistence: the colour lags behind the picture ----
+  // Composite video carried brightness sharp but smeared the colour, so on a moving subject the
+  // colour trails the shape — it drips off moving edges. Take luma from now and the colour
+  // difference from a few frames back (Luma mode swaps them: colour now, brightness late, a woozier
+  // double exposure). A still area matches in both, so only what moved separates.
+  const camt = pv('chroma','amount',1), cdel = Math.max(1, state.chroma.delay|0), lumaLag = (state.chroma.mode|0)===1;
+  assembled(fi);        const now = ctx.getImageData(0,0,w,h), nd=now.data;
+  assembled(fi-cdel);   const pd = ctx.getImageData(0,0,w,h).data;
+  for (let i=0;i<nd.length;i+=4){
+    const Yn=0.299*nd[i]+0.587*nd[i+1]+0.114*nd[i+2], Yp=0.299*pd[i]+0.587*pd[i+1]+0.114*pd[i+2];
+    const Y  = lumaLag ? Yp : Yn;                                  // brightness from one moment
+    const Cb = lumaLag ? nd[i+2]-Yn : pd[i+2]-Yp;                  // colour difference from the other
+    const Cr = lumaLag ? nd[i]-Yn   : pd[i]-Yp;
+    const R=Y+Cr, B=Y+Cb, G=(Y-0.299*R-0.114*B)/0.587;
+    nd[i]  += (R-nd[i])  *camt;                                    // blend toward the recombined pixel
+    nd[i+1]+= (G-nd[i+1])*camt;
+    nd[i+2]+= (B-nd[i+2])*camt;
   }
-  ctx.globalAlpha = 1;
+  ctx.putImageData(now,0,0);
 }

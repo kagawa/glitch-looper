@@ -301,6 +301,11 @@ const FX = [
     { k:'edge',   label:'Edge', type:'select', def:0, options:[[0,'Hard'],[3,'Round'],[1,'Ramp'],[2,'Overshoot']] },
     { k:'edgew',  label:'Edge (px)', min:2, max:40, step:1, def:14, show:s=> (s.edge|0)!==0 },
   ]},
+  { id:'chroma', name:'Chroma Persistence', hint:'the colour lags behind the picture — drips off moving edges', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:1, env:1 },
+    { k:'delay',  label:'Lag (frames)', min:1, max:12, step:1, def:4 },
+    { k:'mode',   label:'What Lags', type:'select', def:0, options:[[0,'Colour (crisp shape)'],[1,'Brightness (double exposure)']] },
+  ]},
   { id:'interlace', name:'Interlace', hint:'two fields scanned a moment apart — combing on anything that moved', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:1, env:1 },
     { k:'delay',  label:'Field Delay (frames)', min:1, max:12, step:1, def:2 },
@@ -323,7 +328,7 @@ const FX_GROUPS = [
   ['Screen / Optics', ['crt','degauss','halftone','hud','bloom']],
   ['Distort',         ['warp','melt','extrude','feedback','pixelate']],
   ['Colour / Tone',   ['color','duotone','solarize','posterize','emboss']],
-  ['Video',           ['time','stale','synctear','interlace']],          // acts on the footage, not on any one frame
+  ['Video',           ['time','stale','synctear','interlace','chroma']],          // acts on the footage, not on any one frame
   ['Global',          ['zoom','mask','motion']],
 ];
 
