@@ -1,26 +1,20 @@
-function applyCompression(w,h,phase){
+function applyCompression(w,h){
 // ---- Compression: heavy-JPEG look — 8×8 block flatten + chroma subsample + luma banding ----
 const cp = state.compress;
 if (cp.on){
   const B = cp.block|0;
-  // Wobble: a starved codec quantises its motion vectors coarsely, so the reconstruction never sits
-  // still — blocks slide a little each frame and the picture breathes like jelly. Move each block by
-  // a 2D field that drifts over the loop (integer speed → seamless). It quantises to the same block
-  // grid that flattens, so the swim and the blockiness agree.
-  const wob = P('compress','wobble');
-  if (wob>0){
-    const A=wob*(3+B*0.5), TAU=Math.PI*2, sp=Math.max(1,cp.wspeed|0), s1=phase*TAU*sp, s2=phase*TAU*sp*2;
-    const fx=TAU*2.5/w, fy=TAU*2.0/h;
-    sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h); sctx.drawImage(canvas,0,0);
-    ctx.clearRect(0,0,w,h);
-    for (let by=0;by<h;by+=B) for (let bx=0;bx<w;bx+=B){
-      const cx=bx+B/2, cy=by+B/2;
-      const dx=A*(Math.sin(cx*fx+cy*fy*0.5+s1)+0.5*Math.sin(cy*fy-cx*fx*0.7+s2));
-      const dy=A*(Math.sin(cy*fy+cx*fx*0.5+s1)+0.5*Math.sin(cx*fx-cy*fy*0.7-s2));
-      const bw=Math.min(B,w-bx), bh=Math.min(B,h-by);
-      const sx=Math.max(0,Math.min(w-bw, bx+Math.round(dx))), sy=Math.max(0,Math.min(h-bh, by+Math.round(dy)));
-      ctx.drawImage(sc, sx,sy,bw,bh, bx,by,bw,bh);
-    }
+  // Softness: a high QP throws away the high-frequency DCT coefficients, so detail smaller than the
+  // step is simply gone and the picture goes soft — a starved stream is usually also encoded at a
+  // lower resolution and stretched back up. Reproduce that by shrinking through a smoothing filter
+  // and scaling back, before the block flatten (the encoder downscales, then blocks). 0 = sharp.
+  const soft = P('compress','soft');
+  if (soft>0){
+    const sf = 1 - soft*0.82;                        // down to ~18% resolution at full
+    const dw = Math.max(1, Math.round(w*sf)), dh = Math.max(1, Math.round(h*sf));
+    sc.width=dw; sc.height=dh; sctx.imageSmoothingEnabled=true;
+    sctx.clearRect(0,0,dw,dh); sctx.drawImage(canvas,0,0,w,h,0,0,dw,dh);   // shrink (averaging)
+    ctx.imageSmoothingEnabled=true; ctx.clearRect(0,0,w,h);
+    ctx.drawImage(sc,0,0,dw,dh,0,0,w,h);                                   // stretch back, soft
   }
   const amt = P('compress','amount');
   if (amt>0){
