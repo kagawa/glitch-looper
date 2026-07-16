@@ -103,7 +103,7 @@ const RAND_PROB = { png:.12, jpeg:.15, warp:.18, halftone:.12, feedback:.12, mel
                     ghost:.14, dotcrawl:.1, hum:.12, herring:.08, sync:.14, zoom:0,
                     compress:.14, pixsort:.14, databend:.12, degauss:.06, gif:.12,
                     sonify:.12, byteshift:.12, bitplane:.1, bmpmisread:.14, webp:.1, gifg:.1,
-                    extrude:.12, time:.1, interlace:.1,   // these re-render the frame — keep them rare
+                    extrude:.12, time:.1, interlace:.1, stale:.1,   // these re-render the frame — keep them rare
                     // colour-mapping / stylise effects: keep them occasional, emboss rarest
                     duotone:.14, solarize:.14, posterize:.14, emboss:.04 };
 // three strength levels: prob = on-probability scale, str = how far params stray from their default

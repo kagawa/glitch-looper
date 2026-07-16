@@ -13,6 +13,8 @@ const tacc = document.createElement('canvas');               // Time: trail accu
 const tax = tacc.getContext('2d');                           //   so drawFrame can't clobber it)
 const iacc = document.createElement('canvas');               // Interlace: the lagging field's moment
 const iax = iacc.getContext('2d');
+const bacc = document.createElement('canvas');               // Stale Blocks: the frame being assembled
+const bax = bacc.getContext('2d');
 const mshape = document.createElement('canvas');             // region-mask alpha shape
 const msx = mshape.getContext('2d');
 const mclean = document.createElement('canvas');             // region-mask clean plate (base, pre-glitch)
@@ -186,10 +188,12 @@ function timeFrame(fi, NF, drop){
 // would each do it their own way, on three different frame grids).
 function draw(phase){
   const NF = Math.round(LOOP_MS/1000*30);
-  const tm = state.time, il = state.interlace;
-  const timeOn = tm.on && (tm.hold>1 || tm.drop>0 || tm.trail>0);
-  const ilOn   = il.on && il.amount>0;
-  if (!timeOn && !ilOn){ drawFrame(phase); return; }   // untouched — keep the raw, unquantised phase
+  const tm = state.time, il = state.interlace, st = state.stale;
+  const timeOn  = tm.on && (tm.hold>1 || tm.drop>0 || tm.trail>0);
+  const ilOn    = il.on && il.amount>0;
+  const staleOn = st.on && st.amount>0;
+  // nothing temporal is on → keep the raw, unquantised phase rather than snapping to the frame grid
+  if (!timeOn && !ilOn && !staleOn){ drawFrame(phase); return; }
   // P() reads the ENV that drawFrame sets for the frame it is painting — the wrong one to ask here,
   // and for trails it belongs to a frame further back in time. Take the envelope for the moment
   // being shown instead. Clamped because motionMul peaks above 1: an unclamped Trails would weigh
@@ -222,16 +226,48 @@ function draw(phase){
     tax.globalAlpha = 1;
     ctx.clearRect(0,0,w,h); ctx.drawImage(tacc,0,0);
   };
-  if (!ilOn){ moment(fi); return; }
+  // ---- Stale Blocks: what a starved stream looks like ----
+  // A decoder short of data doesn't refresh every block, so parts of the picture sit on an older
+  // frame while the rest moves on. The lag is fixed per block rather than re-rolled every frame:
+  // re-rolling makes noise, fixing it makes the damage sit somewhere you can see. That also keeps
+  // it a pure function of the block's coordinates — no buffer, no warm-up. It re-rolls on its own
+  // schedule instead, so blocks freeze, catch up, and others freeze.
+  const footage = (f)=>{
+    if (!staleOn){ moment(f); return; }
+    const amt = pv('stale','amount',1);
+    const bs = Math.max(4, st.block|0), steps = Math.max(1, Math.min(3, st.steps|0));
+    const age = Math.max(1, st.age|0);
+    const pat = Math.floor((((f%NF)+NF)%NF) * Math.max(1,st.rate|0) / NF);   // which re-roll we are in
+    const nbx = Math.ceil(w/bs), nby = Math.ceil(h/bs);
+    // which lag each block is stuck at: 0 = keeping up, 1..steps = that many ages behind
+    const lvl = new Uint8Array(nbx*nby);
+    for (let by=0;by<nby;by++) for (let bx=0;bx<nbx;bx++){
+      if (rand(pat*7.1 + bx*0.37 + by*2.13) >= amt) continue;     // this block is keeping up
+      lvl[by*nbx+bx] = 1 + Math.floor(rand(pat*3.3 + bx*1.7 + by*0.91)*steps);
+    }
+    moment(f);                                   // the blocks that are keeping up
+    bacc.width=w; bacc.height=h; bax.clearRect(0,0,w,h); bax.drawImage(canvas,0,0);
+    for (let l=1;l<=steps;l++){
+      if (!lvl.includes(l)) continue;            // nothing is stuck this far back — skip the render
+      moment(f - Math.round(age*l/steps));
+      for (let by=0;by<nby;by++) for (let bx=0;bx<nbx;bx++){
+        if (lvl[by*nbx+bx]!==l) continue;
+        const x=bx*bs, y=by*bs, bw=Math.min(bs,w-x), bh=Math.min(bs,h-y);
+        bax.drawImage(canvas, x,y,bw,bh, x,y,bw,bh);
+      }
+    }
+    ctx.clearRect(0,0,w,h); ctx.drawImage(bacc,0,0);
+  };
+  if (!ilOn){ footage(fi); return; }
   // ---- Interlace: the two fields were never scanned at the same instant ----
   // A field carries every other line and is grabbed a moment after the other, so anything that
   // moved between them lands in a different place on each — which is why the tell is teeth along
   // moving edges, and why a still part of the picture stays perfectly clean. Paint both moments
   // and weave them.
   const amt = pv('interlace','amount',1);
-  moment(fi - Math.max(1, il.delay|0));       // the field that lags
+  footage(fi - Math.max(1, il.delay|0));      // the field that lags
   iacc.width=w; iacc.height=h; iax.clearRect(0,0,w,h); iax.drawImage(canvas,0,0);
-  moment(fi);                                 // the field that leads
+  footage(fi);                                // the field that leads
   const th = Math.max(1, il.thick|0);
   const lagParity = (il.swap|0)===0 ? 1 : 0;
   ctx.globalAlpha = amt;

@@ -279,6 +279,13 @@ const FX = [
     { k:'gap',    label:'Trail Gap (frames)', min:1, max:12, step:1, def:5, show:s=> s.trail>0 },
     { k:'trailn', label:'Trail Frames (a render each)', min:2, max:4, step:1, def:3, show:s=> s.trail>0 },
   ]},
+  { id:'stale', name:'Stale Blocks', hint:'a starved stream — blocks stuck on an older frame', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
+    { k:'block',  label:'Block Size', min:8, max:48, step:4, def:16 },
+    { k:'age',    label:'Max Age (frames)', min:1, max:12, step:1, def:6 },
+    { k:'steps',  label:'Age Steps (a render each)', min:1, max:3, step:1, def:2 },
+    { k:'rate',   label:'Re-roll Rate (per loop)', min:1, max:30, step:1, def:6 },
+  ]},
   { id:'interlace', name:'Interlace', hint:'two fields scanned a moment apart — combing on anything that moved', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:1, env:1 },
     { k:'delay',  label:'Field Delay (frames)', min:1, max:12, step:1, def:2 },
@@ -301,7 +308,7 @@ const FX_GROUPS = [
   ['Screen / Optics', ['crt','degauss','halftone','hud','bloom']],
   ['Distort',         ['warp','melt','extrude','feedback','pixelate']],
   ['Colour / Tone',   ['color','duotone','solarize','posterize','emboss']],
-  ['Video',           ['time','interlace']],          // acts on the footage, not on any one frame
+  ['Video',           ['time','stale','interlace']],          // acts on the footage, not on any one frame
   ['Global',          ['zoom','mask','motion']],
 ];
 
