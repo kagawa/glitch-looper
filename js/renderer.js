@@ -170,6 +170,27 @@ function timeFrame(fi, NF, drop){
   const tm = state.time;
   const wrap = k => ((k % NF) + NF) % NF;
   let e = wrap(fi);
+  // Playback order: reshuffle which moment each display frame reads. It stays a pure function of the
+  // frame index, so all three grids agree and the loop still closes; the reorder progresses forward
+  // segment to segment, glitching only inside a segment, so the wrap point stays clean.
+  const ord = tm.order|0;
+  if (ord>0){
+    if (ord===4){                                // Jitter: swap the odd frame of a flagged pair
+      const pair=e>>1;
+      if (rand(pair*4.3+0.5)<0.5) e = wrap((e&1) ? e-1 : e+1);
+    } else {
+      const L=Math.max(2,tm.olen|0), seg=Math.floor(e/L), s=seg*L;
+      const segLen=Math.min(L, NF-s), local=e-s;
+      let lo=local;
+      if (rand(seg*3.7+0.5) < 0.6){              // ~60% of segments glitch, the rest play straight
+        if (ord===1){ lo = local<segLen/2 ? local*2 : (segLen-1-local)*2;   // Ping-Pong: local triangle
+                      if (lo>segLen-1) lo=segLen-1; }
+        else if (ord===2) lo = segLen-1-local;                              // Reverse Burst: segment backward
+        else if (ord===3){ const rl=Math.max(1,Math.floor(segLen/3)); lo = local%rl; }  // Stutter: repeat a run
+      }
+      e = wrap(s+lo);
+    }
+  }
   const hold = Math.max(1, tm.hold|0);
   if (hold>1) e -= e % hold;                  // hold divides NF, so no short group at the seam
   if (drop>0){

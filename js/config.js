@@ -272,6 +272,9 @@ const FX = [
   { id:'time', name:'Time', hint:'frame drop · stutter · trails — acts on the footage, not the frame', on:false, open:false, params:[
     // every hold divides the loop's 90 frames, so the last group is full length and the loop closes.
     // Stops at 10 (3fps): past that so few frames are left that it reads as a still, not a stutter.
+    { k:'order',  label:'Playback', type:'select', def:0,
+      options:[[0,'Forward'],[1,'Ping-Pong'],[2,'Reverse Burst'],[3,'Stutter Loop'],[4,'Jitter']] },
+    { k:'olen',   label:'Segment (frames)', min:2, max:30, step:1, def:8, show:s=> [1,2,3].includes(s.order|0) },
     { k:'hold',   label:'Frame Hold', type:'select', def:1,
       options:[[1,'Off'],[2,'2 frames'],[3,'3'],[5,'5'],[6,'6'],[9,'9'],[10,'10']] },
     { k:'drop',   label:'Random Drop', min:0, max:.9, step:.01, def:0, env:1 },
