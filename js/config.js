@@ -108,7 +108,9 @@ const FX = [
   { id:'pixfmt', name:'Pixel Format Misread', hint:'raw reinterpret — reader and writer disagree on bytes-per-pixel', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:1, env:1 },
     { k:'fmt',    label:'Read As', type:'select', def:1,
-      options:[[0,'BGR (swap R/B)'],[1,'RGBA (4-byte)'],[2,'RGB565 (16-bit)'],[3,'Gray8 (1-byte)']] },
+      options:[[0,'BGR (swap R/B)'],[1,'RGBA (4-byte)'],[2,'RGB565 (16-bit)']] },
+    { k:'run',    label:'Run Length', min:1, max:64, step:1, def:20, show:s=> s.fmt!==0 },
+    { k:'jitter', label:'Jitter', min:0, max:1, step:.01, def:.25, env:1, show:s=> s.fmt!==0 },
     { k:'offset', label:'Byte Offset', min:0, max:3, step:1, def:0 },
   ]},
   { id:'bitplane', name:'Bit-plane', hint:'split bit planes — displace / XOR / drop for banded glitch', on:false, open:false, params:[
