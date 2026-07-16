@@ -290,7 +290,7 @@ function applyMosh(w,h,fseed,em=1){
     const yEnd = Math.min(h,y0+bh);
     // each band picks its own kind of break-up, so Jitter reads as a signal coming apart in
     // several ways at once rather than as the same channel smear over and over
-    switch (Math.floor(rand(seed*6.9+k)*4)){
+    switch (Math.floor(rand(seed*6.9+k)*3)){
       case 1: {                                   // one channel pulled from another row (vertical tear)
         const vs = Math.floor((rand(seed*4.3+k)-0.5)*2*(2+bh*6*intensity));
         for (let y=y0;y<yEnd;y++){
@@ -305,17 +305,6 @@ function applyMosh(w,h,fseed,em=1){
           for (let x=0;x<w;x++){
             const i=(y*w+x)*4, r=src[i], g=src[i+1], b=src[i+2];
             if (rot){ d[i]=g; d[i+1]=b; d[i+2]=r; } else { d[i]=b; d[i+1]=r; d[i+2]=g; }
-          }
-        }
-        break;
-      }
-      case 3: {                                   // a narrow slice held and repeated across the band
-        const sw = Math.max(1, Math.floor((0.01+0.06*rand(seed*8.1+k))*w));
-        const sx0 = Math.floor(rand(seed*9.7+k)*(w-sw));
-        for (let y=y0;y<yEnd;y++){
-          for (let x=0;x<w;x++){
-            const i=(y*w+x)*4, si=(y*w+sx0+(x%sw))*4;
-            d[i]=src[si]; d[i+1]=src[si+1]; d[i+2]=src[si+2];
           }
         }
         break;
