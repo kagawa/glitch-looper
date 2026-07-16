@@ -89,6 +89,8 @@ function drawFrame(phase){    // phase in [0,1)
 
   applyMelt(w,h,phase);
 
+  applyExtrude(w,h);
+
   applyHalftone(w,h);
 
   applyEmboss(w,h);

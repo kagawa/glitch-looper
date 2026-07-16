@@ -119,6 +119,98 @@ if (fb.on && fb.amount>0){
 }
 }
 
+function applyExtrude(w,h){
+// ---- Extrude: pick a band of the picture by tone or colour and push it out — pseudo-3D ----
+//      The shading is what sells it. Drag a region along a direction with its own colour and you
+//      get a smear; a real extrusion shows a SIDE, lit differently from the face, so the pixels
+//      trailing behind darken with depth. Without that this is a directional blur.
+//      The face keeps its original pixels; only the body behind it is shaded.
+const ex = state.extrude;
+if (ex.on){
+  const dist = P('extrude','dist');
+  // 0.12: at 0.35 the top of the slider pushed ~190px on a 540-tall frame, well past anything
+  // readable, and every useful setting was crammed into the bottom of the travel. Top is now ~65px.
+  const D = Math.round(dist * Math.min(w,h) * 0.12);
+  if (D>0){
+    const im = ctx.getImageData(0,0,w,h), d = im.data;
+    const src = new Uint8ClampedArray(d);
+    const key = ex.key|0, c0 = ex.center, wd = ex.width;
+    // which pixels get pushed: distance from the range centre, in the chosen key
+    const sel = new Uint8Array(w*h);
+    let minX=w, maxX=-1, minY=h, maxY=-1;
+    for (let y=0,i=0;y<h;y++) for (let x=0;x<w;x++,i++){
+      const j=i*4, r=src[j], g=src[j+1], b=src[j+2];
+      let dd;
+      if (key===2){                                   // Hue
+        const mx=Math.max(r,g,b), ch=mx-Math.min(r,g,b);
+        if (ch===0) continue;                         // a grey pixel has no hue to match against
+        let hh = mx===r ? ((g-b)/ch)%6 : mx===g ? (b-r)/ch+2 : (r-g)/ch+4;
+        hh*=60; if (hh<0) hh+=360;
+        dd = Math.abs(hh - c0*360);
+        if (dd>180) dd = 360-dd;                      // hue is a circle — the short way round
+        dd /= 180;
+      } else if (key===1){                            // Saturation
+        const mx=Math.max(r,g,b);
+        dd = Math.abs((mx ? (mx-Math.min(r,g,b))/mx : 0) - c0);
+      } else {                                        // Lightness
+        dd = Math.abs((0.299*r+0.587*g+0.114*b)/255 - c0);
+      }
+      if (dd<=wd){ sel[i]=1;
+        if (x<minX)minX=x; if (x>maxX)maxX=x; if (y<minY)minY=y; if (y>maxY)maxY=y; }
+    }
+    if (maxX<0) return;                               // nothing in range → nothing to push
+    const a = ex.angle*Math.PI/180, dx = Math.cos(a), dy = Math.sin(a), shade = ex.shade;
+    // Sweep along the push instead of searching back from every pixel. Asking each pixel "what is
+    // behind me?" costs the whole distance for every pixel that finds nothing — the emptier the
+    // selection the slower it got, which is backwards. Walking in the direction of the push lets
+    // each pixel inherit its answer from the one behind it, already solved: one pass, whatever the
+    // distance. dist carries ray length so the diagonals don't come out short.
+    const adx=Math.abs(dx), ady=Math.abs(dy);
+    const dist=new Float32Array(w*h).fill(-1), from=new Int32Array(w*h).fill(-1);
+    if (adx>=ady){                                    // mostly sideways → walk columns
+      const step = dx>=0?1:-1, ky = dy/adx, per = 1/adx;
+      for (let n=0;n<w;n++){
+        const x = dx>=0 ? n : w-1-n;
+        for (let y=0;y<h;y++){
+          const i=y*w+x;
+          if (sel[i]){ dist[i]=0; from[i]=i; continue; }   // the face seeds the sweep
+          const px=x-step, py=Math.round(y-ky);
+          if (px<0||px>=w||py<0||py>=h) continue;
+          const pi=py*w+px, pd=dist[pi];
+          if (pd<0) continue;
+          const nd=pd+per;
+          if (nd>D) continue;                              // past the extrusion's reach
+          dist[i]=nd; from[i]=from[pi];
+        }
+      }
+    } else {                                          // mostly up/down → walk rows
+      const step = dy>=0?1:-1, kx = dx/ady, per = 1/ady;
+      for (let n=0;n<h;n++){
+        const y = dy>=0 ? n : h-1-n;
+        for (let x=0;x<w;x++){
+          const i=y*w+x;
+          if (sel[i]){ dist[i]=0; from[i]=i; continue; }
+          const py=y-step, px=Math.round(x-kx);
+          if (px<0||px>=w||py<0||py>=h) continue;
+          const pi=py*w+px, pd=dist[pi];
+          if (pd<0) continue;
+          const nd=pd+per;
+          if (nd>D) continue;
+          dist[i]=nd; from[i]=from[pi];
+        }
+      }
+    }
+    for (let i=0;i<w*h;i++){
+      if (dist[i]<=0) continue;                       // 0 is the face, -1 was never reached
+      const f = 1 - shade*(dist[i]/D);                // the side falls away with depth
+      const o=i*4, s2=from[i]*4;
+      d[o]=src[s2]*f; d[o+1]=src[s2+1]*f; d[o+2]=src[s2+2]*f;
+    }
+    ctx.putImageData(im,0,0);
+  }
+}
+}
+
 // ---- melt: pixel drip, breathes 0→max→0 over the loop (seamless) ----
 //      Drip = pixels smear down (top stretches)
 //      Wrap = drips off the bottom and re-enters the top, so a column can travel a full height

@@ -216,6 +216,14 @@ const FX = [
     { k:'speed',  label:'Fast Spin (whole turns/loop)', min:-1, max:1, step:1, def:0 },
     { k:'pulse',  label:'Zoom Pulse', min:0, max:1, step:.01, def:0 },
   ]},
+  { id:'extrude', name:'Extrude', hint:'pick a tone or colour and push it out — pseudo-3D', on:false, open:false, params:[
+    { k:'key',    label:'Select By', type:'select', def:0, options:[[0,'Lightness'],[1,'Saturation'],[2,'Hue']] },
+    { k:'center', label:'Range Centre', min:0, max:1, step:.01, def:.78 },
+    { k:'width',  label:'Range Width', min:.01, max:1, step:.01, def:.22 },
+    { k:'angle',  label:'Direction', min:0, max:345, step:15, def:45 },
+    { k:'dist',   label:'Distance', min:0, max:1, step:.01, def:.3, env:1 },
+    { k:'shade',  label:'Shade (side falloff)', min:-1, max:1, step:.01, def:.65 },
+  ]},
   { id:'melt', name:'Melt', hint:'pixel drip (breathes over the loop) — Drip or vertical Wrap', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.4, env:1 },
     { k:'mode',   label:'Mode', type:'select', def:0, options:[[0,'Drip'],[1,'Wrap']] },
@@ -272,7 +280,7 @@ const FX_GROUPS = [
   ['Pixel Glitch',    ['glitch','mosh','compress','pixsort','databend','bmpmisread','gif']],
   ['Analog / Tape',   ['vhs','sync','roll','film','noise','ghost','dotcrawl','hum','herring']],
   ['Screen / Optics', ['crt','degauss','halftone','hud','bloom']],
-  ['Distort',         ['warp','melt','feedback','pixelate']],
+  ['Distort',         ['warp','melt','extrude','feedback','pixelate']],
   ['Colour / Tone',   ['color','duotone','solarize','posterize','emboss']],
   ['Global',          ['zoom','mask','motion']],
 ];
