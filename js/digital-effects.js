@@ -234,34 +234,24 @@ function applyMosh(w,h,fseed,em=1){
   const d = id.data;
   const src = new Uint8ClampedArray(d);        // snapshot to read from
 
-  // Block Noise only breaks blocks that the displacement below actually dragged something into, so
-  // record which noise-grid cells each pasted block lands on. No displacement → no noise.
-  const np = Math.max(1, m.npix|0);
-  const nbx = Math.ceil(w/np), nby = Math.ceil(h/np);
-  const moshMask = m.noise>0 ? new Uint8Array(nbx*nby) : null;
-
   // 1) block displacement (datamosh smear)
   //    Bloom mimics P-frame duplication: the same motion vector is applied over and over, so the
   //    block content is dragged another step each time and leaves a copy behind at every stop —
-  //    the stretched, trailing look of a real datamosh. 1 = applied once (a plain displacement).
+  //    the stretched, trailing look of a real datamosh. It is a ceiling, not a fixed count: each
+  //    block draws its own repeat count from 1..Bloom, so the trails come out uneven. 1 = every
+  //    block applied once (a plain displacement).
   if (m.blocks>0){
     const n = Math.floor(1 + m.blocks*10*intensity);
-    const reps = Math.max(1, m.bloom|0);
+    const maxReps = Math.max(1, m.bloom|0);
     for (let k=0;k<n;k++){
       const bw = Math.max(4, Math.floor((0.08+0.35*rand(seed*3.1+k))*w));
       const bh = Math.max(2, Math.floor((0.02+0.14*rand(seed*5.7+k))*h));
       const sx = Math.floor(rand(seed*9.3+k)*(w-bw));
       const sy = Math.floor(rand(seed*1.7+k)*(h-bh));
       const dxo = Math.floor((rand(seed*2.2+k)-0.5)*w*intensity);
+      const reps = Math.round(1 + rand(seed*7.3+k)*(maxReps-1));
       for (let p=1;p<=reps;p++){
         const off = dxo*p;
-        if (moshMask){                          // mark where this paste lands
-          const tx0=Math.max(0,sx+off), tx1=Math.min(w-1,sx+off+bw-1);
-          if (tx1>=tx0){
-            const bx0=(tx0/np)|0, bx1=(tx1/np)|0, by0=(sy/np)|0, by1=((sy+bh-1)/np)|0;
-            for (let by=by0;by<=by1;by++) for (let bx=bx0;bx<=bx1;bx++) moshMask[by*nbx+bx]=1;
-          }
-        }
         for (let y=0;y<bh;y++){
           for (let x=0;x<bw;x++){
             const tx = sx+x+off;
@@ -291,53 +281,51 @@ function applyMosh(w,h,fseed,em=1){
     }
   }
 
-  // 3) channel corruption (shift a single RGB channel on random rows)
-  const bands = Math.floor(m.chaos*6*intensity);
+  // 3) jitter — bands where the signal comes apart
+  const bands = Math.floor(m.chaos*14*intensity);
   for (let k=0;k<bands;k++){
     const y0 = Math.floor(rand(seed*7.7+k)*h);
     const bh = Math.floor((0.01+0.05*rand(seed*3.9+k))*h)+1;
     const ch = Math.floor(rand(seed*5.5+k)*3);
-    const sh = Math.floor((rand(seed*2.1+k)-0.5)*80);
-    for (let y=y0;y<Math.min(h,y0+bh);y++){
-      for (let x=0;x<w;x++){
-        const sx=Math.max(0,Math.min(w-1,x+sh));
-        d[(y*w+x)*4+ch]=src[(y*w+sx)*4+ch];
-      }
-    }
-  }
-
-  // 4) block noise — the macroblock look of a starved stream. Blocks sit on the screen grid rather
-  //    than at random positions, otherwise they read as plain noise instead of as broken blocks.
-  //    Confined to the blocks the displacement dragged into, so the colour breaks up where the
-  //    mosh is, instead of speckling the untouched picture.
-  if (m.noise>0){
-    const nmode = m.nmode|0, amtN = m.noise*intensity;
-    for (let by=0; by<nby; by++){
-      for (let bx=0; bx<nbx; bx++){
-        if (!moshMask[by*nbx+bx]) continue;                         // nothing was moshed here
-        if (rand(seed*11.3 + bx*0.31 + by*7.7) >= amtN) continue;   // this block survived
-        const a = rand(seed*4.7 + bx*1.9 + by*0.53), b = rand(seed*8.3 + bx*0.77 + by*2.9);
-        const x0=bx*np, y0=by*np, x1=Math.min(w,x0+np), y1=Math.min(h,y0+np);
-        let nr=0, ng=0, nb=0, cb=0, cr=0;
-        if (nmode===0){                       // Replace: a flat block of a fully saturated hue
-          const hh=a*6, i6=Math.floor(hh)%6, f=hh-Math.floor(hh);
-          const seg=[[1,f,0],[1-f,1,0],[0,1,f],[0,1-f,1],[f,0,1],[1,0,1-f]][i6];
-          nr=seg[0]*255; ng=seg[1]*255; nb=seg[2]*255;
-        } else if (nmode===1){                // Chroma: keep the luma, blow out the colour difference
-          cb=(a*2-1)*180; cr=(b*2-1)*180;     // — the picture stays readable but the colour is wrong
-        } else {                              // Add: signed offset, keeps the texture underneath
-          const c = rand(seed*2.3 + bx*3.1 + by*1.7);
-          nr=(a*2-1)*140; ng=(b*2-1)*140; nb=(c*2-1)*140;
+    const yEnd = Math.min(h,y0+bh);
+    // each band picks its own kind of break-up, so Jitter reads as a signal coming apart in
+    // several ways at once rather than as the same channel smear over and over
+    switch (Math.floor(rand(seed*6.9+k)*4)){
+      case 1: {                                   // one channel pulled from another row (vertical tear)
+        const vs = Math.floor((rand(seed*4.3+k)-0.5)*2*(2+bh*6*intensity));
+        for (let y=y0;y<yEnd;y++){
+          const sy=Math.max(0,Math.min(h-1,y+vs));
+          for (let x=0;x<w;x++) d[(y*w+x)*4+ch]=src[(sy*w+x)*4+ch];
         }
-        for (let y=y0;y<y1;y++){
-          for (let x=x0;x<x1;x++){
-            const i=(y*w+x)*4;
-            if (nmode===0){ d[i]=nr; d[i+1]=ng; d[i+2]=nb; }
-            else if (nmode===1){
-              const Y = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
-              d[i]=Y+1.402*cr; d[i+1]=Y-0.344136*cb-0.714136*cr; d[i+2]=Y+1.772*cb;
-            }
-            else { d[i]+=nr; d[i+1]+=ng; d[i+2]+=nb; }
+        break;
+      }
+      case 2: {                                   // channels rotated → the band swings to a wrong hue
+        const rot = rand(seed*8.7+k)<0.5;
+        for (let y=y0;y<yEnd;y++){
+          for (let x=0;x<w;x++){
+            const i=(y*w+x)*4, r=src[i], g=src[i+1], b=src[i+2];
+            if (rot){ d[i]=g; d[i+1]=b; d[i+2]=r; } else { d[i]=b; d[i+1]=r; d[i+2]=g; }
+          }
+        }
+        break;
+      }
+      case 3: {                                   // a narrow slice held and repeated across the band
+        const sw = Math.max(1, Math.floor((0.01+0.06*rand(seed*8.1+k))*w));
+        const sx0 = Math.floor(rand(seed*9.7+k)*(w-sw));
+        for (let y=y0;y<yEnd;y++){
+          for (let x=0;x<w;x++){
+            const i=(y*w+x)*4, si=(y*w+sx0+(x%sw))*4;
+            d[i]=src[si]; d[i+1]=src[si+1]; d[i+2]=src[si+2];
+          }
+        }
+        break;
+      }
+      default: {                                  // one channel slid sideways (the original jitter)
+        const sh = Math.floor((rand(seed*2.1+k)-0.5)*2*(20+w*0.2*intensity));
+        for (let y=y0;y<yEnd;y++){
+          for (let x=0;x<w;x++){
+            const sx=Math.max(0,Math.min(w-1,x+sh));
+            d[(y*w+x)*4+ch]=src[(y*w+sx)*4+ch];
           }
         }
       }
