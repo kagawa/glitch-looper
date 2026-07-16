@@ -35,10 +35,12 @@ if (wp.on && wp.amp>0){
 // the anticipation an animator would put on a hard move. Overshoot can return <0 or >1 on purpose.
 function edgeEase(t, mode){
   if (t<=0) return 0; if (t>=1) return 1;
-  if ((mode|0)===2){ const c=1.70158*1.525;                // easeInOutBack
+  const m=mode|0;
+  if (m===2){ const c=1.70158*1.525;                       // easeInOutBack
     return t<0.5 ? (Math.pow(2*t,2)*((c+1)*2*t-c))/2
                  : (Math.pow(2*t-2,2)*((c+1)*(2*t-2)+c)+2)/2; }
-  if ((mode|0)===1) return t*t*t*(t*(t*6-15)+10);          // smootherstep
+  if (m===1) return t*t*t*(t*(t*6-15)+10);                 // smootherstep — a gentle S
+  if (m===3) return t*t*t*t*(35 + t*(-84 + t*(70 - 20*t))); // 7th-order — hugs the ends, snaps mid
   return t<0.5 ? 0 : 1;                                    // hard
 }
 
