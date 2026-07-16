@@ -65,6 +65,8 @@ const FX = [
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.6, env:1 },
     { k:'chroma', label:'Chroma Bleed', min:0, max:1, step:.01, def:.5 },
     { k:'ring',   label:'Ringing', min:0, max:1, step:.01, def:0, env:1 },
+    { k:'wobble', label:'Wobble', min:0, max:1, step:.01, def:0, env:1 },
+    { k:'wspeed', label:'Wobble Speed', min:1, max:6, step:1, def:2, show:s=> s.wobble>0 },
     { k:'block',  label:'Block', min:4, max:16, step:2, def:8 },
   ]},
   { id:'pixsort', name:'Pixel Sort', hint:'reorder runs of pixels by a chosen key (glitch-art staple)', on:false, open:false, params:[

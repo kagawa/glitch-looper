@@ -1,10 +1,30 @@
-function applyCompression(w,h){
+function applyCompression(w,h,phase){
 // ---- Compression: heavy-JPEG look — 8×8 block flatten + chroma subsample + luma banding ----
 const cp = state.compress;
 if (cp.on){
+  const B = cp.block|0;
+  // Wobble: a starved codec quantises its motion vectors coarsely, so the reconstruction never sits
+  // still — blocks slide a little each frame and the picture breathes like jelly. Move each block by
+  // a 2D field that drifts over the loop (integer speed → seamless). It quantises to the same block
+  // grid that flattens, so the swim and the blockiness agree.
+  const wob = P('compress','wobble');
+  if (wob>0){
+    const A=wob*(3+B*0.5), TAU=Math.PI*2, sp=Math.max(1,cp.wspeed|0), s1=phase*TAU*sp, s2=phase*TAU*sp*2;
+    const fx=TAU*2.5/w, fy=TAU*2.0/h;
+    sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h); sctx.drawImage(canvas,0,0);
+    ctx.clearRect(0,0,w,h);
+    for (let by=0;by<h;by+=B) for (let bx=0;bx<w;bx+=B){
+      const cx=bx+B/2, cy=by+B/2;
+      const dx=A*(Math.sin(cx*fx+cy*fy*0.5+s1)+0.5*Math.sin(cy*fy-cx*fx*0.7+s2));
+      const dy=A*(Math.sin(cy*fy+cx*fx*0.5+s1)+0.5*Math.sin(cx*fx-cy*fy*0.7-s2));
+      const bw=Math.min(B,w-bx), bh=Math.min(B,h-by);
+      const sx=Math.max(0,Math.min(w-bw, bx+Math.round(dx))), sy=Math.max(0,Math.min(h-bh, by+Math.round(dy)));
+      ctx.drawImage(sc, sx,sy,bw,bh, bx,by,bw,bh);
+    }
+  }
   const amt = P('compress','amount');
   if (amt>0){
-    const B = cp.block|0, chb = cp.chroma, ring = P('compress','ring');
+    const chb = cp.chroma, ring = P('compress','ring');
     const qstep = 2 + amt*30;                       // luma quantisation → banding
     const im = ctx.getImageData(0,0,w,h), d = im.data;
     for (let by=0; by<h; by+=B){

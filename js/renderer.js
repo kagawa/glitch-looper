@@ -121,7 +121,7 @@ function drawFrame(phase){    // phase in [0,1)
 
   applyColorGrade(w,h,c);
 
-  applyCompression(w,h);
+  applyCompression(w,h,phase);
 
   applyPixelSort(w,h);
 
