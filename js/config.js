@@ -208,9 +208,9 @@ const FX = [
     { k:'zoom',   label:'Zoom (under 1 = nested)', min:.6, max:1.4, step:.01, def:.82 },
     { k:'copies', label:'Copies', min:2, max:8, step:1, def:5 },
     { k:'feather',label:'Edge Feather', min:0, max:1, step:.01, def:.35 },
-    { k:'flow',   label:'Flow', min:-3, max:3, step:1, def:0 },
-    { k:'rotate', label:'Twist (slow spin w/ Flow)', min:-15, max:15, step:.5, def:0 },
-    { k:'speed',  label:'Spin (whole turns/loop)', min:-4, max:4, step:1, def:0 },
+    { k:'flow',   label:'Flow (steps/loop)', min:-3, max:3, step:1, def:1 },
+    { k:'rotate', label:'Twist (° per step → slow spin)', min:-45, max:45, step:.5, def:8 },
+    { k:'speed',  label:'Fast Spin (whole turns/loop)', min:-4, max:4, step:1, def:0 },
     { k:'pulse',  label:'Zoom Pulse', min:0, max:1, step:.01, def:0 },
   ]},
   { id:'melt', name:'Melt', hint:'pixel drip (breathes over the loop) — Drip or vertical Wrap', on:false, open:false, params:[
