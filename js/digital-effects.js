@@ -272,56 +272,6 @@ if (bsf.on){
 }
 }
 
-function applyPixelFormatMisread(w,h){
-// ---- Pixel Format Misread: read the pixel buffer back under a format the writer never used ----
-//      The tell is not the colour, it is the drift. A reader that assumes the wrong bytes-per-pixel
-//      walks the buffer at the wrong rate, so each row starts further off than the last and the
-//      picture shears — and because the channel it lands on rotates as it goes, the shear comes out
-//      in rainbow. Only BGR keeps the pitch right, so only BGR leaves the geometry alone.
-const pf = state.pixfmt;
-if (pf.on){
-  const amt = P('pixfmt','amount');
-  if (amt>0){
-    const fmt = pf.fmt|0, off = pf.offset|0;
-    const im = ctx.getImageData(0,0,w,h), d = im.data;
-    // Pack down to 24-bit first. The alpha byte is a canvas artifact, not something a raw pixel
-    // buffer would carry, and letting a constant 255 fall into a colour channel just washes the
-    // frame instead of glitching it.
-    const N = w*h*3, raw = new Uint8Array(N);
-    for (let i=0,p=0;i<w*h;i++,p+=3){ const j=i*4; raw[p]=d[j]; raw[p+1]=d[j+1]; raw[p+2]=d[j+2]; }
-    const B = fmt===1?4 : fmt===2?2 : 3;               // bytes-per-pixel the reader assumes
-    // Charge the pitch error once per run of pixels instead of once per pixel. Per pixel, the
-    // channel the reader lands on comes back round every 3 pixels — far too fine to see, so the
-    // eye averages the three rotations and (R+G+B)/3 is grey. Spreading it over a run slows that
-    // cycle to something you can actually read as colour, and softens the stretch to match.
-    // Run 1 is the raw per-pixel misread.
-    //
-    // Jitter is load-bearing, not decoration. The phase is (run index) % 3, so when a row holds a
-    // whole number of runs the phase marches 0,1,2 down the ROWS instead — the same cancellation
-    // stood on its end, and three neighbouring rows average back to grey. Which runs land in that
-    // trap moves with the picture's width, so it can't be dodged with a fixed list; knocking the
-    // runs out of lockstep is what avoids it. With Jitter up, each run takes a random phase and
-    // Run just sets how big the blocks are.
-    const runN = Math.max(1, pf.run|0), jit = P('pixfmt','jitter');
-    for (let i=0,di=0;i<w*h;i++,di+=4){
-      const c = (i/runN)|0;                            // which run this pixel belongs to
-      let s = off + i*3 + c*(B-3);                     // run 1 collapses to off + i*B
-      if (jit>0) s += Math.round((rand(c*0.618+0.5)*2-1) * jit * 48);   // runs slip against each other
-      s = ((s % N) + N) % N;                           // wrap so the frame stays filled
-      let r,g,b;
-      switch (fmt){
-        case 0: r=raw[(s+2)%N]; g=raw[(s+1)%N]; b=raw[s]; break;              // BGR — channel order only
-        case 2: { const v = raw[s] | (raw[(s+1)%N]<<8);                        // RGB565 — 5/6/5 out of 2 bytes
-                  r=((v>>>11)&31)*255/31; g=((v>>>5)&63)*255/63; b=(v&31)*255/31; break; }
-        default: r=raw[s]; g=raw[(s+1)%N]; b=raw[(s+2)%N];                     // RGBA — eats a 4th byte that isn't there
-      }
-      d[di]  +=(r-d[di])*amt; d[di+1]+=(g-d[di+1])*amt; d[di+2]+=(b-d[di+2])*amt;
-    }
-    ctx.putImageData(im,0,0);
-  }
-}
-}
-
 function applyBitPlane(w,h){
 // ---- Bit-plane: split each channel at a bit boundary, displace / XOR / drop the low planes ----
 const bpl = state.bitplane;
