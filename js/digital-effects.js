@@ -272,6 +272,41 @@ if (bsf.on){
 }
 }
 
+function applyPixelFormatMisread(w,h){
+// ---- Pixel Format Misread: read the pixel buffer back under a format the writer never used ----
+//      The tell is not the colour, it is the drift. A reader that assumes the wrong bytes-per-pixel
+//      walks the buffer at the wrong rate, so each row starts further off than the last and the
+//      picture shears — and because the channel it lands on rotates as it goes, the shear comes out
+//      in rainbow. Only BGR keeps the pitch right, so only BGR leaves the geometry alone.
+const pf = state.pixfmt;
+if (pf.on){
+  const amt = P('pixfmt','amount');
+  if (amt>0){
+    const fmt = pf.fmt|0, off = pf.offset|0;
+    const im = ctx.getImageData(0,0,w,h), d = im.data;
+    // Pack down to 24-bit first. The alpha byte is a canvas artifact, not something a raw pixel
+    // buffer would carry, and letting a constant 255 fall into a colour channel just washes the
+    // frame instead of glitching it.
+    const N = w*h*3, raw = new Uint8Array(N);
+    for (let i=0,p=0;i<w*h;i++,p+=3){ const j=i*4; raw[p]=d[j]; raw[p+1]=d[j+1]; raw[p+2]=d[j+2]; }
+    const B = fmt===1?4 : fmt===2?2 : fmt===3?1 : 3;   // bytes-per-pixel the reader assumes
+    for (let i=0,di=0;i<w*h;i++,di+=4){
+      const s = (off + i*B) % N;                       // wrap so the frame stays filled
+      let r,g,b;
+      switch (fmt){
+        case 0: r=raw[(s+2)%N]; g=raw[(s+1)%N]; b=raw[s]; break;              // BGR — channel order only
+        case 2: { const v = raw[s] | (raw[(s+1)%N]<<8);                        // RGB565 — 5/6/5 out of 2 bytes
+                  r=((v>>>11)&31)*255/31; g=((v>>>5)&63)*255/63; b=(v&31)*255/31; break; }
+        case 3: r=g=b=raw[s]; break;                                           // Gray8 — one byte per pixel
+        default: r=raw[s]; g=raw[(s+1)%N]; b=raw[(s+2)%N];                     // RGBA — eats a 4th byte that isn't there
+      }
+      d[di]  +=(r-d[di])*amt; d[di+1]+=(g-d[di+1])*amt; d[di+2]+=(b-d[di+2])*amt;
+    }
+    ctx.putImageData(im,0,0);
+  }
+}
+}
+
 function applyBitPlane(w,h){
 // ---- Bit-plane: split each channel at a bit boundary, displace / XOR / drop the low planes ----
 const bpl = state.bitplane;

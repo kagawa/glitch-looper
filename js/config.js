@@ -105,6 +105,12 @@ const FX = [
     { k:'roll',   label:'Channel Roll', type:'select', def:1, options:[[0,'RGB'],[1,'GBR'],[2,'BRG']] },
     { k:'skew',   label:'Skew', min:0, max:1, step:.01, def:.3 },
   ]},
+  { id:'pixfmt', name:'Pixel Format Misread', hint:'raw reinterpret — reader and writer disagree on bytes-per-pixel', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:1, env:1 },
+    { k:'fmt',    label:'Read As', type:'select', def:1,
+      options:[[0,'BGR (swap R/B)'],[1,'RGBA (4-byte)'],[2,'RGB565 (16-bit)'],[3,'Gray8 (1-byte)']] },
+    { k:'offset', label:'Byte Offset', min:0, max:3, step:1, def:0 },
+  ]},
   { id:'bitplane', name:'Bit-plane', hint:'split bit planes — displace / XOR / drop for banded glitch', on:false, open:false, params:[
     { k:'mode',   label:'Mode', type:'select', def:0, options:[[0,'Plane Shift'],[1,'XOR'],[2,'Drop Low']] },
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
@@ -268,7 +274,7 @@ const FX = [
 
 // effect cards are shown grouped by sub-genre (order here = display order)
 const FX_GROUPS = [
-  ['Binary Glitch',   ['jpeg','png','webp','gifg','sonify','byteshift','bitplane']],
+  ['Binary Glitch',   ['jpeg','png','webp','gifg','sonify','byteshift','pixfmt','bitplane']],
   ['Pixel Glitch',    ['glitch','mosh','compress','pixsort','databend','bmpmisread','gif']],
   ['Analog / Tape',   ['vhs','sync','roll','film','noise','ghost','dotcrawl','hum','herring']],
   ['Screen / Optics', ['crt','degauss','halftone','hud','bloom']],

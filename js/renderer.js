@@ -127,6 +127,8 @@ function drawFrame(phase){    // phase in [0,1)
 
   applyByteShift(w,h);
 
+  applyPixelFormatMisread(w,h);
+
   applyBitPlane(w,h);
 
   applyGhosting(w,h,phase);
