@@ -161,7 +161,13 @@ function applyPreset(name){
   FX.forEach(f=>{
     const pp = p[f.id] || {};
     state[f.id].on = !!pp.on;
-    f.params.forEach(par=>{ if (pp[par.k] !== undefined) state[f.id][par.k] = pp[par.k]; });
+    // Anything the preset doesn't name goes back to the effect's default rather than keeping
+    // whatever the user last had — otherwise a preset renders differently depending on what was
+    // fiddled with before it was picked, and picking it twice gives two different looks.
+    f.params.forEach(par=>{
+      state[f.id][par.k] = pp[par.k] !== undefined ? pp[par.k] : par.def;
+      if (par.env) state[f.id][par.k+'_env'] = !!par.envd;
+    });
   });
   syncUI();
 }
