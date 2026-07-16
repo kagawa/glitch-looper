@@ -40,7 +40,8 @@ function edgeEase(t, mode){
     return t<0.5 ? (Math.pow(2*t,2)*((c+1)*2*t-c))/2
                  : (Math.pow(2*t-2,2)*((c+1)*(2*t-2)+c)+2)/2; }
   if (m===1) return t*t*t*(t*(t*6-15)+10);                 // smootherstep — a gentle S
-  if (m===3) return t*t*t*t*(35 + t*(-84 + t*(70 - 20*t))); // 7th-order — hugs the ends, snaps mid
+  if (m===3){ const u=(t-0.48)/0.04;                       // near-hard: flat until ~0.48, then ~80%
+    return u<=0?0 : u>=1?1 : u*u*u*(u*(u*6-15)+10); }      // of the swing across 0.49–0.51, still smooth
   return t<0.5 ? 0 : 1;                                    // hard
 }
 
