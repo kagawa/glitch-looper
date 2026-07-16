@@ -12,29 +12,58 @@ const stageEl = document.querySelector('.stage');
 ['dragover','dragenter'].forEach(ev=> stageEl.addEventListener(ev, e=> e.preventDefault()));
 stageEl.addEventListener('drop', e=>{ e.preventDefault(); const f=e.dataTransfer.files[0]; if (f) loadImage(f); });
 
+// commit a drawable (Image / canvas) as the working picture, capped for perf. A canvas works
+// everywhere img is used — the codecs and palette sampler only ever use it as a drawImage source.
+function commitImage(src, sw, sh){
+  img = src;
+  gifKey = '';                          // rebuild GIF palette for the new image
+  const maxW = 720, scale = Math.min(1, maxW/sw);
+  const w = Math.round(sw*scale), h = Math.round(sh*scale);
+  canvas.width = tmp.width = w;
+  canvas.height = tmp.height = h;
+  drop.classList.add('hidden');
+  canvas.classList.remove('hidden');
+  startT = performance.now();
+  if (state.jpeg.on) scheduleJpeg();
+  if (state.png.on)  schedulePng();
+  if (state.webp.on) scheduleWebp();
+  if (state.gifg.on) scheduleGifg();
+  return { w, h };
+}
 function loadImage(file){
   const url = URL.createObjectURL(file);
   const im = new Image();
   im.onload = ()=>{
-    img = im;
-    gifKey = '';                        // rebuild GIF palette for the new image
-    // cap size for perf
-    const maxW = 720;
-    const scale = Math.min(1, maxW/im.width);
-    const w = Math.round(im.width*scale), h = Math.round(im.height*scale);
-    canvas.width = tmp.width = w;
-    canvas.height = tmp.height = h;
-    drop.classList.add('hidden');
-    canvas.classList.remove('hidden');
-    startT = performance.now();
+    const { w, h } = commitImage(im, im.width, im.height);
     setStatus(`${im.width}×${im.height} → ${w}×${h}, processing`);
-    if (state.jpeg.on) scheduleJpeg();
-    if (state.png.on)  schedulePng();
-    if (state.webp.on) scheduleWebp();
-    if (state.gifg.on) scheduleGifg();
     URL.revokeObjectURL(url);
   };
   im.src = url;
+}
+// A self-contained sample so the app renders something on first load. A test-card composition —
+// colour bars, gradients, hard-edged shapes — happens to be exactly what shows every effect off.
+function loadSample(){
+  const c = document.createElement('canvas'); c.width = 640; c.height = 480;
+  const x = c.getContext('2d'), W = c.width, H = c.height;
+  const g = x.createLinearGradient(0,0,W,H);      // sky-ish backdrop (gradients → banding)
+  g.addColorStop(0,'#1b2a4a'); g.addColorStop(1,'#c65b7c');
+  x.fillStyle = g; x.fillRect(0,0,W,H);
+  const bars = ['#fff','#ff0','#0ff','#0f0','#f0f','#f00','#00f'];   // colour bars strip
+  const bw = W/bars.length;
+  bars.forEach((col,i)=>{ x.fillStyle = col; x.fillRect(i*bw, 0, bw+1, 90); });
+  for (let i=0;i<4;i++){                            // concentric rings (curvature / ringing)
+    x.strokeStyle = `hsl(${i*60},80%,60%)`; x.lineWidth = 10;
+    x.beginPath(); x.arc(W*0.32, H*0.55, 40+i*34, 0, 7); x.stroke();
+  }
+  x.fillStyle = '#ffcf3a';                          // hard-edged shapes (slice / sort / blocking)
+  x.beginPath(); x.moveTo(W*0.68,H*0.3); x.lineTo(W*0.9,H*0.72); x.lineTo(W*0.5,H*0.72); x.closePath(); x.fill();
+  x.fillStyle = '#2ee6c0'; x.fillRect(W*0.6, H*0.34, 120, 120);
+  const ramp = x.createLinearGradient(0,0,W,0);     // luma ramp (banding / posterise)
+  ramp.addColorStop(0,'#000'); ramp.addColorStop(1,'#fff');
+  x.fillStyle = ramp; x.fillRect(0, H-56, W, 56);
+  x.fillStyle = '#fff'; x.font = 'bold 64px system-ui, sans-serif'; x.textBaseline='middle';
+  x.fillText('GLITCH', W*0.06, H*0.34);
+  commitImage(c, W, H);
 }
 
 // ---------- controls ----------
