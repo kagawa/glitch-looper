@@ -4,24 +4,36 @@ const cp = state.compress;
 if (cp.on){
   const amt = P('compress','amount');
   if (amt>0){
-    const B = cp.block|0, chb = cp.chroma;
+    const B = cp.block|0, chb = cp.chroma, ring = P('compress','ring');
     const qstep = 2 + amt*30;                       // luma quantisation → banding
     const im = ctx.getImageData(0,0,w,h), d = im.data;
     for (let by=0; by<h; by+=B){
       const ye=Math.min(by+B,h);
       for (let bx=0; bx<w; bx+=B){
         const xe=Math.min(bx+B,w);
-        let n=0,sY=0,sCb=0,sCr=0;                    // block means (DC term + chroma)
+        let n=0,sY=0,sY2=0,sCb=0,sCr=0;              // block means (DC term + chroma) + luma spread
         for (let y=by;y<ye;y++) for(let x=bx;x<xe;x++){
           const i=(y*w+x)*4, r=d[i],g=d[i+1],b=d[i+2], Y=0.299*r+0.587*g+0.114*b;
-          sY+=Y; sCb+=b-Y; sCr+=r-Y; n++;
+          sY+=Y; sY2+=Y*Y; sCb+=b-Y; sCr+=r-Y; n++;
         }
         const mY=sY/n, mCb=sCb/n, mCr=sCr/n;
+        // Ringing (mosquito noise): a coarsely quantised high-frequency coefficient spreads its
+        // error over the whole block, so blocks holding an edge ring while flat blocks stay clean.
+        // Standard deviation of luma stands in for how much high-frequency energy the block had.
+        let amp=0, ou=0, ov=0;
+        if (ring>0){
+          const sd = Math.sqrt(Math.max(0, sY2/n - mY*mY));
+          amp = ring * Math.min(1, sd/40) * 45;       // flat block → sd≈0 → no ring
+          const bseed = bx*0.317 + by*1.913;          // which basis got mangled, per block
+          ou = 2 + Math.floor(rand(bseed)*3); ov = 2 + Math.floor(rand(bseed+7.1)*3);
+        }
         for (let y=by;y<ye;y++) for(let x=bx;x<xe;x++){
           const i=(y*w+x)*4, r=d[i],g=d[i+1],b=d[i+2];
           let Y=0.299*r+0.587*g+0.114*b, Cb=b-Y, Cr=r-Y;
           Y += (mY-Y)*amt*0.7;                        // kill high-freq luma toward block mean
           Y = Math.round(Y/qstep)*qstep;              // quantise → banding
+          if (amp>0.5)                                // lay the mangled basis back over the block
+            Y += amp * Math.cos(Math.PI*ou*(x-bx+0.5)/B) * Math.cos(Math.PI*ov*(y-by+0.5)/B);
           Cb += (mCb-Cb)*chb; Cr += (mCr-Cr)*chb;     // chroma subsample toward block mean
           const R=Y+Cr, Bb=Y+Cb, G=(Y-0.299*R-0.114*Bb)/0.587;
           d[i]=R; d[i+1]=G; d[i+2]=Bb;

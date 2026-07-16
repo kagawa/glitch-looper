@@ -61,6 +61,7 @@ const FX = [
   { id:'compress', name:'Compression', hint:'heavy-JPEG look — blocky DCT · chroma bleed · banding', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.6, env:1 },
     { k:'chroma', label:'Chroma Bleed', min:0, max:1, step:.01, def:.5 },
+    { k:'ring',   label:'Ringing', min:0, max:1, step:.01, def:0, env:1 },
     { k:'block',  label:'Block', min:4, max:16, step:2, def:8 },
   ]},
   { id:'pixsort', name:'Pixel Sort', hint:'reorder runs of pixels by a chosen key (glitch-art staple)', on:false, open:false, params:[
