@@ -103,7 +103,7 @@ const RAND_PROB = { png:.12, jpeg:.15, warp:.18, halftone:.12, feedback:.12, mel
                     ghost:.14, dotcrawl:.1, hum:.12, herring:.08, sync:.14, zoom:0,
                     compress:.14, pixsort:.14, databend:.12, degauss:.06, gif:.12,
                     sonify:.12, byteshift:.12, bitplane:.1, bmpmisread:.14, webp:.1, gifg:.1,
-                    extrude:.12, time:.1, interlace:.1, stale:.1,   // these re-render the frame — keep them rare
+                    extrude:.12, time:.1, interlace:.1, stale:.1, synctear:.1,   // these re-render the frame — keep them rare
                     // colour-mapping / stylise effects: keep them occasional, emboss rarest
                     duotone:.14, solarize:.14, posterize:.14, emboss:.04 };
 // three strength levels: prob = on-probability scale, str = how far params stray from their default
@@ -136,8 +136,11 @@ function randomizeFX(){
     state[drop].on = false; onTone = onTone.filter(id=>id!==drop);
     droppableTone = droppableTone.filter(id=>id!==drop);
   }
-  // Envelope/Zoom/Mask render nothing on their own — guarantee a real visible effect is on
-  if (!FX.some(f=> !['motion','zoom','mask'].includes(f.id) && state[f.id].on)){
+  // Envelope/Zoom/Mask render nothing on their own — and the Video effects only rework what another
+  // effect already moved, so a roll of nothing-but-Video is a blank frame. Guarantee at least one
+  // effect that actually puts something on screen.
+  const PASSIVE = ['motion','zoom','mask','time','stale','synctear','interlace'];
+  if (!FX.some(f=> !PASSIVE.includes(f.id) && state[f.id].on)){
     const candidates = ['vhs','glitch','noise','color'].filter(id=>!state[id]._locked);
     if (candidates.length) state[candidates[Math.floor(Math.random()*candidates.length)]].on = true;
   }

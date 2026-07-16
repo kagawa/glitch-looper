@@ -15,6 +15,8 @@ const iacc = document.createElement('canvas');               // Interlace: the l
 const iax = iacc.getContext('2d');
 const bacc = document.createElement('canvas');               // Stale Blocks: the frame being assembled
 const bax = bacc.getContext('2d');
+const sacc = document.createElement('canvas');               // Sync Tear: the torn frame assembled
+const sax = sacc.getContext('2d');
 const mshape = document.createElement('canvas');             // region-mask alpha shape
 const msx = mshape.getContext('2d');
 const mclean = document.createElement('canvas');             // region-mask clean plate (base, pre-glitch)
@@ -189,11 +191,13 @@ function timeFrame(fi, NF, drop){
 function draw(phase){
   const NF = Math.round(LOOP_MS/1000*30);
   const tm = state.time, il = state.interlace, st = state.stale;
+  const sy0 = state.synctear;
   const timeOn  = tm.on && (tm.hold>1 || tm.drop>0 || tm.trail>0);
   const ilOn    = il.on && il.amount>0;
   const staleOn = st.on && st.amount>0;
+  const syncOn0 = sy0.on && sy0.amount>0;
   // nothing temporal is on → keep the raw, unquantised phase rather than snapping to the frame grid
-  if (!timeOn && !ilOn && !staleOn){ drawFrame(phase); return; }
+  if (!timeOn && !ilOn && !staleOn && !syncOn0){ drawFrame(phase); return; }
   // P() reads the ENV that drawFrame sets for the frame it is painting — the wrong one to ask here,
   // and for trails it belongs to a frame further back in time. Take the envelope for the moment
   // being shown instead. Clamped because motionMul peaks above 1: an unclamped Trails would weigh
@@ -258,16 +262,48 @@ function draw(phase){
     }
     ctx.clearRect(0,0,w,h); ctx.drawImage(bacc,0,0);
   };
-  if (!ilOn){ footage(fi); return; }
+  // ---- Sync Tear: the raster torn where the signal lost horizontal lock ----
+  // The frame breaks into a few horizontal bands, each grabbed at a slightly different moment and
+  // slid sideways — the picture doesn't just lag in places, it steps left or right at the tear,
+  // the way a broadcast looks when the sync is failing. Where the tears sit re-rolls on a schedule.
+  const sy = state.synctear;
+  const syncOn = sy.on && sy.amount>0;
+  const torn = (f)=>{
+    if (!syncOn){ footage(f); return; }
+    const amt = pv('synctear','amount',1);
+    const nT = Math.max(1, sy.tears|0), maxD = Math.max(0, sy.delay|0), maxS = sy.shift|0;
+    const pat = Math.floor((((f%NF)+NF)%NF) * Math.max(1,sy.rate|0) / NF);
+    // band boundaries down the frame, jittered per re-roll window; each band its own lag + shift
+    const ys=[0]; for (let i=1;i<nT;i++) ys.push(Math.round(h*i/nT + (rand(pat*5.3+i*1.7)-0.5)*(h/nT)*0.7));
+    ys.push(h); ys.sort((a,b)=>a-b);
+    const band=[];
+    for (let i=0;i<nT;i++){
+      const lag = Math.round(rand(pat*2.1+i*3.7)*maxD*amt);           // amt scales both, so amt 0 = clean
+      const sh  = Math.round((rand(pat*8.9+i*0.53)*2-1)*maxS*amt);
+      band.push({ y0:ys[i], y1:ys[i+1], lag, sh });
+    }
+    sacc.width=w; sacc.height=h; sax.clearRect(0,0,w,h);
+    for (const lag of [...new Set(band.map(b=>b.lag))]){              // render each distinct lag once
+      footage(f-lag);
+      for (const b of band){
+        const bh=b.y1-b.y0; if (b.lag!==lag || bh<=0) continue;
+        const shf=((b.sh%w)+w)%w;                                     // horizontal slide, wrapped
+        sax.drawImage(canvas, 0,b.y0,w-shf,bh, shf,b.y0,w-shf,bh);
+        if (shf>0) sax.drawImage(canvas, w-shf,b.y0,shf,bh, 0,b.y0,shf,bh);
+      }
+    }
+    ctx.clearRect(0,0,w,h); ctx.drawImage(sacc,0,0);
+  };
+  if (!ilOn){ torn(fi); return; }
   // ---- Interlace: the two fields were never scanned at the same instant ----
   // A field carries every other line and is grabbed a moment after the other, so anything that
   // moved between them lands in a different place on each — which is why the tell is teeth along
   // moving edges, and why a still part of the picture stays perfectly clean. Paint both moments
   // and weave them.
   const amt = pv('interlace','amount',1);
-  footage(fi - Math.max(1, il.delay|0));      // the field that lags
+  torn(fi - Math.max(1, il.delay|0));         // the field that lags
   iacc.width=w; iacc.height=h; iax.clearRect(0,0,w,h); iax.drawImage(canvas,0,0);
-  footage(fi);                                // the field that leads
+  torn(fi);                                   // the field that leads
   const th = Math.max(1, il.thick|0);
   const lagParity = (il.swap|0)===0 ? 1 : 0;
   ctx.globalAlpha = amt;

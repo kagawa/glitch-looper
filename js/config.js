@@ -286,6 +286,13 @@ const FX = [
     { k:'steps',  label:'Age Steps (a render each)', min:1, max:3, step:1, def:2 },
     { k:'rate',   label:'Re-roll Rate (per loop)', min:1, max:30, step:1, def:6 },
   ]},
+  { id:'synctear', name:'Sync Tear', hint:'horizontal hold failure — the picture steps sideways at the tear', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:1, env:1 },
+    { k:'tears',  label:'Tears', min:1, max:6, step:1, def:3 },
+    { k:'shift',  label:'Slip (px)', min:0, max:120, step:2, def:40 },
+    { k:'delay',  label:'Lag (frames)', min:0, max:12, step:1, def:3 },
+    { k:'rate',   label:'Re-tear Rate (per loop)', min:1, max:30, step:1, def:8 },
+  ]},
   { id:'interlace', name:'Interlace', hint:'two fields scanned a moment apart — combing on anything that moved', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:1, env:1 },
     { k:'delay',  label:'Field Delay (frames)', min:1, max:12, step:1, def:2 },
@@ -308,7 +315,7 @@ const FX_GROUPS = [
   ['Screen / Optics', ['crt','degauss','halftone','hud','bloom']],
   ['Distort',         ['warp','melt','extrude','feedback','pixelate']],
   ['Colour / Tone',   ['color','duotone','solarize','posterize','emboss']],
-  ['Video',           ['time','stale','interlace']],          // acts on the footage, not on any one frame
+  ['Video',           ['time','stale','synctear','interlace']],          // acts on the footage, not on any one frame
   ['Global',          ['zoom','mask','motion']],
 ];
 
