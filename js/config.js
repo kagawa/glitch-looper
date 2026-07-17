@@ -386,8 +386,8 @@ const FX_GROUPS = [
 const PRESETS = {
   // ---- Classic ----
   'VHS Tape':    { vhs:{on:1,aberration:8,scanline:.45,bleed:4,tracking:.4,wobble:7}, glitch:{on:0}, noise:{on:1,grain:.22,flicker:.15}, color:{on:1,saturate:1.1,contrast:1.05,hue:0,tint:.15,vignette:.4} },
-  '8mm Film':    { vhs:{on:1,aberration:0,scanline:0,bleed:0,tracking:0,wobble:1,wobmode:2}, glitch:{on:0}, noise:{on:1,grain:.14,flicker:.2}, color:{on:1,saturate:.8,contrast:1.1,hue:0,tint:.1,vignette:.5}, film:{on:1,dust:.6,scratch:.5,sepia:.6,burn:.4}, roll:{on:0}, mosh:{on:0} },
-  'Dreamy':      { vhs:{on:1,aberration:12,scanline:.1,bleed:8,tracking:.1,wobble:3}, glitch:{on:0}, noise:{on:1,grain:.08,flicker:.03}, color:{on:1,saturate:1.4,contrast:.95,hue:0,tint:-.3,vignette:.5} },
+  '8mm Film':    { vhs:{on:1,aberration:0,scanline:0,bleed:0,tracking:0,wobble:1,wobmode:2}, glitch:{on:0}, noise:{on:1,grain:.14,flicker:.2}, color:{on:1,saturate:.8,contrast:1.1,bright:1.08,hue:0,tint:.1,vignette:.5}, film:{on:1,dust:.6,scratch:.5,sepia:.6,burn:.4}, roll:{on:0}, mosh:{on:0}, leak:{on:1,amount:.4,tone:0,pos:4,size:.6,drift:.5} },
+  'Dreamy':      { vhs:{on:1,aberration:12,scanline:.1,bleed:8,tracking:.1,wobble:3}, glitch:{on:0}, noise:{on:1,grain:.08,flicker:.03}, color:{on:1,saturate:1.4,contrast:.95,bright:1.06,hue:0,tint:-.3,vignette:.5}, bloom:{on:1,amount:.4,size:14,glow:.6}, leak:{on:1,amount:.35,tone:3,pos:1,size:.6,drift:.4} },
   'CRT':         { vhs:{on:1,aberration:5,scanline:0,bleed:2,tracking:.1,wobble:1}, glitch:{on:0}, noise:{on:1,grain:.1,flicker:.08}, color:{on:1,saturate:1.2,contrast:1.1,hue:0,tint:.05,vignette:.35}, crt:{on:1,amount:.35,round:.5,corner:.5,frame:.08,mask:2,phosphor:.5,scan:.5,converge:.3,glow:.35}, sync:{on:1,hsync:0,flag:0.15,contact:0.12} },
   'Trinitron':   { vhs:{on:1,aberration:4,scanline:0,bleed:2,tracking:.05,wobble:1}, glitch:{on:0}, noise:{on:1,grain:.05,flicker:.04}, color:{on:1,saturate:1.25,contrast:1.12,hue:0,tint:.03,vignette:.3}, film:{on:0}, roll:{on:0}, mosh:{on:0}, crt:{on:1,amount:.22,round:.35,corner:.45,frame:.09,mask:1,phosphor:.6,scan:.45,converge:.2,glow:.4} },
   'Dead Channel':{ vhs:{on:1,aberration:7,scanline:0,bleed:2,tracking:.6,wobble:5}, glitch:{on:0}, noise:{on:1,grain:.3,flicker:.35}, color:{on:1,saturate:.85,contrast:1.2,hue:0,tint:-.05,vignette:.5}, film:{on:0}, roll:{on:0}, mosh:{on:0}, crt:{on:1,amount:.3,round:.4,corner:.55,frame:.1,mask:2,phosphor:.5,scan:.4,converge:.5,glow:.3}, sync:{on:1,hsync:0.35,flag:0.55,contact:0.7}, motion:{on:1,mode:4,depth:.6,rate:5} },
@@ -417,7 +417,7 @@ const PRESETS = {
   // ---- Vivid ----
   'Y2K':         { vhs:{on:1,aberration:14,scanline:0,bleed:4,tracking:.05,wobble:0}, noise:{on:1,grain:.1,flicker:.05}, color:{on:1,saturate:1.7,contrast:1.45,hue:0,tint:0,vignette:.2}, dotcrawl:{on:1,amount:.5,size:2,speed:6} },
   'Neon':        { vhs:{on:1,aberration:16,scanline:.3,bleed:4,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.1,flicker:.05}, color:{on:1,saturate:1.8,contrast:1.15,hue:60,tint:-.2,vignette:.5} },
-  'Vaporwave':   { vhs:{on:1,aberration:11,scanline:.18,bleed:5,tracking:.1,wobble:3}, glitch:{on:0}, noise:{on:1,grain:.07,flicker:.04}, color:{on:1,saturate:1.7,contrast:1.0,hue:-35,tint:-.15,vignette:.4}, film:{on:0}, roll:{on:0}, mosh:{on:0} },
+  'Vaporwave':   { vhs:{on:1,aberration:11,scanline:.18,bleed:5,tracking:.1,wobble:3}, glitch:{on:0}, noise:{on:1,grain:.07,flicker:.04}, color:{on:1,saturate:1.7,contrast:1.0,hue:-35,tint:-.15,vignette:.4}, film:{on:0}, roll:{on:0}, mosh:{on:0}, bloom:{on:1,amount:.4,size:12,glow:.5}, leak:{on:1,amount:.3,tone:4,pos:1,size:.6,drift:.4} },
   'LED Board':   { vhs:{on:0}, glitch:{on:0}, noise:{on:0}, color:{on:1,saturate:1.6,contrast:1.1,hue:0,tint:0,vignette:.25}, halftone:{on:1,cell:7,bg:0}, bloom:{on:1,amount:.5,size:6} },
   'Arcade':      { vhs:{on:1,aberration:3,scanline:.55,bleed:1,tracking:.05,wobble:0}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.06}, color:{on:1,saturate:1.6,contrast:1.15,hue:0,tint:0,vignette:.35}, pixelate:{on:1,size:4}, bloom:{on:1,amount:.4,size:5}, crt:{on:1,amount:.4,round:.55,corner:.55,frame:.1,mask:1,phosphor:.6,scan:.55,converge:.15,glow:.4} },
   // ---- Camera / Scene ----
@@ -434,12 +434,12 @@ const PRESETS = {
   'Peephole':    { vhs:{on:1,aberration:4,scanline:.3,bleed:2,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.18,flicker:.08}, color:{on:1,saturate:.9,contrast:1.1,hue:0,tint:.05,vignette:.2}, crt:{on:1,amount:.95,round:.6,corner:.9,frame:.15,mask:0,phosphor:0,scan:0,converge:0,glow:0} },
   'Trip':        { vhs:{on:1,aberration:8,scanline:.1,bleed:4,tracking:.1,wobble:3}, glitch:{on:0}, noise:{on:1,grain:.05,flicker:.04}, color:{on:1,saturate:1.7,contrast:1.05,hue:90,tint:0,vignette:.35}, warp:{on:1,amp:7,freq:7,speed:3}, bloom:{on:1,amount:.5,size:8}, motion:{on:1,mode:2,depth:.6,rate:3} },
   'Newsprint':   { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.1,flicker:.05}, color:{on:1,saturate:.9,contrast:1.2,hue:0,tint:.05,vignette:.3}, halftone:{on:1,cell:6,bg:1} },
-  'Dream Bloom': { vhs:{on:1,aberration:8,scanline:.1,bleed:6,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.03}, color:{on:1,saturate:1.3,contrast:.95,hue:0,tint:-.2,vignette:.4}, bloom:{on:1,amount:.6,size:10} },
-  'Heat Haze':   { vhs:{on:1,aberration:5,scanline:.1,bleed:3,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.07,flicker:.05}, color:{on:1,saturate:1.15,contrast:1.05,hue:15,tint:.25,vignette:.4}, warp:{on:1,amp:6,freq:4,speed:2} },
+  'Dream Bloom': { vhs:{on:1,aberration:8,scanline:.1,bleed:6,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.03}, color:{on:1,saturate:1.3,contrast:.95,bright:1.05,hue:0,tint:-.2,vignette:.4}, bloom:{on:1,amount:.6,size:10,glow:.55}, sparkle:{on:1,amount:.4,density:.25,size:.4,speed:1,shape:0,tone:1} },
+  'Heat Haze':   { vhs:{on:1,aberration:5,scanline:.1,bleed:3,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.07,flicker:.05}, color:{on:1,saturate:1.15,contrast:1.05,bright:1.05,hue:15,tint:.25,vignette:.4}, warp:{on:1,amp:6,freq:4,speed:2}, leak:{on:1,amount:.45,tone:0,pos:2,size:.6,drift:.6} },
   'Wormhole':    { vhs:{on:1,aberration:10,scanline:.15,bleed:4,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.03}, color:{on:1,saturate:1.5,contrast:1.05,hue:-60,tint:0,vignette:.5}, feedback:{on:1,amount:.6,zoom:.84,copies:6,flow:1,rotate:20,speed:0,pulse:.5} },
   'Sunwashed':   { vhs:{on:1,aberration:5,scanline:.08,bleed:3,tracking:.1,wobble:1}, noise:{on:1,grain:.06,flicker:.03}, color:{on:1,saturate:1.15,contrast:1.0,bright:1.28,hue:0,tint:.18,vignette:.12}, bloom:{on:1,amount:.5,size:12,glow:.6}, leak:{on:1,amount:.55,tone:1,pos:1,size:.6,drift:.4} },
   // ---- Art ----
-  'Cinematic':   { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.05,flicker:.02}, color:{on:1,saturate:1.0,contrast:1.1,hue:0,tint:0,vignette:.45}, bloom:{on:1,amount:.3,size:8}, duotone:{on:1,preset:0,amount:.7} },
+  'Cinematic':   { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.05,flicker:.02}, color:{on:1,saturate:1.0,contrast:1.1,hue:0,tint:0,vignette:.45}, bloom:{on:1,amount:.3,size:8,glow:.3}, duotone:{on:1,preset:0,amount:.7}, leak:{on:1,amount:.3,tone:0,pos:0,size:.7,drift:.3} },
   'Acid':        { vhs:{on:1,aberration:6,scanline:.1,bleed:2,tracking:.1,wobble:2}, glitch:{on:1,amount:.25,slices:16,shift:20,rgb:8}, noise:{on:1,grain:.06,flicker:.05}, color:{on:1,saturate:1.5,contrast:1.1,hue:40,tint:0,vignette:.3}, solarize:{on:1,threshold:.5,amount:.85} },
   'Risograph':   { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.12,flicker:.03}, color:{on:1,saturate:1.1,contrast:1.15,hue:0,tint:0,vignette:.35}, posterize:{on:1,levels:4,dither:.6}, duotone:{on:1,preset:1,amount:.55} },
   'Metal':       { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.04,flicker:.02}, color:{on:1,saturate:.8,contrast:1.3,hue:0,tint:0,vignette:.4}, emboss:{on:1,amount:.8,angle:135,mix:.4} },
@@ -456,13 +456,13 @@ const PRESETS = {
 // select layout (group label → preset names)
 const PRESET_GROUPS = [
   ['Classic', ['VHS Tape','8mm Film','Dreamy','CRT','Trinitron','Dead Channel','Broken TV','Backrooms']],
+  ['Hype',    ['Jackpot','Gold Rush','Fever','Prism Rush','Manga']],
   ['Glitch',  ['Digital Decay','Datamosh','Dead Stream','Frame Skip','Signal Tear','JPEG Databend','PNG Glitch','Databent','Pixel Flow','Roll Break']],
   ['Horror',  ['Cursed Tape','Haunted Film','Corruption','Red Room','Meltdown']],
   ['Vivid',   ['Y2K','Neon','Vaporwave','LED Board','Arcade']],
   ['Camera',  ['Security Cam','Camcorder','Broadcast','Analog TV','Interlaced','Bad Reception','Fisheye Cam','Retro Game','Underwater']],
   ['Lens/FX', ['Peephole','Trip','Newsprint','Dream Bloom','Heat Haze','Wormhole','Sunwashed','Degauss']],
   ['Art',     ['Cinematic','Acid','Risograph','Metal','Relief']],
-  ['Hype',    ['Jackpot','Gold Rush','Fever','Prism Rush','Manga']],
 ];
 
 // duotone palettes: [shadow rgb, highlight rgb]
