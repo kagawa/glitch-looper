@@ -44,7 +44,7 @@ const FX = [
     { k:'sepia',   label:'Sepia', min:0, max:1, step:.01, def:.5 },
     { k:'burn',    label:'Burn/Flicker', min:0, max:1, step:.01, def:.3, env:1 },
   ]},
-  { id:'mosh', name:'Datamosh (fake)', hint:'mimics gif-corruption look (not real data corruption)', on:false, open:false, params:[
+  { id:'mosh', name:'Datamosh', hint:'mimics gif-corruption look (not real data corruption)', on:false, open:false, params:[
     { k:'intensity', label:'Intensity',   min:0, max:1, step:.01, def:.5, env:1, envd:1 },
     { k:'blocks',    label:'Blocks', min:0, max:1, step:.01, def:.5 },
     { k:'bloom',     label:'Bloom (max repeat)', min:1, max:4, step:1, def:1 },
@@ -52,12 +52,12 @@ const FX = [
     { k:'chaos',     label:'Jitter', min:0, max:1, step:.01, def:.6 },
     { k:'rate',      label:'Change Rate', min:1, max:30, step:1, def:10 },
   ]},
-  { id:'jpeg', name:'JPEG databend', hint:'real byte corruption · DCT block melt', on:false, open:false, params:[
+  { id:'jpeg', name:'JPEG Databend', hint:'real byte corruption · DCT block melt', on:false, open:false, params:[
     { k:'amount',  label:'Corruption', min:0, max:1, step:.01, def:.3 },
     { k:'quality', label:'Quality (coarse)', min:.05, max:.95, step:.01, def:.35 },
     { k:'frames',  label:'Frames', min:1, max:16, step:1, def:6 },
   ]},
-  { id:'png', name:'PNG glitch', hint:'real · scanline-filter corruption (H/V/diagonal bleed + noise)', on:false, open:false, params:[
+  { id:'png', name:'PNG Glitch', hint:'real · scanline-filter corruption (H/V/diagonal bleed + noise)', on:false, open:false, params:[
     { k:'amount', label:'Bleed (filter)', min:0, max:1, step:.01, def:.3 },
     { k:'noise',  label:'Random Noise', min:0, max:1, step:.01, def:.2 },
     { k:'dir',    label:'Bleed Dir', type:'select', def:0,
@@ -83,7 +83,7 @@ const FX = [
     { k:'dir',    label:'Direction', type:'select', def:0, options:[[0,'Rows →'],[1,'Columns ↓'],[2,'Both']] },
     { k:'len',    label:'Max Length', min:0, max:1, step:.01, def:.6, show:s=> s.ivl!==4 },
   ]},
-  { id:'databend', name:'Databend Shift', hint:'raw-byte / stride error — diagonal shear + rainbow', on:false, open:false, params:[
+  { id:'databend', name:'Data Shear', hint:'raw-byte / stride error — diagonal shear + rainbow', on:false, open:false, params:[
     { k:'amount',   label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
     { k:'skew',     label:'Skew', min:0, max:1, step:.01, def:.4 },
     { k:'scramble', label:'Scramble', min:0, max:1, step:.01, def:.4 },
@@ -454,12 +454,11 @@ const PRESETS = {
   'Trinitron':   { vhs:{on:1,aberration:4,scanline:0,bleed:2,tracking:.05,wobble:1}, glitch:{on:0}, noise:{on:1,grain:.05,flicker:.04}, color:{on:1,saturate:1.25,contrast:1.12,hue:0,tint:.03,vignette:.3}, film:{on:0}, roll:{on:0}, mosh:{on:0}, crt:{on:1,amount:.22,round:.35,corner:.45,frame:.09,mask:1,phosphor:.6,scan:.45,converge:.2,glow:.4} },
   'Dead Channel':{ vhs:{on:1,aberration:7,scanline:0,bleed:2,tracking:.6,wobble:5}, glitch:{on:0}, noise:{on:1,grain:.3,flicker:.35}, color:{on:1,saturate:.85,contrast:1.2,hue:0,tint:-.05,vignette:.5}, film:{on:0}, roll:{on:0}, mosh:{on:0}, crt:{on:1,amount:.3,round:.4,corner:.55,frame:.1,mask:2,phosphor:.5,scan:.4,converge:.5,glow:.3}, sync:{on:1,hsync:0.35,flag:0.55,contact:0.7}, motion:{on:1,mode:4,depth:.6,rate:5} },
   'Pixel Flow':  { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.05,flicker:.03}, color:{on:1,saturate:1.25,contrast:1.08,hue:0,tint:0,vignette:.3}, film:{on:0}, roll:{on:0}, mosh:{on:0}, pixsort:{on:1,amount:.9,thresh:.45,dir:1,len:.8} },
-  'Databent':    { vhs:{on:1,aberration:5,scanline:0,bleed:2,tracking:.2,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.1,flicker:.06}, color:{on:1,saturate:1.1,contrast:1.1,hue:0,tint:0,vignette:.3}, film:{on:0}, roll:{on:0}, mosh:{on:0}, compress:{on:1,amount:.6,chroma:.6,ring:.5,block:8}, databend:{on:1,amount:.9,skew:.5,scramble:.5,speed:2} },
   'Degauss':     { vhs:{on:1,aberration:4,scanline:0,bleed:2,tracking:.1,wobble:1}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.05}, color:{on:1,saturate:1.2,contrast:1.1,hue:0,tint:.03,vignette:.35}, film:{on:0}, roll:{on:0}, mosh:{on:0}, degauss:{on:1,amount:.7,sway:.6,freq:4,color:.7,curve:1,rate:2}, crt:{on:1,amount:.3,round:.4,corner:.5,frame:.09,mask:1,phosphor:.5,scan:.4,converge:.25,glow:.35} },
   'Backrooms':   { vhs:{on:1,aberration:4,scanline:.28,bleed:2,tracking:.22,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.2,flicker:.14}, color:{on:1,saturate:.85,contrast:1.12,hue:12,tint:.4,vignette:.55}, film:{on:0}, roll:{on:0}, mosh:{on:0} },
   'Broken TV':   { vhs:{on:1,aberration:6,scanline:.45,bleed:2,tracking:.9,wobble:8}, glitch:{on:1,amount:.2,slices:18,shift:20,rgb:5}, noise:{on:1,grain:.35,flicker:.3}, color:{on:1,saturate:.7,contrast:1.15,hue:0,tint:0,vignette:.45}, roll:{on:1,hspeed:0,hstep:0,vspeed:.35,band:.6}, crt:{on:1,amount:.3,round:.45,corner:.5,frame:.07,mask:2,phosphor:.45,scan:.4,converge:.4,glow:.3}, sync:{on:1,hsync:0,flag:0.45,contact:0.5}, motion:{on:1,mode:4,depth:.6,rate:6} },
   // ---- Glitch ----
-  'Digital Decay':{ vhs:{on:1,aberration:4,scanline:.15,bleed:1,tracking:.2,wobble:2}, glitch:{on:1,amount:.45,slices:22,shift:30,rgb:10}, noise:{on:1,grain:.1,flicker:.05}, color:{on:0}, compress:{on:1,amount:.5,chroma:.5,ring:.6,block:8} },
+  'Digital Decay':{ vhs:{on:1,aberration:4,scanline:.15,bleed:1,tracking:.2,wobble:2}, glitch:{on:1,amount:.45,slices:22,shift:30,rgb:10}, noise:{on:1,grain:.1,flicker:.05}, color:{on:0}, compress:{on:1,amount:.5,chroma:.5,ring:.6,block:8}, databend:{on:1,amount:.6,skew:.5,scramble:.35,speed:2} },
   'Datamosh':    { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.08,flicker:0}, color:{on:1,saturate:1.3,contrast:1.1,hue:0,tint:0,vignette:.2}, roll:{on:0}, film:{on:0}, mosh:{on:1,intensity:.75,blocks:.65,bloom:3,sort:.55,chaos:.85,rate:12} },
   // a starved low-framerate stream: a slow Warp gives the temporal effects something to break, then
   // blocks freeze (Stale), the picture macroblocks (Compression), colour lags (Chroma) and it stutters (Time)
@@ -496,12 +495,11 @@ const PRESETS = {
   'Peephole':    { vhs:{on:1,aberration:4,scanline:.3,bleed:2,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.18,flicker:.08}, color:{on:1,saturate:.9,contrast:1.1,hue:0,tint:.05,vignette:.2}, crt:{on:1,amount:.95,round:.6,corner:.9,frame:.15,mask:0,phosphor:0,scan:0,converge:0,glow:0} },
   'Trip':        { vhs:{on:1,aberration:8,scanline:.1,bleed:4,tracking:.1,wobble:3}, glitch:{on:0}, noise:{on:1,grain:.05,flicker:.04}, color:{on:1,saturate:1.7,contrast:1.05,hue:90,tint:0,vignette:.35}, warp:{on:1,amp:7,freq:7,speed:3}, bloom:{on:1,amount:.5,size:8}, motion:{on:1,mode:2,depth:.6,rate:3} },
   'Newsprint':   { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.1,flicker:.05}, color:{on:1,saturate:.9,contrast:1.2,hue:0,tint:.05,vignette:.3}, halftone:{on:1,cell:6,bg:1} },
-  'Dream Bloom': { vhs:{on:1,aberration:8,scanline:.1,bleed:6,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.03}, color:{on:1,saturate:1.3,contrast:.95,bright:1.05,hue:0,tint:-.2,vignette:.4}, bloom:{on:1,amount:.6,size:10,glow:.55}, sparkle:{on:1,amount:.4,density:.25,size:.4,speed:1,shape:0,tone:1} },
   'Heat Haze':   { vhs:{on:1,aberration:5,scanline:.1,bleed:3,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.07,flicker:.05}, color:{on:1,saturate:1.15,contrast:1.05,bright:1.05,hue:15,tint:.25,vignette:.4}, warp:{on:1,amp:6,freq:4,speed:2}, leak:{on:1,amount:.45,tone:0,pos:2,size:.6,drift:.6} },
   'Wormhole':    { vhs:{on:1,aberration:10,scanline:.15,bleed:4,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.03}, color:{on:1,saturate:1.5,contrast:1.05,hue:-60,tint:0,vignette:.5}, feedback:{on:1,amount:.6,zoom:.84,copies:6,flow:1,rotate:20,speed:0,pulse:.5} },
   'Sunwashed':   { vhs:{on:1,aberration:5,scanline:.08,bleed:3,tracking:.1,wobble:1}, noise:{on:1,grain:.06,flicker:.03}, color:{on:1,saturate:1.15,contrast:1.0,bright:1.28,hue:0,tint:.18,vignette:.12}, bloom:{on:1,amount:.5,size:12,glow:.6}, leak:{on:1,amount:.55,tone:1,pos:1,size:.6,drift:.4} },
   // ---- Art ----
-  'Cinematic':   { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.05,flicker:.02}, color:{on:1,saturate:1.0,contrast:1.1,hue:0,tint:0,vignette:.45}, bloom:{on:1,amount:.3,size:8,glow:.3}, duotone:{on:1,preset:0,amount:.7}, leak:{on:1,amount:.3,tone:0,pos:0,size:.7,drift:.3} },
+  'Teal & Peach':{ vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.05,flicker:.02}, color:{on:1,saturate:1.0,contrast:1.1,hue:0,tint:0,vignette:.45}, bloom:{on:1,amount:.3,size:8,glow:.3}, duotone:{on:1,preset:0,amount:.7}, leak:{on:1,amount:.3,tone:0,pos:0,size:.7,drift:.3} },
   'Acid':        { vhs:{on:1,aberration:6,scanline:.1,bleed:2,tracking:.1,wobble:2}, glitch:{on:1,amount:.25,slices:16,shift:20,rgb:8}, noise:{on:1,grain:.06,flicker:.05}, color:{on:1,saturate:1.5,contrast:1.1,hue:40,tint:0,vignette:.3}, solarize:{on:1,threshold:.5,amount:.85} },
   'Risograph':   { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.12,flicker:.03}, color:{on:1,saturate:1.1,contrast:1.15,hue:0,tint:0,vignette:.35}, posterize:{on:1,levels:4,dither:.6}, duotone:{on:1,preset:1,amount:.55} },
   'Metal':       { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.04,flicker:.02}, color:{on:1,saturate:.8,contrast:1.3,hue:0,tint:0,vignette:.4}, emboss:{on:1,amount:.8,angle:135,mix:.4} },
@@ -526,15 +524,13 @@ const PRESETS = {
 };
 // select layout (group label → preset names)
 const PRESET_GROUPS = [
-  ['Classic', ['VHS Tape','8mm Film','Dreamy','CRT','Trinitron','Dead Channel','Broken TV','Backrooms']],
-  ['Hype',    ['Jackpot','Gold Rush','Fever','Prism Rush']],
-  ['Glitch',  ['Digital Decay','Datamosh','Dead Stream','Frame Skip','Signal Tear','JPEG Databend','PNG Glitch','Databent','Pixel Flow','Roll Break']],
-  ['Horror',  ['Cursed Tape','Haunted Film','Corruption','Red Room','Meltdown']],
-  ['Vivid',   ['Y2K','Neon','Vaporwave','LED Board','Arcade']],
-  ['Camera',  ['Security Cam','Camcorder','Broadcast','Analog TV','Interlaced','Bad Reception','Fisheye Cam','Retro Game','Underwater']],
-  ['Lens/FX', ['Peephole','Trip','Newsprint','Dream Bloom','Heat Haze','Wormhole','Sunwashed','Degauss']],
-  ['Art',     ['Cinematic','Acid','Risograph','Metal','Relief','Manga','Papercraft']],
-  ['Dream',   ['Pastel Dream','Angelcore','Kaleidoscope','Oil Slick','Fairy Dust','Hologram','Aqua Glass']],
+  ['Analog / Camera',      ['VHS Tape','8mm Film','CRT','Trinitron','Analog TV','Security Cam','Camcorder','Broadcast','Interlaced','Bad Reception','Broken TV','Dead Channel','Roll Break','Degauss']],
+  ['Digital Glitch',       ['Digital Decay','Datamosh','Dead Stream','Frame Skip','Signal Tear','JPEG Databend','PNG Glitch','Pixel Flow','Corruption']],
+  ['Horror',               ['Cursed Tape','Haunted Film','Red Room','Meltdown','Backrooms']],
+  ['Vivid / Hype',         ['Jackpot','Gold Rush','Fever','Prism Rush','Y2K','Neon','Vaporwave']],
+  ['Dream / Light',        ['Pastel Dream','Angelcore','Fairy Dust','Hologram','Oil Slick','Aqua Glass','Sunwashed','Teal & Peach','Dreamy']],
+  ['Psychedelic / Spatial',['Kaleidoscope','Trip','Wormhole','Heat Haze','Underwater','Peephole','Fisheye Cam','Acid']],
+  ['Print / Material',     ['Newsprint','Risograph','Manga','Papercraft','Metal','Relief','LED Board','Retro Game','Arcade']],
 ];
 
 // duotone palettes: [shadow rgb, highlight rgb]
