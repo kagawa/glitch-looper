@@ -199,7 +199,12 @@ function randomizeFX(){
     state[f.id].on = Math.random() < Math.min(0.95, (RAND_PROB[f.id] ?? 0.5) * lv.prob);
     f.params.forEach(p=>{
       if (p.type==='text') return;               // free text isn't randomised (HUD fills it from the layout below)
-      if (p.type==='select'){ state[f.id][p.k] = p.options[Math.floor(Math.random()*p.options.length)][0]; }
+      if (p.type==='select'){
+        if (f.id==='glitch' && p.k==='edge')     // Slice reads best as a clean hard cut — favour Hard heavily
+          state[f.id][p.k] = Math.random()<0.8 ? 0 : [3,1,2][Math.floor(Math.random()*3)];  // 80% Hard, else Round/Ramp/Overshoot
+        else
+          state[f.id][p.k] = p.options[Math.floor(Math.random()*p.options.length)][0];
+      }
       else {
         const rnd = p.min + Math.random()*(p.max-p.min);
         let val = p.def + (rnd - p.def)*lv.str;                 // blend toward default → gentler at low levels
