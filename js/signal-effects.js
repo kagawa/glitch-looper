@@ -15,15 +15,23 @@ if (dg.on){
     const amp = Math.max(0, envCurve(phase, dg.curve|0, dg.rate));
     const str = amt*amp;
     if (str>0.004){
-      const wob = phase*TAU*dg.freq;                  // shimmer / buzz (integer freq → repeats)
       const maxShift = str*(10 + 18*(0.4+0.6*dg.color));   // per-blob channel misconvergence (px)
       const sway = str*P('degauss','sway')*34;             // whole-picture ripple (px)
-      const a=TAU*2.5/w, b=TAU*1.9/h, cc=TAU*1.7/w, dd=TAU*2.7/h;
+      // Three ripples summed. A single sine reads as one clean grating; the sum beats into an organic
+      // wobble — but only if the spatial frequencies are NOT near-harmonic, or a common period
+      // survives and it still looks periodic. Space them by the golden ratio (irrational, so they
+      // never share a period) and give them near-equal weight so none dominates. The temporal drift
+      // stays integer per loop, so it repeats exactly once and stays seamless.
+      const P1=1.618, P2=2.618;                                 // golden-ratio frequency spacing
+      const f1=dg.freq, f2=dg.freq+3, f3=dg.freq+7;
+      const wA=phase*TAU*f1, wB=phase*TAU*f2, wC=phase*TAU*f3;
+      const gx=TAU*3.2/w, gy=TAU*3.7/h;                         // base spatial frequency (several ripples)
       const cX=x=>x<0?0:x>=w?w-1:x, cY=y=>y<0?0:y>=h?h-1:y;
       const src=ctx.getImageData(0,0,w,h), out=ctx.createImageData(w,h), sd=src.data, od=out.data;
       for (let y=0;y<h;y++){
         for (let x=0;x<w;x++){
-          const fx=Math.sin(x*a + y*b + wob), fy=Math.sin(x*cc - y*dd - wob*2);
+          const fx=0.4*Math.sin(x*gx     +y*gy     +wA) + 0.35*Math.sin(x*gx*P1*1.1 -y*gy*P1 +wB) + 0.25*Math.sin(x*gx*P2 +y*gy*P2*0.9 -wC);
+          const fy=0.4*Math.sin(x*gx*0.9 -y*gy*1.1 +wA) + 0.35*Math.sin(x*gx*P1 +y*gy*P1*1.1 -wB) + 0.25*Math.sin(x*gx*P2*1.1 -y*gy*P2 +wC);
           const di=(y*w+x)*4;
           const ox=fx*sway, oy=fy*sway;      // the ripple every channel rides
           const gX=cX((x+ox)|0), gY=cY((y+oy)|0);
