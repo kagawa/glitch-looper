@@ -163,15 +163,15 @@ function drawFrame(phase){    // phase in [0,1)
 
   const cr = applyCrtTube(w,h);
 
-  applyRegionMask(w,h,phase);
-
-  applyFinalZoom(w,h);
-
-  applyLightLeak(w,h,phase);
-
   applyBurst(w,h,phase);
 
   applySparkle(w,h,phase);
+
+  applyRegionMask(w,h,phase);      // confines everything above, Burst/Sparkle included
+
+  applyFinalZoom(w,h);
+
+  applyLightLeak(w,h,phase);       // a lens overlay — deliberately covers the whole frame, past the mask
 
   // ---- HUD / text overlay (drawn last so it stays crisp) ----
   if (state.hud.on) drawHUD(w,h,phase);
