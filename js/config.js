@@ -151,10 +151,15 @@ const FX = [
       options:[[0,'Even'],[1,'Right'],[2,'Left'],[3,'Bottom'],[4,'Top'],[5,'Bright areas'],[6,'Dark areas']] },
     { k:'cover', label:'Coverage', min:0, max:1, step:.01, def:.5, env:1, show:s=> s.fade!==0 },
   ]},
-  { id:'hud', name:'HUD / Text', hint:'REC ● · camcorder · TV / VCR on-screen text', on:false, open:false, params:[
-    { k:'layout',  label:'Layout', type:'select', def:3,
+  { id:'hud', name:'HUD / Text', hint:'5 text slots · tokens {date} {time} {ctr} {rec} {n}', on:false, open:false, params:[
+    { k:'layout',  label:'Preset', type:'select', def:3,
       options:[[0,'REC ●'],[1,'▶ PLAY'],[2,'Timestamp'],[3,'Camcorder'],[4,'Security Cam'],
                [5,'TV Channel'],[6,'VCR Play'],[7,'ON AIR']] },
+    { k:'tl', label:'Top-left',     type:'text', def:'{rec}REC',   ph:'{rec}REC' },
+    { k:'tr', label:'Top-right',    type:'text', def:'{time}{n}SP',ph:'{time}' },
+    { k:'c',  label:'Centre',       type:'text', def:'',           ph:'text' },
+    { k:'bl', label:'Bottom-left',  type:'text', def:'▶',          ph:'▶ PLAY' },
+    { k:'br', label:'Bottom-right', type:'text', def:'{date}',     ph:'{date} {time}' },
     { k:'color',   label:'Text Color', type:'select', def:0,
       options:[[0,'White'],[1,'Amber'],[2,'Green'],[3,'Red'],[4,'Cyan'],[5,'Black']] },
     { k:'size',    label:'Size', min:.5, max:2.5, step:.1, def:1 },

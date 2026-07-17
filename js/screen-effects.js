@@ -173,58 +173,43 @@ function drawHUD(w,h,phase){
   const time=`${p2(now.getHours())}:${p2(now.getMinutes())}:${p2(now.getSeconds())}`;
   const recOn = Math.floor(phase*6)%2===0;                 // ~3 blinks per loop
   const col=['#ffffff','#ffb000','#33ff66','#ff3b30','#33e0ff','#000000'][hd.color]||'#fff';
-  // VCR tape counter (advances with real time) — H:MM:SS
-  const cs=Math.floor(now.getTime()/1000)%36000;
+  const cs=Math.floor(now.getTime()/1000)%36000;           // VCR tape counter — H:MM:SS
   const ctr=`${Math.floor(cs/3600)}:${p2(Math.floor(cs/60)%60)}:${p2(cs%60)}`;
-  const setFont=s=>ctx.font=`${s}px ui-monospace, Menlo, monospace`;
+  const sub = s => String(s).replace(/\{date\}/g,date).replace(/\{time\}/g,time).replace(/\{ctr\}/g,ctr);
+  const lh=Math.round(base*1.28);
   ctx.save();
   ctx.globalAlpha=hd.opacity;
   ctx.font=`${base}px ui-monospace, Menlo, monospace`;
-  ctx.textBaseline='top'; ctx.textAlign='left';
+  ctx.textBaseline='top';
   ctx.shadowColor='rgba(0,0,0,.85)'; ctx.shadowBlur=3; ctx.shadowOffsetY=1;
-  const rec=(x,y)=>{ if(recOn){ ctx.fillStyle='#ff3b30'; ctx.beginPath(); ctx.arc(x+base*0.35,y+base*0.55,base*0.32,0,7); ctx.fill(); } ctx.fillStyle=col; ctx.fillText('REC', x+base, y); };
-  ctx.fillStyle=col;
-  switch(hd.layout){
-    case 0: rec(pad,pad); break;
-    case 1: ctx.fillText('▶ PLAY', pad, pad); break;
-    case 2: ctx.textAlign='right'; ctx.fillText(`${date}  ${time}`, w-pad, h-pad-base); break;
-    case 3:                                                 // Camcorder
-      rec(pad,pad);
-      ctx.textAlign='right';
-      ctx.fillText(time, w-pad, pad);
-      ctx.fillText('SP', w-pad, pad+base*1.25);
-      ctx.fillText(`${date}`, w-pad, h-pad-base);
-      ctx.textAlign='left'; ctx.fillText('▶', pad, h-pad-base);
-      break;
-    case 4:                                                 // Security cam
-      ctx.fillText('CAM 01', pad, pad);
-      rec(w-pad-base*3.2, pad);
-      ctx.textAlign='right'; ctx.fillText(`${date} ${time}`, w-pad, h-pad-base);
-      break;
-    case 5:{                                                 // TV Channel (OSD on channel change)
-      const big=Math.round(base*1.7);
-      setFont(big); ctx.fillText('CH 3', pad, pad);
-      setFont(base);
-      ctx.fillText('VIDEO 1', pad, pad+big+base*0.25);
-      ctx.textAlign='right';
-      ctx.fillText('STEREO', w-pad, pad);
-      ctx.fillText(time, w-pad, h-pad-base);
-      break;
+  // draw one line (which may contain {rec} dots) at anchor ax with the given horizontal alignment
+  const drawLine=(line, ax, ay, align)=>{
+    const segs = line.split(/(\{rec\})/).filter(s=>s!=='');
+    const parts = segs.map(s=> s==='{rec}' ? {dot:true, w:base*0.95} : {t:s, w:ctx.measureText(s).width});
+    const total = parts.reduce((a,p)=>a+p.w, 0);
+    let x = align==='right' ? ax-total : align==='center' ? ax-total/2 : ax;
+    for (const p of parts){
+      if (p.dot){ if(recOn){ ctx.fillStyle='#ff3b30'; ctx.beginPath(); ctx.arc(x+base*0.4,ay+base*0.52,base*0.32,0,7); ctx.fill(); } ctx.fillStyle=col; }
+      else { ctx.textAlign='left'; ctx.fillStyle=col; ctx.fillText(p.t, x, ay); }
+      x += p.w;
     }
-    case 6:                                                  // VCR Play
-      ctx.fillText('▶ PLAY', pad, pad);
-      ctx.fillText('SP', pad, pad+base*1.3);
-      ctx.textAlign='right';
-      ctx.fillText(ctr, w-pad, pad);
-      ctx.fillText('STEREO', w-pad, pad+base*1.3);
-      break;
-    case 7:                                                  // ON AIR / broadcast bug
-      if(recOn){ ctx.fillStyle='#ff3b30'; ctx.beginPath(); ctx.arc(pad+base*0.35,pad+base*0.55,base*0.32,0,7); ctx.fill(); }
-      ctx.fillStyle=col; ctx.fillText('ON AIR', pad+base, pad);
-      ctx.textAlign='right';
-      ctx.fillText(time, w-pad, pad);
-      ctx.fillText('CH 4', w-pad, h-pad-base);
-      break;
-  }
+  };
+  // a slot: token-substitute, split into lines on {n}, then stack from the anchor (top slots grow
+  // down, bottom slots grow up, centre grows around the middle) so multi-line text stays in frame
+  const slot=(raw, ax, ay, align, vert)=>{
+    if (!raw) return;
+    const lines = sub(raw).split('{n}');
+    for (let i=0;i<lines.length;i++){
+      const y = vert==='down' ? ay + i*lh
+              : vert==='up'   ? ay - (lines.length-1-i)*lh
+              :                 ay + (i - (lines.length-1)/2)*lh;   // centre
+      drawLine(lines[i], ax, y, align);
+    }
+  };
+  slot(hd.tl, pad,   pad,        'left',   'down');
+  slot(hd.tr, w-pad, pad,        'right',  'down');
+  slot(hd.c,  w/2,   h/2-base/2, 'center', 'mid');
+  slot(hd.bl, pad,   h-pad-base, 'left',   'up');
+  slot(hd.br, w-pad, h-pad-base, 'right',  'up');
   ctx.restore();
 }

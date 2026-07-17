@@ -198,6 +198,7 @@ function randomizeFX(){
     if (f.id==='motion'){ state.motion.on = true; return; }    // Envelope always on, but don't randomise its values
     state[f.id].on = Math.random() < Math.min(0.95, (RAND_PROB[f.id] ?? 0.5) * lv.prob);
     f.params.forEach(p=>{
+      if (p.type==='text') return;               // free text isn't randomised (HUD fills it from the layout below)
       if (p.type==='select'){ state[f.id][p.k] = p.options[Math.floor(Math.random()*p.options.length)][0]; }
       else {
         const rnd = p.min + Math.random()*(p.max-p.min);
@@ -208,6 +209,7 @@ function randomizeFX(){
     });
     state[f.id]._seq = null;                       // reset to always-on; patterns are handed out below,
   });                                              // once the final on-count is settled by the clamp
+  if (state.hud.on && !state.hud._locked) applyHudPreset(state.hud.layout|0);   // slots follow the rolled layout
   // keep the heavy colour-mapping effects from stacking into mush — cap how many run at once
   const TONE = ['duotone','solarize','posterize','emboss'];
   const toneCap = randLevelVal==='wild' ? 2 : 1;
@@ -247,13 +249,22 @@ function randomizeFX(){
     state[f.id].on = true; on.push(f);           // its params were already randomised in the pass above
   }
   // Sequencer patterns — now the on-count is final. A busy roll (many effects at once) reads as mush,
-  // so the more effects are on, the more likely each gets a pattern that spreads it across the loop.
+  // so spread some of them across the loop with per-step gating. Two dials, both keyed to the on-count:
+  //  · a gate deciding whether this roll gets any pattern at all — 5+ effects always, 4 half the time,
+  //    fewer than that only occasionally; when it fires at least one effect is guaranteed a pattern.
+  //  · a per-effect chance that climbs with the count, so busier rolls also get *more* effects sequenced.
   const seqable = FX.filter(f=> !state[f.id]._locked && state[f.id].on && !UNCOUNTED.includes(f.id));
-  const busyMul = 1 + Math.max(0, seqable.length - 3) * 0.35;   // 3 on → 1x, 6 → ~2x, 9 → ~3x
-  seqable.forEach(f=>{
-    const base = RAND_SEQ_HEAVY.has(f.id) ? lv.seqHeavy : lv.seq;
-    if (Math.random() < Math.min(0.9, base*busyMul)) state[f.id]._seq = randomSeqPattern();
-  });
+  const n = seqable.length;
+  const gate = n>=5 ? 1 : n===4 ? 0.5 : n===3 ? 0.22 : n===2 ? 0.1 : 0;
+  if (n && Math.random() < gate){
+    const busyMul = 1 + Math.max(0, n - 4) * 0.30;             // 4 on → 1x, 7 → ~1.9x, 10 → ~2.8x
+    let any = false;
+    seqable.forEach(f=>{
+      const base = RAND_SEQ_HEAVY.has(f.id) ? lv.seqHeavy : lv.seq;
+      if (Math.random() < Math.min(0.9, base*busyMul)){ state[f.id]._seq = randomSeqPattern(); any = true; }
+    });
+    if (!any){ const f = seqable[Math.floor(Math.random()*n)]; state[f.id]._seq = randomSeqPattern(); }  // guarantee ≥1
+  }
   // (Zoom is left untouched above; the wobble's own zoom is handled by the base overscan that
   //  hides its wrap seam — no separate Zoom-effect coupling.)
   syncUI();

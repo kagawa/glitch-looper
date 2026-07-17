@@ -113,6 +113,12 @@ canvas {
 .seqcell.on { background: var(--accent2); border-color: var(--accent2); }
 .seqcell.now { box-shadow: 0 0 0 2px var(--accent) inset; }   /* current step, highlighted while playing */
 .seqnote, .seqempty { padding: 0 12px 10px; font-size: 11px; color: var(--muted); }
+
+/* ---- HUD text-slot inputs ---- */
+.rowtext .fxtext { flex: 1; min-width: 0; font: 12px ui-monospace, Menlo, monospace;
+  background: var(--panel2); color: var(--fg); border: 1px solid var(--line);
+  border-radius: 4px; padding: 3px 6px; }
+.rowtext .fxtext:focus { outline: none; border-color: var(--accent); }
 .grp .body { padding: 4px 12px 12px; display: none; }
 .grp.open .body { display: block; }
 .grp .caret { color: var(--muted); font-size: 10px; }

@@ -62,6 +62,12 @@ function buildUI(){
                </select>
                <span class="val"></span>
              </label>`
+          : p.type==='text'
+          ? `<label class="row rowtext" data-fx="${f.id}" data-param="${p.k}">
+               <span class="k">${p.label}</span>
+               <input type="text" class="fxtext" data-fx="${f.id}" data-k="${p.k}"
+                      value="${String(state[f.id][p.k]).replace(/"/g,'&quot;')}" placeholder="${p.ph||''}">
+             </label>`
           : `<label class="row${p.env?' hasenv':''}" data-fx="${f.id}" data-param="${p.k}">
                <span class="k">${p.label}</span>
                <input type="range" min="${p.min}" max="${p.max}" step="${p.step}"
@@ -122,11 +128,15 @@ function buildUI(){
     toggleSeqCell(cell.dataset.fx, +cell.dataset.i);
     cell.classList.toggle('on');
   });
+  controls.querySelectorAll('.fxtext').forEach(t=>{
+    t.addEventListener('input', ()=>{ state[t.dataset.fx][t.dataset.k] = t.value; });
+  });
   controls.querySelectorAll('.fxsel').forEach(s=>{
     s.addEventListener('change', ()=>{
       state[s.dataset.fx][s.dataset.k] = parseInt(s.value, 10);
       if (s.dataset.fx==='png') schedulePng();
       if (s.dataset.fx==='mask' && s.dataset.k==='source') state.mask.mode=(state.mask.source|0)===6?1:0;
+      if (s.dataset.fx==='hud' && s.dataset.k==='layout'){ applyHudPreset(state.hud.layout|0); syncUI(); }
       updateRows();          // any select can gate rows, not just the mask's
     });
   });
@@ -182,6 +192,22 @@ function buildSeqGrid(){
   });
   updateSeqCount();
 }
+// HUD layout presets, expressed in the 5-slot / token format (tl tr c bl br). Tokens: {rec} blinking
+// red dot, {date} {time} {ctr} tape counter, {n} newline. Picking a Preset fills the five text slots.
+const HUD_PRESETS = {
+  0:{tl:'{rec}REC',        tr:'',              c:'', bl:'',  br:''},
+  1:{tl:'▶ PLAY',          tr:'',              c:'', bl:'',  br:''},
+  2:{tl:'',                tr:'',              c:'', bl:'',  br:'{date}  {time}'},
+  3:{tl:'{rec}REC',        tr:'{time}{n}SP',   c:'', bl:'▶', br:'{date}'},
+  4:{tl:'CAM 01',          tr:'{rec}',         c:'', bl:'',  br:'{date} {time}'},
+  5:{tl:'CH 3{n}VIDEO 1',  tr:'STEREO',        c:'', bl:'',  br:'{time}'},
+  6:{tl:'▶ PLAY{n}SP',     tr:'{ctr}{n}STEREO',c:'', bl:'',  br:''},
+  7:{tl:'{rec}ON AIR',     tr:'{time}',        c:'', bl:'',  br:'CH 4'},
+};
+function applyHudPreset(n){
+  const p = HUD_PRESETS[n]; if (!p) return;
+  for (const k of ['tl','tr','c','bl','br']) state.hud[k] = p[k];
+}
 function updateSeqCount(){
   const el = document.getElementById('seqcount'); if (!el) return;
   const n = FX.filter(f=> state[f.id]._seq).length;   // effects with a non-trivial pattern
@@ -221,6 +247,7 @@ function applyPreset(name){
       if (par.env) state[f.id][par.k+'_env'] = !!par.envd;
     });
   });
+  if (state.hud.on) applyHudPreset(state.hud.layout|0);   // fill the text slots to match the preset's layout
   syncUI();
 }
 function syncUI(){
@@ -231,6 +258,7 @@ function syncUI(){
     document.getElementById(`v-${r.dataset.fx}-${r.dataset.k}`).textContent = r.value;
   });
   controls.querySelectorAll('.fxsel').forEach(s=> s.value = state[s.dataset.fx][s.dataset.k]);
+  controls.querySelectorAll('.fxtext').forEach(t=> t.value = state[t.dataset.fx][t.dataset.k]);
   controls.querySelectorAll('.envchk').forEach(c=> c.checked = !!state[c.dataset.fx][c.dataset.k+'_env']);
   controls.querySelectorAll('.fxlock').forEach(button=>{
     const locked = !!state[button.dataset.fx]._locked;
