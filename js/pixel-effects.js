@@ -170,7 +170,9 @@ if (gd.on && gd.amount>0){
   const a = P('gold','amount'), shine = gd.shine, tone = gd.tone|0;
   // ramp: shadow → body → bright → specular
   const RAMPS = { 0:[[40,20,0],[150,95,10],[240,190,60],[255,244,200]],      // Gold
-                  1:[[24,27,33],[120,128,140],[205,212,222],[255,255,255]] };// Silver / chrome
+                  1:[[24,27,33],[120,128,140],[205,212,222],[255,255,255]],  // Silver / chrome
+                  3:[[40,14,14],[168,90,88],[240,168,158],[255,236,226]],    // Rose
+                  4:[[30,14,4],[128,68,28],[210,130,66],[255,222,180]] };    // Bronze / copper
   const ramp = RAMPS[tone] || RAMPS[0];
   const lerp3=(c0,c1,t)=>[c0[0]+(c1[0]-c0[0])*t, c0[1]+(c1[1]-c0[1])*t, c0[2]+(c1[2]-c0[2])*t];
   const map=(lum)=> tone===2 ? hsv(40+lum*90, 0.85, 0.2+lum*0.8)            // Rainbow-gold: hue swings with luma

@@ -127,20 +127,22 @@ if (state.zoom.on){
 }
 }
 
+// shared flat-colour palette for Sparkle / Burst (index 2 = Rainbow, handled per-element via hsv())
+const HYPE_TONE = [[255,222,120],[255,255,255],null,[150,225,255],[255,150,220],[130,255,180],[200,150,255],[24,24,34]];
+
 function applySparkle(w,h,phase){
 // ---- Sparkle: seeded twinkling glints, screened on top — each twinkles an integer number of times
 //      over the loop so it lands back where it started (seamless), positions fixed by the seed ----
 const sp = state.sparkle;
 if (sp.on && sp.amount>0){
   const a=P('sparkle','amount'), N=Math.round(8+sp.density*90), base=2+sp.size*11, tone=sp.tone|0, spd=sp.speed|0||1;
-  const TONE=[[255,238,175],[255,255,255]];                    // gold / white (2 = rainbow, per-sparkle hue)
   ctx.save(); ctx.globalCompositeOperation='screen';
   for (let i=0;i<N;i++){
     const freq=(1+(rand(i*3.3)*3|0))*spd, ph=rand(i*5.7+.2);   // integer twinkles/loop → seamless
     const tw=Math.sin((phase*freq+ph)*Math.PI*2); if (tw<=0.05) continue;
     const pop=tw*tw;                                            // sharpen the flash
     const x=rand(i*12.9+1)*w, y=rand(i*78.2+3)*h, s=base*(0.5+rand(i*9.1)*0.9);
-    const col= tone===2 ? hsv(rand(i*2.1)*360,0.55,1) : (TONE[tone]||TONE[0]);
+    const col= tone===2 ? hsv(rand(i*2.1)*360,0.55,1) : (HYPE_TONE[tone]||HYPE_TONE[0]);
     drawGlint(x,y, s*pop, col, a*pop);
   }
   ctx.restore();
@@ -165,12 +167,11 @@ const bs = state.burst;
 if (bs.on && bs.amount>0){
   const a=P('burst','amount'), cx=w/2, cy=h/2, R=Math.hypot(w,h)/2*1.1;
   const N=Math.round(12+bs.lines*44), spin=(bs.spin|0)*phase*Math.PI*2, tone=bs.tone|0;
-  const TONE=[[255,214,88],[255,255,255]];
   sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h);
   sctx.save(); sctx.translate(cx,cy); sctx.rotate(spin);
   for (let i=0;i<N;i++){
     const t=i/N, ang=t*Math.PI*2, half=(Math.PI/N)*(0.25+rand(i*7.3)*0.75);   // jittered wedge width
-    const col= tone===2 ? hsv(t*360,0.9,1) : (TONE[tone]||TONE[0]);
+    const col= tone===2 ? hsv(t*360,0.9,1) : (HYPE_TONE[tone]||HYPE_TONE[0]);
     sctx.fillStyle=`rgb(${col[0]},${col[1]},${col[2]})`;
     sctx.beginPath(); sctx.moveTo(0,0);
     sctx.lineTo(Math.cos(ang-half)*R, Math.sin(ang-half)*R);
@@ -186,7 +187,7 @@ if (bs.on && bs.amount>0){
   if (s0>0.001) rg.addColorStop(s0,'rgba(0,0,0,0)');
   rg.addColorStop(s1,'rgba(0,0,0,.85)'); rg.addColorStop(1,'rgba(0,0,0,1)');
   sctx.globalCompositeOperation='destination-in'; sctx.fillStyle=rg; sctx.fillRect(0,0,w,h); sctx.globalCompositeOperation='source-over';
-  const BLEND=['screen','lighter','overlay','source-over'];
+  const BLEND=['screen','lighter','overlay','source-over','multiply'];
   const pulse=0.8+0.2*Math.sin(phase*Math.PI*2);
   ctx.save(); ctx.globalCompositeOperation=BLEND[bs.blend|0]||'screen'; ctx.globalAlpha=a*pulse; ctx.drawImage(sc,0,0); ctx.restore();
 }
