@@ -1,3 +1,15 @@
+// Roll speed curve over the loop. The monotonic modes reach exactly 1 at phase 1, so the total
+// travel matches the old linear roll and the loop closes the same way. Pendulum returns to 0 at
+// both ends (a sway there and back), so it always closes regardless of speed.
+function rollEase(p, mode){
+  switch (mode|0){
+    case 1: return p*p;                          // ease in — start slow, accelerate
+    case 2: return 1-(1-p)*(1-p);                // ease out — start fast, settle
+    case 3: return p*p*p*(p*(p*6-15)+10);        // ease in-out — slow, fast, slow (smootherstep)
+    case 4: return Math.sin(p*Math.PI*2);        // pendulum — sway one way then back (loops at any speed)
+    default: return p;                            // linear — constant speed (unchanged)
+  }
+}
 function drawBaseFrame(w,h,phase,t,c,v,rl,fm,fseed){
 // ---- base image into scratch canvas, with color/sepia filter ----
 let fp = [];
@@ -44,10 +56,11 @@ if (v.on && v.wobble>0){
 // ---- roll: wrap-around scroll (slides off one edge, back in the other) ----
 let rollX = 0, rollY = 0;
 if (rl.on){
-  let hx = phase * rl.hspeed;
+  const e = rollEase(phase, rl.ease|0);          // shared speed curve for H and V
+  let hx = e * rl.hspeed;
   if (rl.hstep>0){ const q = Math.max(1, Math.round(24*(1-rl.hstep))); hx = Math.round(hx*q)/q; }
   rollX = hx * w;
-  rollY = phase * rl.vspeed * h;
+  rollY = e * rl.vspeed * h;
 }
 
 // ---- overscan: zoom in just enough to cover the wobble jitter, so the

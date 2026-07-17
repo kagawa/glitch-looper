@@ -30,9 +30,11 @@ const FX = [
     { k:'vignette', label:'Vignette', min:0, max:1, step:.01, def:.3 },
   ]},
   { id:'roll', name:'Roll', hint:'scroll / vertical roll (wraps around)', on:false, open:false, params:[
-    { k:'hspeed', label:'H-Scroll', min:-2, max:2, step:.05, def:.3 },
+    { k:'hspeed', label:'H-Scroll', min:-8, max:8, step:.05, def:.3 },
     { k:'hstep',  label:'Step', min:0, max:1, step:.01, def:0 },
-    { k:'vspeed', label:'V-Roll', min:-2, max:2, step:.05, def:0 },
+    { k:'vspeed', label:'V-Roll', min:-8, max:8, step:.05, def:0 },
+    { k:'ease',   label:'Speed Curve', type:'select', def:0,
+      options:[[0,'Linear'],[1,'Ease In'],[2,'Ease Out'],[3,'Ease In-Out'],[4,'Pendulum']] },
     { k:'band',   label:'Roll Band', min:0, max:1, step:.01, def:.4 },
   ]},
   { id:'film', name:'Film 8mm', hint:'old film · dust · scratches · burn (shake = VHS Wobble)', on:false, open:false, params:[
