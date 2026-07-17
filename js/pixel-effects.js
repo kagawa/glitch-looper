@@ -241,13 +241,24 @@ if (st.on && st.amount>0){
   const amt=P('starf','amount'), thr=st.thresh, len=P('starf','length')*Math.max(w,h)*0.3;
   if (len<1) return;
   const RAYS=[4,6,8,2][st.rays|0]||4, base=(st.angle|0)*Math.PI/180;
-  // bright pass: crush everything below the threshold so screen only spreads the highlights (black = no-op)
+  // local-highlight pass: keep each pixel by how much brighter it is than its blurred surroundings,
+  // tinted by its OWN colour. A uniform (even white) area has no local excess → nothing streaks; only
+  // genuine local highlights of any hue do. Black elsewhere = a no-op under the screen blend below.
+  const R=Math.max(2, Math.min(w,h)*0.05), gain=3+(1-thr)*6;
   sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h);
-  sctx.filter=`brightness(${(1-thr*0.55).toFixed(3)}) contrast(${(1.6+thr*3.5).toFixed(3)})`;
-  sctx.drawImage(canvas,0,0); sctx.filter='none';
+  sctx.filter=`blur(${R}px)`; sctx.drawImage(canvas,0,0); sctx.filter='none';
+  const bl=sctx.getImageData(0,0,w,h).data, og=ctx.getImageData(0,0,w,h).data;
+  const bp=sctx.createImageData(w,h), b=bp.data;
+  for (let i=0;i<og.length;i+=4){
+    const lo=(og[i]*0.299+og[i+1]*0.587+og[i+2]*0.114)/255;
+    const lb=(bl[i]*0.299+bl[i+1]*0.587+bl[i+2]*0.114)/255;
+    const g=Math.min(1, Math.max(0, lo-lb-thr*0.12)*gain);
+    b[i]=og[i]*g; b[i+1]=og[i+1]*g; b[i+2]=og[i+2]*g; b[i+3]=255;
+  }
+  sctx.putImageData(bp,0,0);
   const K=10;
   ctx.save(); ctx.globalCompositeOperation='screen';
-  const dirs = st.rays===3 ? [0,Math.PI] : Array.from({length:RAYS},(_,d)=>base+d*(Math.PI*2/RAYS));
+  const dirs = st.rays===3 ? [base,base+Math.PI] : Array.from({length:RAYS},(_,d)=>base+d*(Math.PI*2/RAYS));
   for (const a of dirs){
     const ux=Math.cos(a), uy=Math.sin(a);
     for (let k=1;k<=K;k++){ const t=k/K; ctx.globalAlpha=amt*(1-t)*0.5; ctx.drawImage(sc, ux*len*t, uy*len*t); }

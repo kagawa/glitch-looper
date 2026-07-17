@@ -170,20 +170,26 @@ function applyKaleido(w,h,phase){
 //      the spin be slow (one sector per loop) and still meet itself at the seam. Only one source wedge
 //      is ever sampled (chosen by Source Angle), so the sample content never rotates.
 const kd = state.kaleido;
-if (kd.on){
+if (kd.on && (kd.amount==null || kd.amount>0)){
+  const amt = kd.amount==null?1:P('kaleido','amount');
   const seg=Math.max(3,kd.seg|0), sector=Math.PI*2/seg, half=sector/2;
   const cx=w*kd.cx, cy=h*kd.cy, off=(kd.angle|0)*Math.PI/180;
+  const scale=1+(kd.zoom||0)*2.5;                            // >1 pulls a wider, scaled-down area into each wedge
   const rot=(kd.spin|0)*sector*phase;                        // whole sectors/loop → seamless
   const src=ctx.getImageData(0,0,w,h), s=src.data;
   const out=ctx.createImageData(w,h), o=out.data;
   for (let y=0;y<h;y++) for (let x=0;x<w;x++){
-    const dx=x-cx, dy=y-cy, r=Math.sqrt(dx*dx+dy*dy);
+    const oi=(y*w+x)*4;
+    const dx=x-cx, dy=y-cy, r=Math.sqrt(dx*dx+dy*dy)*scale;
     let a=(Math.atan2(dy,dx)-rot)%sector; if (a<0) a+=sector; if (a>half) a=sector-a;   // fold into a mirror wedge
     a+=off;
     let sx=(cx+r*Math.cos(a))|0, sy=(cy+r*Math.sin(a))|0;
     sx = sx<0?0:sx>=w?w-1:sx; sy = sy<0?0:sy>=h?h-1:sy;
-    const si=(sy*w+sx)*4, oi=(y*w+x)*4;
-    o[oi]=s[si]; o[oi+1]=s[si+1]; o[oi+2]=s[si+2]; o[oi+3]=255;
+    const si=(sy*w+sx)*4;
+    o[oi]  = s[oi]  +(s[si]  -s[oi])  *amt;                  // blend the kaleidoscope over the original by Amount
+    o[oi+1]= s[oi+1]+(s[si+1]-s[oi+1])*amt;
+    o[oi+2]= s[oi+2]+(s[si+2]-s[oi+2])*amt;
+    o[oi+3]= 255;
   }
   ctx.putImageData(out,0,0);
 }
