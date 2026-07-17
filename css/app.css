@@ -49,7 +49,9 @@ header h1 em { font-style: normal; color: var(--accent2); margin-left: 2px; }
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  min-height: 300px;
+  min-height: 0;               /* height follows the content — the drop zone carries its own min-height,
+                                  and once an image loads the stage hugs the canvas (no gap under a
+                                  short 16:9 frame, which was the case on narrow/phone widths) */
   position: sticky;            /* keep the image visible while scrolling the controls */
   top: 62px;
   align-self: start;

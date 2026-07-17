@@ -209,7 +209,9 @@ function randomizeFX(){
     });
     state[f.id]._seq = null;                       // reset to always-on; patterns are handed out below,
   });                                              // once the final on-count is settled by the clamp
-  if (state.hud.on && !state.hud._locked) applyHudPreset(state.hud.layout|0);   // slots follow the rolled layout
+  if (!state.hud._locked) applyHudPreset(state.hud.layout|0);   // slots follow the rolled layout, even
+                                                               // when HUD is off, so the Preset picker and
+                                                               // the text fields never disagree
   // keep the heavy colour-mapping effects from stacking into mush — cap how many run at once
   const TONE = ['duotone','solarize','posterize','emboss'];
   const toneCap = randLevelVal==='wild' ? 2 : 1;

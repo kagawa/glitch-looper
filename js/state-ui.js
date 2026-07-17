@@ -247,7 +247,7 @@ function applyPreset(name){
       if (par.env) state[f.id][par.k+'_env'] = !!par.envd;
     });
   });
-  if (state.hud.on) applyHudPreset(state.hud.layout|0);   // fill the text slots to match the preset's layout
+  applyHudPreset(state.hud.layout|0);   // fill the text slots to match the preset's layout (on or off)
   syncUI();
 }
 function syncUI(){
