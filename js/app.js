@@ -19,10 +19,21 @@ function frame(now){
 requestAnimationFrame(frame);
 
 buildUI();
-// restore from a shared link if present, otherwise open with a gentle random look
+// restore from a shared link if present, otherwise open with either a random roll or a random preset
 const sm = location.hash.match(/[#&]s=([^&]+)/);
 const fromLink = sm && applyState(sm[1]);
-if (!fromLink) randomizeFX();
+let openedWith = '🎲 Random';
+if (!fromLink){
+  if (Math.random() < 0.5){
+    randomizeFX();
+  } else {                                          // 50%: open on a random preset instead
+    const names = Object.keys(PRESETS).filter(n => n !== 'Clean');
+    const pick = names[Math.floor(Math.random()*names.length)];
+    applyPreset(pick);
+    if (presetSel) presetSel.value = pick;
+    openedWith = 'Preset · ' + pick;
+  }
+}
 loadSample();                 // give the effects something to render; the status says how to swap it
 setStatus(fromLink ? 'Loaded from link 🎛️ · tap the image to use your own'
-                   : 'Sample image · tap it to load your own · 🎲 Random');
+                   : openedWith + ' · tap the image to load your own');
