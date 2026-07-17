@@ -69,6 +69,14 @@ function drawWrap(src, ox, oy, w, h){
 // Nothing outside should call this directly; call draw() below.
 function drawFrame(phase){    // phase in [0,1)
   if (!img) return;
+  // Sequencer gate: an effect with a step pattern is skipped where its cell for this phase is off.
+  // Done by flipping .on off for the gated effects (every apply already checks .on) and restoring
+  // at the very end — cheaper than threading a check through 40 apply functions, and safe because
+  // drawFrame runs straight through with no early return past here.
+  const seqStep = Math.floor(phase * SEQ_STEPS) % SEQ_STEPS;
+  let seqGated = null;
+  for (const f of FX){ const s = state[f.id]._seq;
+    if (s && state[f.id].on && !s[seqStep]){ state[f.id].on = false; (seqGated ||= []).push(f.id); } }
   const w = canvas.width, h = canvas.height;
   const t = phase * Math.PI * 2;
 
@@ -159,6 +167,8 @@ function drawFrame(phase){    // phase in [0,1)
   if (state.hud.on) drawHUD(w,h,phase);
 
   applyCrtBezel(w,h,cr);
+
+  if (seqGated) for (const id of seqGated) state[id].on = true;   // restore what the sequencer gated
 }
 
 // ---- Time: the one stage that works on the footage rather than on a frame ----

@@ -103,6 +103,16 @@ canvas {
 .fxlock { border: 0; background: none; padding: 2px 4px; opacity: .45; font-size: 12px; }
 .fxlock:hover, .fxlock.active { border: 0; opacity: 1; color: var(--accent2); }
 .grp > .head .name small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+
+/* ---- Sequencer step grid ---- */
+.seqgrid { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; }
+.seqrow { display: flex; align-items: center; gap: 8px; }
+.seqname { flex: 0 0 92px; font-size: 12px; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seqcells { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; flex: 1; }
+.seqcell { height: 20px; border: 1px solid var(--line); border-radius: 3px; background: var(--panel2); cursor: pointer; padding: 0; }
+.seqcell.on { background: var(--accent2); border-color: var(--accent2); }
+.seqcell.now { box-shadow: 0 0 0 2px var(--accent) inset; }   /* current step, highlighted while playing */
+.seqnote, .seqempty { padding: 0 12px 10px; font-size: 11px; color: var(--muted); }
 .grp .body { padding: 4px 12px 12px; display: none; }
 .grp.open .body { display: block; }
 .grp .caret { color: var(--muted); font-size: 10px; }

@@ -1,9 +1,10 @@
 // ---------- state ----------
 const state = {};
-FX.forEach(f => { state[f.id] = { on:f.on, _locked:false };
+FX.forEach(f => { state[f.id] = { on:f.on, _locked:false, _seq:null };   // _seq: per-step on/off, null = always
   f.params.forEach(p => { state[f.id][p.k] = p.def; if (p.env) state[f.id][p.k+'_env'] = !!p.envd; }); });
 
 const LOOP_MS = 3000;   // 1 loop period
+const SEQ_STEPS = 8;    // the loop is split into this many on/off steps for the Sequencer
 let img = null, playing = true, startT = performance.now();
 
 // real JPEG databend: pool of genuinely-corrupted decoded frames, cycled for animation
@@ -112,7 +113,14 @@ function buildUI(){
       if (c.dataset.fx==='webp' && c.checked) scheduleWebp();
       if (c.dataset.fx==='gifg' && c.checked) scheduleGifg();
       updateCatCounts();
+      if (document.querySelector('.seqcat.open')) buildSeqGrid();   // rows follow which effects are on
     });
+  });
+  // sequencer cells are added dynamically, so delegate the click from the grid
+  controls.addEventListener('click', e=>{
+    const cell = e.target.closest('.seqcell'); if (!cell) return;
+    toggleSeqCell(cell.dataset.fx, +cell.dataset.i);
+    cell.classList.toggle('on');
   });
   controls.querySelectorAll('.fxsel').forEach(s=>{
     s.addEventListener('change', ()=>{
@@ -141,7 +149,52 @@ function buildUI(){
       names.map(n=>`<option value="${n}">${n}</option>`).join('')+`</optgroup>`).join('');
   presetSel.addEventListener('change', ()=>{ if (presetSel.value) applyPreset(presetSel.value); });
   presetsEl.appendChild(lab); presetsEl.appendChild(presetSel);
+
+  // ---- Sequencer: a step grid, one row per ON effect, tap a cell to gate that effect on/off ----
+  const seqCat = document.createElement('div'); seqCat.className='cat seqcat';
+  const seqHead = document.createElement('div'); seqHead.className='cathead';
+  seqHead.innerHTML = `<span class="catname">⏱ Sequencer</span><span class="catcount" id="seqcount"></span><span class="caret">▶</span>`;
+  const seqBody = document.createElement('div'); seqBody.className='catbody';
+  seqBody.innerHTML = `<div id="seqgrid" class="seqgrid"></div>
+    <div class="seqnote">Split the loop into ${SEQ_STEPS} steps · tap a cell to skip that effect there · empty row = always on</div>`;
+  seqHead.addEventListener('click', ()=>{ seqCat.classList.toggle('open');
+    seqHead.querySelector('.caret').textContent = seqCat.classList.contains('open')?'▼':'▶';
+    if (seqCat.classList.contains('open')) buildSeqGrid(); });
+  seqCat.appendChild(seqHead); seqCat.appendChild(seqBody); controls.appendChild(seqCat);
+
   updateRows();
+}
+// effects the sequencer can gate — everything visible (Envelope/Zoom/Mask make no sense to step)
+function seqEffects(){ return FX.filter(f=> !['motion','zoom','mask'].includes(f.id) && state[f.id].on); }
+function buildSeqGrid(){
+  const grid = document.getElementById('seqgrid'); if (!grid) return;
+  const on = seqEffects();
+  grid.innerHTML = on.length ? '' : `<div class="seqempty">Turn some effects on first.</div>`;
+  on.forEach(f=>{
+    const seq = state[f.id]._seq;
+    const row = document.createElement('div'); row.className='seqrow'; row.dataset.fx=f.id;
+    const cells = Array.from({length:SEQ_STEPS}, (_,i)=>{
+      const active = !seq || seq[i];
+      return `<button class="seqcell${active?' on':''}" data-fx="${f.id}" data-i="${i}" aria-label="${f.name} step ${i+1}"></button>`;
+    }).join('');
+    row.innerHTML = `<span class="seqname">${f.name}</span><div class="seqcells">${cells}</div>`;
+    grid.appendChild(row);
+  });
+  updateSeqCount();
+}
+function updateSeqCount(){
+  const el = document.getElementById('seqcount'); if (!el) return;
+  const n = FX.filter(f=> state[f.id]._seq).length;   // effects with a non-trivial pattern
+  el.textContent = n ? n : '';
+}
+// tapping a cell: give the effect a pattern (all-on) on first touch, flip the cell, and drop the
+// pattern back to null (always-on) if it ends up all-on again — keeps state and the share URL clean
+function toggleSeqCell(id, i){
+  let s = state[id]._seq;
+  if (!s){ s = new Array(SEQ_STEPS).fill(true); state[id]._seq = s; }
+  s[i] = !s[i];
+  if (s.every(v=>v)) state[id]._seq = null;
+  updateSeqCount();
 }
 // Hide the knobs the current selects render inert — a param declares a `show(state)` predicate in
 // FX and the row follows it. Purely cosmetic: a hidden param keeps its value and still renders,
@@ -159,6 +212,7 @@ function applyPreset(name){
   FX.forEach(f=>{
     const pp = p[f.id] || {};
     state[f.id].on = !!pp.on;
+    state[f.id]._seq = null;                    // a preset is a whole look — clear any sequencer pattern
     // Anything the preset doesn't name goes back to the effect's default rather than keeping
     // whatever the user last had — otherwise a preset renders differently depending on what was
     // fiddled with before it was picked, and picking it twice gives two different looks.
@@ -185,6 +239,8 @@ function syncUI(){
   updateRows();
   rebuildCodecs();
   updateCatCounts();
+  if (document.querySelector('.seqcat.open')) buildSeqGrid();
+  updateSeqCount();
 }
 // (re)build the real-byte codec frame pools for whatever is enabled. Their corruption is seeded off
 // randomSeed, so this must also run whenever the Pattern Seed changes — not just on a param change.
