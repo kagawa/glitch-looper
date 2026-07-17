@@ -132,11 +132,11 @@ function applySparkle(w,h,phase){
 //      over the loop so it lands back where it started (seamless), positions fixed by the seed ----
 const sp = state.sparkle;
 if (sp.on && sp.amount>0){
-  const a=P('sparkle','amount'), N=Math.round(8+sp.density*90), base=2+sp.size*11, tone=sp.tone|0;
+  const a=P('sparkle','amount'), N=Math.round(8+sp.density*90), base=2+sp.size*11, tone=sp.tone|0, spd=sp.speed|0||1;
   const TONE=[[255,238,175],[255,255,255]];                    // gold / white (2 = rainbow, per-sparkle hue)
   ctx.save(); ctx.globalCompositeOperation='screen';
   for (let i=0;i<N;i++){
-    const freq=1+(rand(i*3.3)*3|0), ph=rand(i*5.7+.2);         // integer twinkles/loop → seamless
+    const freq=(1+(rand(i*3.3)*3|0))*spd, ph=rand(i*5.7+.2);   // integer twinkles/loop → seamless
     const tw=Math.sin((phase*freq+ph)*Math.PI*2); if (tw<=0.05) continue;
     const pop=tw*tw;                                            // sharpen the flash
     const x=rand(i*12.9+1)*w, y=rand(i*78.2+3)*h, s=base*(0.5+rand(i*9.1)*0.9);
@@ -178,12 +178,17 @@ if (bs.on && bs.amount>0){
     sctx.closePath(); sctx.fill();
   }
   sctx.restore();
-  // clear the centre so the picture shows through; lines intensify outward
-  const rg=sctx.createRadialGradient(cx,cy,R*0.12, cx,cy,R);
-  rg.addColorStop(0,'rgba(0,0,0,0)'); rg.addColorStop(0.5,'rgba(0,0,0,.6)'); rg.addColorStop(1,'rgba(0,0,0,1)');
+  // Reach controls how far in from the rim the lines run: low = a thin ring near the edge (clear
+  // middle), high = all the way to the centre. Lines always fade to nothing at the very centre.
+  const reach = bs.reach==null?0.7:bs.reach, s0=Math.min(0.9,0.5*(1-reach)), s1=Math.min(0.98,s0+0.45);
+  const rg=sctx.createRadialGradient(cx,cy,0, cx,cy,R);
+  rg.addColorStop(0,'rgba(0,0,0,0)');
+  if (s0>0.001) rg.addColorStop(s0,'rgba(0,0,0,0)');
+  rg.addColorStop(s1,'rgba(0,0,0,.85)'); rg.addColorStop(1,'rgba(0,0,0,1)');
   sctx.globalCompositeOperation='destination-in'; sctx.fillStyle=rg; sctx.fillRect(0,0,w,h); sctx.globalCompositeOperation='source-over';
+  const BLEND=['screen','lighter','overlay','source-over'];
   const pulse=0.8+0.2*Math.sin(phase*Math.PI*2);
-  ctx.save(); ctx.globalCompositeOperation='screen'; ctx.globalAlpha=a*pulse; ctx.drawImage(sc,0,0); ctx.restore();
+  ctx.save(); ctx.globalCompositeOperation=BLEND[bs.blend|0]||'screen'; ctx.globalAlpha=a*pulse; ctx.drawImage(sc,0,0); ctx.restore();
 }
 }
 

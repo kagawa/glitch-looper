@@ -177,14 +177,16 @@ if (gd.on && gd.amount>0){
     : lum<0.5 ? lerp3(ramp[0],ramp[1],lum/0.5)
     : lum<0.8 ? lerp3(ramp[1],ramp[2],(lum-0.5)/0.3)
     :           lerp3(ramp[2],ramp[3],(lum-0.8)/0.2);
-  const bandPos=((phase%1)+1)%1;                                             // sweeps the diagonal each loop
+  const speed=gd.speed|0||1, ang=(gd.angle|0)*Math.PI/180, cs=Math.cos(ang), sn=Math.sin(ang);
+  const span=(Math.abs(cs)*w+Math.abs(sn)*h)||1, off0=Math.min(0,cs)*w+Math.min(0,sn)*h;   // normalise the projection to 0..1
+  const bandPos=((phase*speed)%1+1)%1;                                       // shine sweeps along the angle, speed cycles/loop
   const id=ctx.getImageData(0,0,w,h), d=id.data;
   for (let p=0,i=0;i<d.length;i+=4,p++){
     const lum=(d[i]*0.3+d[i+1]*0.59+d[i+2]*0.11)/255;
     let c=map(lum), r=c[0], g=c[1], b=c[2];
     if (shine>0){
-      const x=p%w, y=(p/w)|0, diag=(x/w+y/h)/2;
-      const dist=Math.abs(((diag-bandPos+1.5)%1)-0.5)*2;                     // wrapped → seamless at the loop
+      const x=p%w, y=(p/w)|0, proj=(x*cs+y*sn-off0)/span;
+      const dist=Math.abs(((proj-bandPos+1.5)%1)-0.5)*2;                     // wrapped → seamless at the loop
       const boost=Math.max(0,1-dist*6)*shine*190;                           // narrow specular band
       r=Math.min(255,r+boost); g=Math.min(255,g+boost); b=Math.min(255,b+boost*0.8);
     }
