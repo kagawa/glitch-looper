@@ -138,6 +138,12 @@ const HYPE_MULTI = {
 };
 // pick a colour for tone at fraction frac∈[0,1): rainbow → hue, multi → set entry, else the flat tone.
 // frac lets a spinning burst colour by world position (seamless) and a sparkle scatter by its seed.
+// angle-periodic pseudo-noise (0..1) for Burst line widths — integer harmonics keep it periodic over a
+// full turn, so a spinning burst that colours/sizes by world angle still meets itself at the loop seam.
+function burstNoise(f){
+  const v = Math.sin(f*Math.PI*2*7) + 0.8*Math.sin(f*Math.PI*2*13+1.7) + 0.6*Math.sin(f*Math.PI*2*19+4.1);
+  return 0.5 + v/4.8;
+}
 function hypeColor(tone, frac, sat, count){
   frac=((frac%1)+1)%1;
   if (tone===2) return hsv(frac*360, sat, 1);
@@ -199,9 +205,14 @@ if (bs.on && bs.amount>0){
   const rot=spinning ? k*(TWO/N)*phase : 0;                                  // multiple of 2π/N → seamless
   sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h);
   sctx.save(); sctx.translate(cx,cy); sctx.rotate(rot);
+  const jit = bs.jitter==null?0.6:bs.jitter;
   for (let i=0;i<N;i++){
-    const ang=i*(TWO/N), half=(Math.PI/N)*(spinning?0.5:(0.25+rand(i*7.3)*0.75));
-    const frac=spinning ? (i/N)+rot/TWO : i/N;                              // colour by world position when spinning
+    const ang=i*(TWO/N);
+    const frac=spinning ? (i/N)+rot/TWO : i/N;                              // colour/width by world position when spinning
+    // Width variation: per-wedge random when static; a smooth angle-periodic noise when spinning, so the
+    // widths ride the wedges through the loop and still match at the seam (integer harmonics = periodic).
+    const nz = spinning ? burstNoise(frac) : rand(i*7.3);
+    const half=(Math.PI/N)*0.55*(1 + jit*(nz*2-1)*0.9);
     const col=hypeColor(tone, frac, 0.9, N);
     sctx.fillStyle=`rgb(${col[0]},${col[1]},${col[2]})`;
     sctx.beginPath(); sctx.moveTo(0,0);
