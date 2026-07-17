@@ -274,7 +274,7 @@ const FX = [
     { k:'y0',       label:'Y start %', min:0, max:100, step:1, def:20, show:s=> s.source===0 },
     { k:'y1',       label:'Y end %',   min:0, max:100, step:1, def:80, show:s=> s.source===0 },
     { k:'invert',   label:'Invert', type:'select', def:0, options:[[0,'Effects inside'],[1,'Effects outside']] },
-    { k:'interval', label:'Roam Steps', min:1, max:12, step:1, def:4, show:s=> s.source===5 || s.source===6 },
+    { k:'interval', label:'Roam Steps', min:1, max:16, step:1, def:4, show:s=> s.source===5 || s.source===6 },
     { k:'feather',  label:'Feather', min:0, max:1, step:.01, def:.08 },
   ]},
   { id:'time', name:'Time', hint:'frame drop · stutter · trails — acts on the footage, not the frame', on:false, open:false, params:[
