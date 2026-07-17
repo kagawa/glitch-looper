@@ -197,12 +197,8 @@ function randomizeFX(){
         state[f.id][p.k] = parseFloat((Math.round(val/p.step)*p.step).toFixed(4));
       }
     });
-    // reset the Sequencer to always-on, then occasionally hand this effect a pattern (more often
-    // for the destructive ones, which read well flickering in and out)
-    state[f.id]._seq = null;
-    if (state[f.id].on && Math.random() < (RAND_SEQ_HEAVY.has(f.id) ? lv.seqHeavy : lv.seq))
-      state[f.id]._seq = randomSeqPattern();
-  });
+    state[f.id]._seq = null;                       // reset to always-on; patterns are handed out below,
+  });                                              // once the final on-count is settled by the clamp
   // keep the heavy colour-mapping effects from stacking into mush — cap how many run at once
   const TONE = ['duotone','solarize','posterize','emboss'];
   const toneCap = randLevelVal==='wild' ? 2 : 1;
@@ -241,6 +237,14 @@ function randomizeFX(){
     const f = off.splice(Math.floor(Math.random()*off.length),1)[0];
     state[f.id].on = true; on.push(f);           // its params were already randomised in the pass above
   }
+  // Sequencer patterns — now the on-count is final. A busy roll (many effects at once) reads as mush,
+  // so the more effects are on, the more likely each gets a pattern that spreads it across the loop.
+  const seqable = FX.filter(f=> !state[f.id]._locked && state[f.id].on && !UNCOUNTED.includes(f.id));
+  const busyMul = 1 + Math.max(0, seqable.length - 3) * 0.35;   // 3 on → 1x, 6 → ~2x, 9 → ~3x
+  seqable.forEach(f=>{
+    const base = RAND_SEQ_HEAVY.has(f.id) ? lv.seqHeavy : lv.seq;
+    if (Math.random() < Math.min(0.9, base*busyMul)) state[f.id]._seq = randomSeqPattern();
+  });
   // (Zoom is left untouched above; the wobble's own zoom is handled by the base overscan that
   //  hides its wrap seam — no separate Zoom-effect coupling.)
   syncUI();
