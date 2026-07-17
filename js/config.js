@@ -434,15 +434,15 @@ const FX = [
 
 // effect cards are shown grouped by sub-genre (order here = display order)
 const FX_GROUPS = [
-  ['Binary Glitch',   ['jpeg','png','webp','gifg','sonify','byteshift','bitplane']],
-  ['Pixel Glitch',    ['glitch','mosh','compress','pixsort','databend','bmpmisread','gif']],
-  ['Analog / Tape',   ['vhs','sync','roll','film','noise','ghost','dotcrawl','hum','herring']],
-  ['Screen / Optics', ['crt','degauss','halftone','hud','bloom','leak','sparkle','burst']],
-  ['Dream / Optics',  ['prism','iris','starf','kaleido','bokeh','foil']],
-  ['Distort',         ['warp','melt','extrude','feedback','pixelate','liquid']],
-  ['Colour / Tone',   ['color','duotone','solarize','posterize','emboss','gold','rainbow','paper']],
-  ['Video',           ['time','playback','stale','synctear','interlace','chroma']],          // acts on the footage, not on any one frame
-  ['Global',          ['zoom','mask','motion']],
+  ['File Corruption',       ['jpeg','png','webp','gifg','sonify','byteshift','bitplane']],       // real encoded-byte damage + raw reinterpret
+  ['Digital Glitch',        ['glitch','mosh','compress','pixsort','databend','bmpmisread','gif','pixelate']],
+  ['Analog Signal',         ['vhs','sync','roll','noise','ghost','dotcrawl','hum','herring','degauss']],
+  ['Film / Display',        ['film','crt','hud','halftone']],
+  ['Light / Optics',        ['bloom','leak','sparkle','burst','prism','iris','starf','bokeh','foil']],
+  ['Distortion / Geometry', ['warp','melt','extrude','feedback','kaleido','liquid']],
+  ['Colour / Material',     ['color','duotone','solarize','posterize','emboss','gold','rainbow','paper']],
+  ['Video',                 ['time','playback','stale','synctear','interlace','chroma']],        // acts on the footage, not any one frame
+  ['Global',                ['zoom','mask','motion']],                                           // whole-frame settings → lives in its own panel
 ];
 
 const PRESETS = {
