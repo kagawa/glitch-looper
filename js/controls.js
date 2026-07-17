@@ -162,17 +162,17 @@ const RAND_LEVELS = {
 // destructive effects that read well flickering in and out — bump their pattern chance
 const RAND_SEQ_HEAVY = new Set(['jpeg','png','webp','gifg','mosh','databend','bmpmisread','sonify',
                                 'byteshift','bitplane','glitch','sync','pixsort','stale','synctear']);
-// a random Sequencer pattern: bursts / alternations read better than salt-and-pepper, and it always
-// keeps at least one step on and one off (else it is either always-on or invisible)
+// a random Sequencer pattern (8 steps). ~75% pick one of a handful of clean rhythms (o=on, x=off),
+// each usable inverted too; ~25% a free random subset. Always keeps 1..7 steps on.
+const SEQ_RHYTHMS = ['xxxxoooo','xxooxxoo','xoxoxoxo','xxooxoxo','xoxoxxoo'].map(p=>[...p].map(ch=>ch==='o'));
 function randomSeqPattern(){
-  const n = SEQ_STEPS; let s; const style = Math.random();
-  if (style < 0.55){                              // one contiguous burst
-    const len = 1 + Math.floor(Math.random()*(n-1)), start = Math.floor(Math.random()*n);
-    s = Array.from({length:n},(_,i)=> ((i-start+n)%n) < len);
-  } else if (style < 0.8){                         // every-other / periodic
-    const period = [2,2,3,4][Math.floor(Math.random()*4)], off = Math.floor(Math.random()*period);
-    s = Array.from({length:n},(_,i)=> (i+off)%period===0);
-  } else {                                         // random subset
+  const n = SEQ_STEPS;
+  let s;
+  if (Math.random() < 0.75){                       // a set rhythm, optionally inverted
+    const base = SEQ_RHYTHMS[Math.floor(Math.random()*SEQ_RHYTHMS.length)];
+    const inv = Math.random() < 0.5;
+    s = base.map(v=> inv ? !v : v);
+  } else {                                          // free random subset
     s = Array.from({length:n},()=> Math.random()<0.5);
   }
   if (!s.some(v=>v))  s[Math.floor(Math.random()*n)] = true;    // never all-off (invisible)
