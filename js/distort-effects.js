@@ -1,3 +1,5 @@
+const kcanvas = document.createElement('canvas'), kctx = kcanvas.getContext('2d');  // Kaleidoscope fan scratch
+
 function applyWarp(w,h,phase){
 // ---- warp: per-row horizontal displacement (selectable pattern, wraps at edges) ----
 const wp = state.warp;
@@ -173,42 +175,41 @@ const kd = state.kaleido;
 if (kd.on && (kd.amount==null || kd.amount>0)){
   const amt = kd.amount==null?1:P('kaleido','amount');
   const seg=Math.max(2,kd.seg|0), sector=Math.PI*2/seg, half=sector/2;
-  const cx=w*kd.cx, cy=h*kd.cy, off=(kd.angle|0)*Math.PI/180;
-  const scale=1+(kd.zoom||0)*2.5;                            // >1 pulls a wider, scaled-down area in
+  const off=(kd.angle|0)*Math.PI/180;
   const rot=(kd.spin|0)*sector*phase;                        // whole sectors/loop → seamless
   const mode=kd.mode==null?1:(kd.mode|0);
-  const src=ctx.getImageData(0,0,w,h), s=src.data;
-  const out=ctx.createImageData(w,h), o=out.data;
-  for (let y=0;y<h;y++) for (let x=0;x<w;x++){
-    const oi=(y*w+x)*4, dx=x-cx, dy=y-cy;
-    let R,G,B;
-    if (mode===1){
-      // Rotate copies: average seg full copies of the frame, each turned by a sector — uses the WHOLE
-      // image (not just one wedge), and averaging over a full set of sectors is spin-invariant → seamless.
-      // The copies are always sampled from the IMAGE centre (so each blade is the whole picture), while
-      // Centre X/Y only moves the hub the blades fan around — the two centres are decoupled on purpose.
-      R=G=B=0;
-      for (let k=0;k<seg;k++){
-        const ak=-(k*sector+rot+off), ca=Math.cos(ak), sa=Math.sin(ak);
-        const rx=(dx*ca-dy*sa)*scale, ry=(dx*sa+dy*ca)*scale;
-        let sx=(w*0.5+rx)|0, sy=(h*0.5+ry)|0; sx=sx<0?0:sx>=w?w-1:sx; sy=sy<0?0:sy>=h?h-1:sy;
-        const si=(sy*w+sx)*4; R+=s[si]; G+=s[si+1]; B+=s[si+2];
-      }
-      R/=seg; G/=seg; B/=seg;
-    } else {
-      // Mirror: fold the angle into one wedge with a reflection — a crisp, symmetric kaleidoscope
-      const r=Math.sqrt(dx*dx+dy*dy)*scale;
+  if (mode===1){
+    // Rotate copies → a fan of WHOLE-image blades. Each blade is the entire frame, pushed out from the
+    // hub by Fan Spread and turned a sector further, so what sat at the picture's centre now rides out
+    // into the blade. Averaging N blades is order-independent and the blade set is a permutation under
+    // the spin, so it loops seamlessly.
+    const hubX=w*kd.cx, hubY=h*kd.cy, scale=1-(kd.zoom||0)*0.6, bladeR=(kd.spread||0)*Math.min(w,h)*0.6;
+    sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h); sctx.drawImage(canvas,0,0);      // original frame
+    kcanvas.width=w; kcanvas.height=h; kctx.clearRect(0,0,w,h);
+    for (let k=0;k<seg;k++){
+      kctx.setTransform(1,0,0,1,0,0); kctx.globalAlpha=1/(k+1);                        // running average → equal weight
+      kctx.translate(hubX,hubY); kctx.rotate(k*sector+rot+off); kctx.translate(bladeR,0);
+      kctx.scale(scale,scale); kctx.translate(-w/2,-h/2); kctx.drawImage(sc,0,0);
+    }
+    kctx.setTransform(1,0,0,1,0,0); kctx.globalAlpha=1;
+    ctx.save(); ctx.globalAlpha=amt; ctx.drawImage(kcanvas,0,0); ctx.restore();        // fan over the original by Amount
+  } else {
+    // Mirror: per-pixel radial fold with a reflection — a crisp, symmetric kaleidoscope (one wedge)
+    const cx=w*kd.cx, cy=h*kd.cy, scale=1+(kd.zoom||0)*2.5;
+    const src=ctx.getImageData(0,0,w,h), s=src.data, out=ctx.createImageData(w,h), o=out.data;
+    for (let y=0;y<h;y++) for (let x=0;x<w;x++){
+      const oi=(y*w+x)*4, dx=x-cx, dy=y-cy, r=Math.sqrt(dx*dx+dy*dy)*scale;
       let a=(Math.atan2(dy,dx)-rot)%sector; if (a<0) a+=sector; if (a>half) a=sector-a; a+=off;
       let sx=(cx+r*Math.cos(a))|0, sy=(cy+r*Math.sin(a))|0;
       sx = sx<0?0:sx>=w?w-1:sx; sy = sy<0?0:sy>=h?h-1:sy;
-      const si=(sy*w+sx)*4; R=s[si]; G=s[si+1]; B=s[si+2];
+      const si=(sy*w+sx)*4;
+      o[oi]  = s[oi]  +(s[si]  -s[oi])  *amt;
+      o[oi+1]= s[oi+1]+(s[si+1]-s[oi+1])*amt;
+      o[oi+2]= s[oi+2]+(s[si+2]-s[oi+2])*amt;
+      o[oi+3]= 255;
     }
-    o[oi]  = s[oi]  +(R-s[oi])  *amt;                         // blend over the original by Amount
-    o[oi+1]= s[oi+1]+(G-s[oi+1])*amt;
-    o[oi+2]= s[oi+2]+(B-s[oi+2])*amt;
-    o[oi+3]= 255;
+    ctx.putImageData(out,0,0);
   }
-  ctx.putImageData(out,0,0);
 }
 }
 
