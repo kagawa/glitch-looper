@@ -147,7 +147,6 @@ randMaxRange.addEventListener('input', ()=>{
   if (randMax < randMin){ randMin = randMax; randMinRange.value = randMin; randMinVal.textContent = randMin; }
   randMaxVal.textContent = randMax;
 });
-applyLevelRange(randLevelVal);   // start the sliders on the current strength's range (Normal = 1–3)
 const statusEl = document.getElementById('status');
 function setStatus(s){ statusEl.innerHTML = s; }
 
@@ -168,6 +167,7 @@ const RAND_LEVELS = {
   normal:{prob:.5,  str:.22, seq:.08, seqHeavy:.20, min:1, max:3},
   strong:{prob:.9,  str:.55, seq:.14, seqHeavy:.32, min:2, max:5},
   wild:  {prob:1.4, str:1,   seq:.22, seqHeavy:.48, min:3, max:8} };
+applyLevelRange(randLevelVal);   // start the sliders on the current strength's range (declared above)
 // destructive effects that read well flickering in and out — bump their pattern chance
 const RAND_SEQ_HEAVY = new Set(['jpeg','png','webp','gifg','mosh','databend','bmpmisread','sonify',
                                 'byteshift','bitplane','glitch','sync','pixsort','stale','synctear']);
