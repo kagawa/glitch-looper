@@ -24,9 +24,14 @@ if (n.on && (n.grain>0 || n.flicker>0)){
     const d = g.data;
     const amp = P('noise','grain')*90;
     const seed = Math.floor(phase*30);   // 30 grain frames per loop
-    for (let i=0;i<d.length;i+=4){
-      const nz = (rand(i*0.01+seed)-0.5)*amp;
-      d[i]+=nz; d[i+1]+=nz; d[i+2]+=nz;
+    const type = n.type|0;
+    if (type===2){                                   // salt & pepper: sparse white/black specks
+      const density = P('noise','grain')*0.15;
+      for (let i=0;i<d.length;i+=4){ if (rand(i*0.013+seed*1.7)<density){ const v=rand(i*0.019+seed)>0.5?255:0; d[i]=v; d[i+1]=v; d[i+2]=v; } }
+    } else if (type===1){                             // colour: independent per channel → chroma static
+      for (let i=0;i<d.length;i+=4){ d[i]+=(rand(i*0.01+seed)-0.5)*amp; d[i+1]+=(rand(i*0.01+seed+11.3)-0.5)*amp; d[i+2]+=(rand(i*0.01+seed+27.7)-0.5)*amp; }
+    } else {                                          // luma: same value on every channel (mono grain)
+      for (let i=0;i<d.length;i+=4){ const nz=(rand(i*0.01+seed)-0.5)*amp; d[i]+=nz; d[i+1]+=nz; d[i+2]+=nz; }
     }
     ctx.putImageData(g,0,0);
   }

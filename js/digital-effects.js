@@ -183,7 +183,7 @@ function applyBmpRowMisread(w,h){
   const amount=P('bmpmisread','amount');
   if(amount<=0) return;
   const src=ctx.getImageData(0,0,w,h), out=ctx.createImageData(w,h), source=src.data, target=out.data;
-  const rowBytes=w*4, error=(effect.width|0)*4+(effect.padding|0), length=source.length;
+  const rowBytes=w*4, error=(P('bmpmisread','width')|0)*4+(P('bmpmisread','padding')|0), length=source.length;
   for(let y=0;y<h;y++){
     const sourceY=(effect.flip|0)===1?h-1-y:y;
     const rowStart=sourceY*rowBytes+y*error;

@@ -5,7 +5,7 @@ const crPh = (cr.mask|0)>0 ? P('crt','phosphor') : 0;
 const crConv = P('crt','converge');
 const crActive = cr.on && (cr.amount>0 || crPh>0 || cr.scan>0 || crConv>0);
 if (crActive){
-  const k = cr.amount*1.8, corner = cr.corner;
+  const k = cr.amount*cr.amount*2.6, corner = cr.corner;   // squared response: gentle at the low end, stronger (and further) at the top
   const maskType = cr.mask|0;
   const sp = Math.max(1, Math.round(w/560));   // sub-pixel stripe width
   const period = 3*sp;                          // R-G-B phosphor triad period (px)
