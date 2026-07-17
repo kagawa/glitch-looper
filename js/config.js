@@ -210,9 +210,10 @@ const FX = [
     { k:'blend',  label:'Blend', type:'select', def:0, options:[[0,'Screen'],[1,'Add'],[2,'Overlay'],[3,'Solid'],[4,'Multiply (dark)']] },
   ]},
   // ---- Dream / Optics ----
-  { id:'kaleido', name:'Kaleidoscope', hint:'mirror the frame into rotating wedges — geometric symmetry', on:false, open:false, params:[
+  { id:'kaleido', name:'Kaleidoscope', hint:'mirror or rotate the frame into symmetric wedges', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:1, env:1 },
-    { k:'seg',    label:'Segments', min:3, max:16, step:1, def:6 },
+    { k:'mode',   label:'Mode', type:'select', def:1, options:[[0,'Mirror (wedge)'],[1,'Rotate copies']] },
+    { k:'seg',    label:'Segments', min:2, max:16, step:1, def:6 },
     { k:'spin',   label:'Spin (sectors/loop)', min:-6, max:6, step:1, def:1 },
     { k:'angle',  label:'Source Angle', min:0, max:345, step:15, def:0 },
     { k:'zoom',   label:'Zoom Out', min:0, max:1, step:.01, def:.3 },
@@ -484,7 +485,7 @@ const PRESETS = {
   // ---- Dream / Optics ----
   'Pastel Dream':{ color:{on:1,saturate:.85,contrast:1.0,bright:1.1,hue:0,tint:-.1,vignette:.2}, prism:{on:1,amount:.5,spread:.4,blur:.35,rot:1}, iris:{on:1,amount:.35,angscale:.5,lumascale:1,speed:1,edge:0}, bloom:{on:1,amount:.4,size:14,glow:.6}, leak:{on:1,amount:.35,tone:3,pos:1,size:.6,drift:.4} },
   'Angelcore':   { color:{on:1,saturate:.9,contrast:1.0,bright:1.15,hue:0,tint:.05,vignette:.15}, starf:{on:1,amount:.6,thresh:.6,length:.55,rays:0,angle:45}, prism:{on:1,amount:.3,spread:.3,blur:.3,rot:1}, bloom:{on:1,amount:.5,size:16,glow:.7}, leak:{on:1,amount:.4,tone:3,pos:2,size:.7,drift:.4} },
-  'Kaleidoscope':{ color:{on:1,saturate:1.3,contrast:1.05,bright:1.02,hue:0,tint:0,vignette:.25}, kaleido:{on:1,amount:.9,seg:8,spin:1,angle:0,zoom:.4,cx:.5,cy:.5}, bloom:{on:1,amount:.3,size:10,glow:.3} },
+  'Kaleidoscope':{ color:{on:1,saturate:1.3,contrast:1.05,bright:1.02,hue:0,tint:0,vignette:.25}, kaleido:{on:1,amount:.9,mode:1,seg:6,spin:1,angle:0,zoom:.5,cx:.5,cy:.5}, bloom:{on:1,amount:.3,size:10,glow:.3} },
   'Oil Slick':   { color:{on:1,saturate:1.1,contrast:1.05,bright:1.0,hue:0,tint:0,vignette:.3}, iris:{on:1,amount:.7,angscale:.6,lumascale:1.2,speed:2,edge:0}, prism:{on:1,amount:.3,spread:.3,blur:.2,rot:2} },
   // ---- Reset ----
   'Clean':       { vhs:{on:0}, glitch:{on:0}, noise:{on:0}, color:{on:0} },

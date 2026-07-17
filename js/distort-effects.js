@@ -172,23 +172,38 @@ function applyKaleido(w,h,phase){
 const kd = state.kaleido;
 if (kd.on && (kd.amount==null || kd.amount>0)){
   const amt = kd.amount==null?1:P('kaleido','amount');
-  const seg=Math.max(3,kd.seg|0), sector=Math.PI*2/seg, half=sector/2;
+  const seg=Math.max(2,kd.seg|0), sector=Math.PI*2/seg, half=sector/2;
   const cx=w*kd.cx, cy=h*kd.cy, off=(kd.angle|0)*Math.PI/180;
-  const scale=1+(kd.zoom||0)*2.5;                            // >1 pulls a wider, scaled-down area into each wedge
+  const scale=1+(kd.zoom||0)*2.5;                            // >1 pulls a wider, scaled-down area in
   const rot=(kd.spin|0)*sector*phase;                        // whole sectors/loop → seamless
+  const mode=kd.mode==null?1:(kd.mode|0);
   const src=ctx.getImageData(0,0,w,h), s=src.data;
   const out=ctx.createImageData(w,h), o=out.data;
   for (let y=0;y<h;y++) for (let x=0;x<w;x++){
-    const oi=(y*w+x)*4;
-    const dx=x-cx, dy=y-cy, r=Math.sqrt(dx*dx+dy*dy)*scale;
-    let a=(Math.atan2(dy,dx)-rot)%sector; if (a<0) a+=sector; if (a>half) a=sector-a;   // fold into a mirror wedge
-    a+=off;
-    let sx=(cx+r*Math.cos(a))|0, sy=(cy+r*Math.sin(a))|0;
-    sx = sx<0?0:sx>=w?w-1:sx; sy = sy<0?0:sy>=h?h-1:sy;
-    const si=(sy*w+sx)*4;
-    o[oi]  = s[oi]  +(s[si]  -s[oi])  *amt;                  // blend the kaleidoscope over the original by Amount
-    o[oi+1]= s[oi+1]+(s[si+1]-s[oi+1])*amt;
-    o[oi+2]= s[oi+2]+(s[si+2]-s[oi+2])*amt;
+    const oi=(y*w+x)*4, dx=x-cx, dy=y-cy;
+    let R,G,B;
+    if (mode===1){
+      // Rotate copies: average seg full copies of the frame, each turned by a sector — uses the WHOLE
+      // image (not just one wedge), and averaging over a full set of sectors is spin-invariant → seamless.
+      R=G=B=0;
+      for (let k=0;k<seg;k++){
+        const ak=-(k*sector+rot+off), ca=Math.cos(ak), sa=Math.sin(ak);
+        const rx=(dx*ca-dy*sa)*scale, ry=(dx*sa+dy*ca)*scale;
+        let sx=(cx+rx)|0, sy=(cy+ry)|0; sx=sx<0?0:sx>=w?w-1:sx; sy=sy<0?0:sy>=h?h-1:sy;
+        const si=(sy*w+sx)*4; R+=s[si]; G+=s[si+1]; B+=s[si+2];
+      }
+      R/=seg; G/=seg; B/=seg;
+    } else {
+      // Mirror: fold the angle into one wedge with a reflection — a crisp, symmetric kaleidoscope
+      const r=Math.sqrt(dx*dx+dy*dy)*scale;
+      let a=(Math.atan2(dy,dx)-rot)%sector; if (a<0) a+=sector; if (a>half) a=sector-a; a+=off;
+      let sx=(cx+r*Math.cos(a))|0, sy=(cy+r*Math.sin(a))|0;
+      sx = sx<0?0:sx>=w?w-1:sx; sy = sy<0?0:sy>=h?h-1:sy;
+      const si=(sy*w+sx)*4; R=s[si]; G=s[si+1]; B=s[si+2];
+    }
+    o[oi]  = s[oi]  +(R-s[oi])  *amt;                         // blend over the original by Amount
+    o[oi+1]= s[oi+1]+(G-s[oi+1])*amt;
+    o[oi+2]= s[oi+2]+(B-s[oi+2])*amt;
     o[oi+3]= 255;
   }
   ctx.putImageData(out,0,0);
