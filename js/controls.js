@@ -40,35 +40,32 @@ function loadImage(file){
   };
   im.src = url;
 }
-// A self-contained sample so the app renders something on first load. A test-card composition —
-// colour bars, gradients, hard-edged shapes — happens to be exactly what shows every effect off.
+// A self-contained sample so the app renders something on first load — SMPTE EG 1-1990 colour bars,
+// the broadcast test pattern. On-theme, and its bars, castellation and PLUGE exercise every effect.
 function loadSample(){
   const c = document.createElement('canvas'); c.width = 720; c.height = 405;   // 16:9
-  const x = c.getContext('2d'), W = c.width, H = c.height;
-  const g = x.createLinearGradient(0,0,W,H);      // sky-ish backdrop (gradients → banding)
-  g.addColorStop(0,'#1b2a4a'); g.addColorStop(1,'#c65b7c');
-  x.fillStyle = g; x.fillRect(0,0,W,H);
-  const bars = ['#fff','#ff0','#0ff','#0f0','#f0f','#f00','#00f'];   // colour bars strip
-  const bw = W/bars.length;
-  bars.forEach((col,i)=>{ x.fillStyle = col; x.fillRect(i*bw, 0, bw+1, 74); });
-  for (let i=0;i<4;i++){                            // concentric rings (curvature / ringing)
-    x.strokeStyle = `hsl(${i*60},80%,60%)`; x.lineWidth = 9;
-    x.beginPath(); x.arc(W*0.22, H*0.56, 30+i*26, 0, 7); x.stroke();
-  }
-  x.fillStyle = '#ffcf3a';                          // hard-edged shapes (slice / sort / blocking)
-  x.beginPath(); x.moveTo(W*0.74,H*0.24); x.lineTo(W*0.9,H*0.72); x.lineTo(W*0.58,H*0.72); x.closePath(); x.fill();
-  x.fillStyle = '#2ee6c0'; x.fillRect(W*0.62, H*0.30, 96, 96);
-  const ramp = x.createLinearGradient(0,0,W,0);     // luma ramp (banding / posterise)
-  ramp.addColorStop(0,'#000'); ramp.addColorStop(1,'#fff');
-  x.fillStyle = ramp; x.fillRect(0, H-42, W, 42);
-  // the sample carries the drop-zone hint, so it stays visible even once the drop zone is hidden
+  const x = c.getContext('2d'), W = c.width, H = c.height, col = W/7;
+  const band = (cols, y, h)=> cols.forEach((cl,i)=>{ x.fillStyle=cl; x.fillRect(Math.round(i*col), y, Math.ceil(col)+1, h); });
+  const y1 = Math.round(H*0.67), y2 = Math.round(H*0.75);                       // 2/3 bars · 1/12 mid · 1/4 bottom
+  // top: seven 75% bars (191 = 0.75·255) — grey, yellow, cyan, green, magenta, red, blue
+  band(['#bfbfbf','#bfbf00','#00bfbf','#00bf00','#bf00bf','#bf0000','#0000bf'], 0, y1);
+  // castellation: reverse-order chroma against black, for hue alignment
+  band(['#0000bf','#131313','#bf00bf','#131313','#00bfbf','#131313','#bfbfbf'], y1, y2-y1);
+  // bottom: -I, 100% white, +Q, then black with the PLUGE pulses (−/0/+ around black setup)
+  x.fillStyle='#08153a'; x.fillRect(0, y2, Math.round(col), H-y2);              // -I  (dark blue)
+  x.fillStyle='#fff';    x.fillRect(Math.round(col), y2, Math.round(col), H-y2);
+  x.fillStyle='#2d0a52'; x.fillRect(Math.round(2*col), y2, Math.round(col), H-y2); // +Q (violet)
+  x.fillStyle='#0a0a0a'; x.fillRect(Math.round(3*col), y2, W-Math.round(3*col), H-y2);
+  const pb = Math.round(col/3), px = Math.round(4.4*col);                       // PLUGE: below/at/above setup
+  ['#000000','#0a0a0a','#1a1a1a'].forEach((cl,i)=>{ x.fillStyle=cl; x.fillRect(px+i*pb, y2, pb, H-y2); });
+  // the sample carries the drop-zone hint, so it stays visible once the drop zone is hidden
   x.textBaseline='middle'; x.textAlign='center';
-  const hy=H*0.36, hh=88;
-  x.fillStyle='rgba(0,0,0,.45)'; x.fillRect(W*0.20, hy, W*0.60, hh);
-  x.fillStyle='#fff'; x.font='bold 36px system-ui, sans-serif';
+  const hy=Math.round(H*0.30), hh=86;
+  x.fillStyle='rgba(0,0,0,.55)'; x.fillRect(Math.round(W*0.22), hy, Math.round(W*0.56), hh);
+  x.fillStyle='#fff'; x.font='bold 34px system-ui, sans-serif';
   x.fillText('Drop an image', W/2, hy+30);
-  x.font='500 20px system-ui, sans-serif'; x.fillStyle='#e8e8ea';
-  x.fillText('or tap to choose  ·  PNG · JPG · WEBP', W/2, hy+62);
+  x.font='500 19px system-ui, sans-serif'; x.fillStyle='#e8e8ea';
+  x.fillText('or tap to choose  ·  PNG · JPG · WEBP', W/2, hy+60);
   x.textAlign='left';
   commitImage(c, W, H);
 }
