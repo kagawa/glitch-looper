@@ -185,11 +185,13 @@ if (kd.on && (kd.amount==null || kd.amount>0)){
     if (mode===1){
       // Rotate copies: average seg full copies of the frame, each turned by a sector — uses the WHOLE
       // image (not just one wedge), and averaging over a full set of sectors is spin-invariant → seamless.
+      // The copies are always sampled from the IMAGE centre (so each blade is the whole picture), while
+      // Centre X/Y only moves the hub the blades fan around — the two centres are decoupled on purpose.
       R=G=B=0;
       for (let k=0;k<seg;k++){
         const ak=-(k*sector+rot+off), ca=Math.cos(ak), sa=Math.sin(ak);
         const rx=(dx*ca-dy*sa)*scale, ry=(dx*sa+dy*ca)*scale;
-        let sx=(cx+rx)|0, sy=(cy+ry)|0; sx=sx<0?0:sx>=w?w-1:sx; sy=sy<0?0:sy>=h?h-1:sy;
+        let sx=(w*0.5+rx)|0, sy=(h*0.5+ry)|0; sx=sx<0?0:sx>=w?w-1:sx; sy=sy<0?0:sy>=h?h-1:sy;
         const si=(sy*w+sx)*4; R+=s[si]; G+=s[si+1]; B+=s[si+2];
       }
       R/=seg; G/=seg; B/=seg;
