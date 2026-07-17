@@ -286,7 +286,7 @@ function syncSlidersLight(){
 
 // hidden: slowly drift every enabled effect's params for organic, always-changing motion (toggle D)
 let driftTimer = null; const driftTgt = {};
-let autoMs = 4000;      // auto-reroll interval (ms), slider-controlled
+let autoMs = 6000;      // auto-reroll interval (ms), slider-controlled — 2 full 3s loops by default
 let driftAmt = 0.5;     // drift wander range as a fraction of each param's span, slider-controlled
 function driftTick(){
   FX.forEach(f=>{
