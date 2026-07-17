@@ -78,9 +78,10 @@ if (gl.on && gl.amount>0){
     // jump to full offset in one line — a hump that returns to the neighbours at both edges.
     // Give every slice its own top and bottom ease widths (seeded on the slice + loop step so it
     // stays seamless) — a fixed width makes every edge ramp at the same angle, which reads as
-    // mechanical; scattering them 0.5–1.5× and letting top≠bottom breaks that uniformity.
-    const ewTop = ew*(0.5+rand(i*9.3+step*2.1)*1.0);
-    const ewBot = ew*(0.5+rand(i*6.1+step*3.7)*1.0);
+    // mechanical. Each edge also has a fixed chance of snapping fully Hard (width 0 → the offset
+    // lands in one line): mixing genuine hard cuts among the soft ones sells the slice glitch.
+    const ewAt = (s)=> rand(s) < 0.25 ? 0 : ew*(0.3 + rand(s*1.7)*1.2);   // 25% hard, else 0.3–1.5×
+    const ewTop = ewAt(i*9.3+step*2.1), ewBot = ewAt(i*6.1+step*3.7);
     const eTop = Math.min(0.49, ewTop/sh), eBot = Math.min(0.49, ewBot/sh);
     ctx.clearRect(0,sy,w,sh);
     for (let yy=0; yy<sh; yy++){
