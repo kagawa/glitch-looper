@@ -445,7 +445,7 @@ const PRESETS = {
   'Metal':       { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.04,flicker:.02}, color:{on:1,saturate:.8,contrast:1.3,hue:0,tint:0,vignette:.4}, emboss:{on:1,amount:.8,angle:135,mix:.4} },
   'Relief':      { noise:{on:1,grain:.05,flicker:.02}, color:{on:1,saturate:1.0,contrast:1.18,hue:0,tint:0,vignette:.4}, extrude:{on:1,key:0,center:.72,width:.3,angle:135,dist:.4,shade:.7}, bloom:{on:1,amount:.22,size:6} },
   // ---- Hype (dopamine) ----
-  'Jackpot':     { color:{on:1,saturate:1.3,contrast:1.1,bright:1.05,hue:0,tint:.05,vignette:.15}, gold:{on:1,amount:.9,shine:.7,speed:1,angle:45,tone:0}, burst:{on:1,amount:.55,lines:.6,reach:.7,spin:.2,tone:0,blend:0}, sparkle:{on:1,amount:.85,density:.5,size:.45,speed:1,tone:0}, bloom:{on:1,amount:.4,size:10,glow:.3} },
+  'Jackpot':     { color:{on:1,saturate:1.3,contrast:1.1,bright:1.05,hue:0,tint:.05,vignette:.15}, gold:{on:1,amount:.9,shine:.7,speed:1,angle:45,tone:0}, burst:{on:1,amount:.55,lines:.6,reach:.7,spin:.2,tone:0,blend:0}, sparkle:{on:1,amount:.85,density:.5,size:.45,speed:1,tone:0}, rainbow:{on:1,amount:.4,speed:2,angle:45,blend:0} },
   'Gold Rush':   { color:{on:1,saturate:1.25,contrast:1.15,bright:1.05,hue:0,tint:.08,vignette:.1}, gold:{on:1,amount:1,shine:.85,speed:2,angle:45,tone:0}, sparkle:{on:1,amount:.9,density:.4,size:.5,speed:1,tone:0}, bloom:{on:1,amount:.45,size:12,glow:.4} },
   'Fever':       { vhs:{on:1,aberration:6,scanline:.1,bleed:3,tracking:.1,wobble:2}, color:{on:1,saturate:1.6,contrast:1.1,bright:1.05,hue:0,tint:0,vignette:.15}, rainbow:{on:1,amount:.55,speed:2,angle:45,blend:0}, burst:{on:1,amount:.7,lines:.6,reach:.8,spin:.2,tone:2,blend:0}, sparkle:{on:1,amount:.9,density:.6,size:.4,speed:2,tone:2}, bloom:{on:1,amount:.4,size:10,glow:.3} },
   'Prism Rush':  { color:{on:1,saturate:1.5,contrast:1.08,bright:1.05,hue:0,tint:0,vignette:.2}, rainbow:{on:1,amount:.7,speed:3,angle:60,blend:2}, sparkle:{on:1,amount:.7,density:.4,size:.4,speed:2,tone:2}, bloom:{on:1,amount:.45,size:12,glow:.5} },
@@ -456,13 +456,13 @@ const PRESETS = {
 // select layout (group label → preset names)
 const PRESET_GROUPS = [
   ['Classic', ['VHS Tape','8mm Film','Dreamy','CRT','Trinitron','Dead Channel','Broken TV','Backrooms']],
-  ['Hype',    ['Jackpot','Gold Rush','Fever','Prism Rush','Manga']],
+  ['Hype',    ['Jackpot','Gold Rush','Fever','Prism Rush']],
   ['Glitch',  ['Digital Decay','Datamosh','Dead Stream','Frame Skip','Signal Tear','JPEG Databend','PNG Glitch','Databent','Pixel Flow','Roll Break']],
   ['Horror',  ['Cursed Tape','Haunted Film','Corruption','Red Room','Meltdown']],
   ['Vivid',   ['Y2K','Neon','Vaporwave','LED Board','Arcade']],
   ['Camera',  ['Security Cam','Camcorder','Broadcast','Analog TV','Interlaced','Bad Reception','Fisheye Cam','Retro Game','Underwater']],
   ['Lens/FX', ['Peephole','Trip','Newsprint','Dream Bloom','Heat Haze','Wormhole','Sunwashed','Degauss']],
-  ['Art',     ['Cinematic','Acid','Risograph','Metal','Relief']],
+  ['Art',     ['Cinematic','Acid','Risograph','Metal','Relief','Manga']],
 ];
 
 // duotone palettes: [shadow rgb, highlight rgb]

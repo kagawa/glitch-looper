@@ -164,9 +164,9 @@ function buildUI(){
   presetsEl.appendChild(lab); presetsEl.appendChild(presetSel);
 
   // ---- Sequencer: a step grid, one row per ON effect, tap a cell to gate that effect on/off ----
-  const seqCat = document.createElement('div'); seqCat.className='cat seqcat';
+  const seqCat = document.createElement('div'); seqCat.className='cat seqcat open';   // open by default — the grid is a nice thing to see
   const seqHead = document.createElement('div'); seqHead.className='cathead';
-  seqHead.innerHTML = `<span class="catname">⏱ Sequencer</span><span class="catcount" id="seqcount"></span><span class="caret">▶</span>`;
+  seqHead.innerHTML = `<span class="catname">⏱ Sequencer</span><span class="catcount" id="seqcount"></span><span class="caret">▼</span>`;
   const seqBody = document.createElement('div'); seqBody.className='catbody';
   seqBody.innerHTML = `<div id="seqgrid" class="seqgrid"></div>
     <div class="seqnote">Split the loop into ${SEQ_STEPS} steps · tap a cell to skip that effect there · empty row = always on</div>`;
@@ -174,6 +174,7 @@ function buildUI(){
     seqHead.querySelector('.caret').textContent = seqCat.classList.contains('open')?'▼':'▶';
     if (seqCat.classList.contains('open')) buildSeqGrid(); });
   seqCat.appendChild(seqHead); seqCat.appendChild(seqBody); metaPanel.appendChild(seqCat);
+  buildSeqGrid();                                    // populate now since it starts open
 
   updateRows();
 }
