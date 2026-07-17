@@ -178,6 +178,30 @@ const FX = [
     { k:'size',   label:'Size', min:0, max:1, step:.01, def:.5 },
     { k:'drift',  label:'Drift', min:0, max:1, step:.01, def:.4 },
   ]},
+  // ---- hype / dopamine ----
+  { id:'gold', name:'Gold / Chrome', hint:'metallic tone-map with a shine sweep — 5000兆円 gold', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.8, env:1 },
+    { k:'shine',  label:'Shine', min:0, max:1, step:.01, def:.6, env:1 },
+    { k:'tone',   label:'Tone', type:'select', def:0, options:[[0,'Gold'],[1,'Silver'],[2,'Rainbow-gold']] },
+  ]},
+  { id:'rainbow', name:'Rainbow', hint:'full-spectrum overlay, hues cycling over the loop', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.6, env:1 },
+    { k:'speed',  label:'Cycle Speed', min:1, max:6, step:1, def:1 },
+    { k:'angle',  label:'Angle', min:0, max:345, step:15, def:45 },
+    { k:'blend',  label:'Blend', type:'select', def:0, options:[[0,'Overlay'],[1,'Screen'],[2,'Hue (recolor)'],[3,'Soft']] },
+  ]},
+  { id:'sparkle', name:'Sparkle', hint:'twinkling glitter — gold / white / rainbow stars', on:false, open:false, params:[
+    { k:'amount',  label:'Amount', min:0, max:1, step:.01, def:.8, env:1 },
+    { k:'density', label:'Density', min:0, max:1, step:.01, def:.4 },
+    { k:'size',    label:'Size', min:0, max:1, step:.01, def:.4 },
+    { k:'tone',    label:'Tone', type:'select', def:0, options:[[0,'Gold'],[1,'White'],[2,'Rainbow']] },
+  ]},
+  { id:'burst', name:'Burst Lines', hint:'radial 集中線 — spinning speed-lines, pachinko hype', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.6, env:1 },
+    { k:'lines',  label:'Lines', min:0, max:1, step:.01, def:.5 },
+    { k:'spin',   label:'Spin (turns/loop)', min:-2, max:2, step:1, def:1 },
+    { k:'tone',   label:'Tone', type:'select', def:0, options:[[0,'Gold'],[1,'White'],[2,'Rainbow']] },
+  ]},
   { id:'halftone', name:'Halftone', hint:'dot-matrix / newsprint dots', on:false, open:false, params:[
     { k:'cell', label:'Cell Size', min:3, max:20, step:1, def:6 },
     { k:'bg',   label:'Background', type:'select', def:0, options:[[0,'Dark (LED)'],[1,'Light (print)']] },
@@ -345,9 +369,9 @@ const FX_GROUPS = [
   ['Binary Glitch',   ['jpeg','png','webp','gifg','sonify','byteshift','bitplane']],
   ['Pixel Glitch',    ['glitch','mosh','compress','pixsort','databend','bmpmisread','gif']],
   ['Analog / Tape',   ['vhs','sync','roll','film','noise','ghost','dotcrawl','hum','herring']],
-  ['Screen / Optics', ['crt','degauss','halftone','hud','bloom','leak']],
+  ['Screen / Optics', ['crt','degauss','halftone','hud','bloom','leak','sparkle','burst']],
   ['Distort',         ['warp','melt','extrude','feedback','pixelate']],
-  ['Colour / Tone',   ['color','duotone','solarize','posterize','emboss']],
+  ['Colour / Tone',   ['color','duotone','solarize','posterize','emboss','gold','rainbow']],
   ['Video',           ['time','playback','stale','synctear','interlace','chroma']],          // acts on the footage, not on any one frame
   ['Global',          ['zoom','mask','motion']],
 ];
@@ -413,6 +437,11 @@ const PRESETS = {
   'Risograph':   { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.12,flicker:.03}, color:{on:1,saturate:1.1,contrast:1.15,hue:0,tint:0,vignette:.35}, posterize:{on:1,levels:4,dither:.6}, duotone:{on:1,preset:1,amount:.55} },
   'Metal':       { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.04,flicker:.02}, color:{on:1,saturate:.8,contrast:1.3,hue:0,tint:0,vignette:.4}, emboss:{on:1,amount:.8,angle:135,mix:.4} },
   'Relief':      { noise:{on:1,grain:.05,flicker:.02}, color:{on:1,saturate:1.0,contrast:1.18,hue:0,tint:0,vignette:.4}, extrude:{on:1,key:0,center:.72,width:.3,angle:135,dist:.4,shade:.7}, bloom:{on:1,amount:.22,size:6} },
+  // ---- Hype (dopamine) ----
+  'Jackpot':     { color:{on:1,saturate:1.3,contrast:1.1,bright:1.05,hue:0,tint:.05,vignette:.15}, gold:{on:1,amount:.9,shine:.7,tone:0}, burst:{on:1,amount:.55,lines:.6,spin:1,tone:0}, sparkle:{on:1,amount:.85,density:.5,size:.45,tone:0}, bloom:{on:1,amount:.4,size:10,glow:.3} },
+  '5000兆円':     { color:{on:1,saturate:1.25,contrast:1.15,bright:1.05,hue:0,tint:.08,vignette:.1}, gold:{on:1,amount:1,shine:.85,tone:0}, sparkle:{on:1,amount:.9,density:.4,size:.5,tone:0}, bloom:{on:1,amount:.45,size:12,glow:.4} },
+  'Pachinko':    { vhs:{on:1,aberration:6,scanline:.1,bleed:3,tracking:.1,wobble:2}, color:{on:1,saturate:1.6,contrast:1.1,bright:1.05,hue:0,tint:0,vignette:.15}, rainbow:{on:1,amount:.55,speed:2,angle:45,blend:0}, burst:{on:1,amount:.7,lines:.6,spin:1,tone:2}, sparkle:{on:1,amount:.9,density:.6,size:.4,tone:2}, bloom:{on:1,amount:.4,size:10,glow:.3} },
+  'Prism Rush':  { color:{on:1,saturate:1.5,contrast:1.08,bright:1.05,hue:0,tint:0,vignette:.2}, rainbow:{on:1,amount:.7,speed:3,angle:60,blend:2}, sparkle:{on:1,amount:.7,density:.4,size:.4,tone:2}, bloom:{on:1,amount:.45,size:12,glow:.5}, feedback:{on:0} },
   // ---- Reset ----
   'Clean':       { vhs:{on:0}, glitch:{on:0}, noise:{on:0}, color:{on:0} },
 };
@@ -425,6 +454,7 @@ const PRESET_GROUPS = [
   ['Camera',  ['Security Cam','Camcorder','Broadcast','Analog TV','Interlaced','Bad Reception','Fisheye Cam','Retro Game','Underwater']],
   ['Lens/FX', ['Peephole','Trip','Newsprint','Dream Bloom','Heat Haze','Wormhole','Sunwashed','Degauss']],
   ['Art',     ['Cinematic','Acid','Risograph','Metal','Relief']],
+  ['Hype',    ['Jackpot','5000兆円','Pachinko','Prism Rush']],
 ];
 
 // duotone palettes: [shadow rgb, highlight rgb]

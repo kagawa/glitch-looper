@@ -117,6 +117,10 @@ function drawFrame(phase){    // phase in [0,1)
 
   applyDuotone(w,h);
 
+  applyGold(w,h,phase);
+
+  applyRainbow(w,h,phase);
+
   applyTracking(w,h,phase,v);
 
   applyNoise(w,h,phase);
@@ -164,6 +168,10 @@ function drawFrame(phase){    // phase in [0,1)
   applyFinalZoom(w,h);
 
   applyLightLeak(w,h,phase);
+
+  applyBurst(w,h,phase);
+
+  applySparkle(w,h,phase);
 
   // ---- HUD / text overlay (drawn last so it stays crisp) ----
   if (state.hud.on) drawHUD(w,h,phase);

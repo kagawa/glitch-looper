@@ -160,7 +160,8 @@ const RAND_PROB = { png:.12, jpeg:.15, warp:.18, halftone:.12, feedback:.12, mel
                     sonify:.12, byteshift:.12, bitplane:.1, bmpmisread:.14, webp:.1, gifg:.1,
                     extrude:.12, time:.1, playback:.1, interlace:.1, stale:.1, synctear:.1, chroma:.12,   // these re-render the frame — keep them rare
                     // colour-mapping / stylise effects: keep them occasional, emboss rarest
-                    duotone:.14, solarize:.14, posterize:.14, emboss:.04 };
+                    duotone:.14, solarize:.14, posterize:.14, emboss:.04,
+                    gold:.08, rainbow:.07, sparkle:.1, burst:.05 };   // loud hype effects — keep them occasional
 // three strength levels: prob = on-probability scale, str = how far params stray from their default.
 // str stays low at Normal so params sit near their (gentle) defaults instead of jumping to extremes.
 // seq/seqHeavy = chance a roll gives an effect a Sequencer pattern (heavy = higher, for destructive fx).

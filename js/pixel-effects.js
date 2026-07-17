@@ -156,3 +156,55 @@ if (duo.on && duo.amount>0){
   ctx.putImageData(id,0,0);
 }
 }
+
+// shared HSV→RGB (used by the rainbow/gold hype effects). h in degrees, s/v in 0..1 → [r,g,b] 0..255
+function hsv(h,s,v){ h=((h%360)+360)%360/60; const c=v*s, x=c*(1-Math.abs(h%2-1)), m=v-c;
+  let r,g,b; if(h<1){r=c;g=x;b=0;} else if(h<2){r=x;g=c;b=0;} else if(h<3){r=0;g=c;b=x;}
+  else if(h<4){r=0;g=x;b=c;} else if(h<5){r=x;g=0;b=c;} else {r=c;g=0;b=x;}
+  return [Math.round((r+m)*255),Math.round((g+m)*255),Math.round((b+m)*255)]; }
+
+function applyGold(w,h,phase){
+// ---- Gold / Chrome: map luma to a metallic gradient with a shine band sweeping over the loop ----
+const gd = state.gold;
+if (gd.on && gd.amount>0){
+  const a = P('gold','amount'), shine = gd.shine, tone = gd.tone|0;
+  // ramp: shadow → body → bright → specular
+  const RAMPS = { 0:[[40,20,0],[150,95,10],[240,190,60],[255,244,200]],      // Gold
+                  1:[[24,27,33],[120,128,140],[205,212,222],[255,255,255]] };// Silver / chrome
+  const ramp = RAMPS[tone] || RAMPS[0];
+  const lerp3=(c0,c1,t)=>[c0[0]+(c1[0]-c0[0])*t, c0[1]+(c1[1]-c0[1])*t, c0[2]+(c1[2]-c0[2])*t];
+  const map=(lum)=> tone===2 ? hsv(40+lum*90, 0.85, 0.2+lum*0.8)            // Rainbow-gold: hue swings with luma
+    : lum<0.5 ? lerp3(ramp[0],ramp[1],lum/0.5)
+    : lum<0.8 ? lerp3(ramp[1],ramp[2],(lum-0.5)/0.3)
+    :           lerp3(ramp[2],ramp[3],(lum-0.8)/0.2);
+  const bandPos=((phase%1)+1)%1;                                             // sweeps the diagonal each loop
+  const id=ctx.getImageData(0,0,w,h), d=id.data;
+  for (let p=0,i=0;i<d.length;i+=4,p++){
+    const lum=(d[i]*0.3+d[i+1]*0.59+d[i+2]*0.11)/255;
+    let c=map(lum), r=c[0], g=c[1], b=c[2];
+    if (shine>0){
+      const x=p%w, y=(p/w)|0, diag=(x/w+y/h)/2;
+      const dist=Math.abs(((diag-bandPos+1.5)%1)-0.5)*2;                     // wrapped → seamless at the loop
+      const boost=Math.max(0,1-dist*6)*shine*190;                           // narrow specular band
+      r=Math.min(255,r+boost); g=Math.min(255,g+boost); b=Math.min(255,b+boost*0.8);
+    }
+    d[i]+=(r-d[i])*a; d[i+1]+=(g-d[i+1])*a; d[i+2]+=(b-d[i+2])*a;
+  }
+  ctx.putImageData(id,0,0);
+}
+}
+
+function applyRainbow(w,h,phase){
+// ---- Rainbow: a full-spectrum gradient whose hues cycle over the loop, blended on top ----
+const rb = state.rainbow;
+if (rb.on && rb.amount>0){
+  const a=P('rainbow','amount'), ang=(rb.angle|0)*Math.PI/180;
+  const cx=w/2, cy=h/2, L=(Math.abs(Math.cos(ang))*w+Math.abs(Math.sin(ang))*h)/2;
+  const g=ctx.createLinearGradient(cx-Math.cos(ang)*L, cy-Math.sin(ang)*L, cx+Math.cos(ang)*L, cy+Math.sin(ang)*L);
+  const N=12, off=phase*(rb.speed|0||1);                                     // integer cycles/loop → seamless
+  for(let i=0;i<=N;i++) g.addColorStop(i/N, `hsl(${((i/N+off)%1)*360},100%,55%)`);
+  const BLEND=['overlay','screen','hue','soft-light'];
+  ctx.save(); ctx.globalCompositeOperation=BLEND[rb.blend|0]||'overlay'; ctx.globalAlpha=a;
+  ctx.fillStyle=g; ctx.fillRect(0,0,w,h); ctx.restore();
+}
+}
