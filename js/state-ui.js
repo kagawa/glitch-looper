@@ -242,7 +242,7 @@ function applyPreset(name){
   FX.forEach(f=>{
     const pp = p[f.id] || {};
     state[f.id].on = !!pp.on;
-    state[f.id]._seq = null;                    // a preset is a whole look — clear any sequencer pattern
+    state[f.id]._seq = (pp._seq && pp._seq.length) ? pp._seq.map(v=>!!v) : null;   // a preset may bake in a sequencer pattern
     // Anything the preset doesn't name goes back to the effect's default rather than keeping
     // whatever the user last had — otherwise a preset renders differently depending on what was
     // fiddled with before it was picked, and picking it twice gives two different looks.
