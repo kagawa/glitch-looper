@@ -25,6 +25,7 @@ const FX = [
   { id:'color', name:'Color', hint:'grade · fade', on:false, open:false, params:[
     { k:'saturate', label:'Saturation',   min:0, max:2, step:.01, def:1.2 },
     { k:'contrast', label:'Contrast', min:0, max:2, step:.01, def:1.1 },
+    { k:'bright',   label:'Brightness', min:.5, max:2, step:.01, def:1, env:1 },
     { k:'hue',      label:'Hue Rotate', min:-180, max:180, step:1, def:0 },
     { k:'tint',     label:'Tint (blue⇄orange)', min:-1, max:1, step:.01, def:0 },
     { k:'vignette', label:'Vignette', min:0, max:1, step:.01, def:.3 },
@@ -165,9 +166,17 @@ const FX = [
     { k:'size',    label:'Size', min:.5, max:2.5, step:.1, def:1 },
     { k:'opacity', label:'Opacity', min:0, max:1, step:.01, def:.9 },
   ]},
-  { id:'bloom', name:'Bloom', hint:'glow / light bleed on highlights', on:false, open:false, params:[
+  { id:'bloom', name:'Bloom', hint:'glow / light bleed — Halation lifts the whole frame (high-key)', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
     { k:'size',   label:'Radius', min:1, max:30, step:1, def:8 },
+    { k:'glow',   label:'Halation (high-key)', min:0, max:1, step:.01, def:0, env:1 },
+  ]},
+  { id:'leak', name:'Light Leak', hint:'warm light bleeds in from an edge and drifts over the loop — brightens', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
+    { k:'tone',   label:'Tone', type:'select', def:0, options:[[0,'Warm'],[1,'Gold'],[2,'Red'],[3,'White'],[4,'Cool']] },
+    { k:'pos',    label:'From', type:'select', def:0, options:[[0,'Left'],[1,'Right'],[2,'Top'],[3,'Bottom'],[4,'Corner']] },
+    { k:'size',   label:'Size', min:0, max:1, step:.01, def:.5 },
+    { k:'drift',  label:'Drift', min:0, max:1, step:.01, def:.4 },
   ]},
   { id:'halftone', name:'Halftone', hint:'dot-matrix / newsprint dots', on:false, open:false, params:[
     { k:'cell', label:'Cell Size', min:3, max:20, step:1, def:6 },
@@ -336,7 +345,7 @@ const FX_GROUPS = [
   ['Binary Glitch',   ['jpeg','png','webp','gifg','sonify','byteshift','bitplane']],
   ['Pixel Glitch',    ['glitch','mosh','compress','pixsort','databend','bmpmisread','gif']],
   ['Analog / Tape',   ['vhs','sync','roll','film','noise','ghost','dotcrawl','hum','herring']],
-  ['Screen / Optics', ['crt','degauss','halftone','hud','bloom']],
+  ['Screen / Optics', ['crt','degauss','halftone','hud','bloom','leak']],
   ['Distort',         ['warp','melt','extrude','feedback','pixelate']],
   ['Colour / Tone',   ['color','duotone','solarize','posterize','emboss']],
   ['Video',           ['time','playback','stale','synctear','interlace','chroma']],          // acts on the footage, not on any one frame
@@ -397,6 +406,7 @@ const PRESETS = {
   'Dream Bloom': { vhs:{on:1,aberration:8,scanline:.1,bleed:6,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.03}, color:{on:1,saturate:1.3,contrast:.95,hue:0,tint:-.2,vignette:.4}, bloom:{on:1,amount:.6,size:10} },
   'Heat Haze':   { vhs:{on:1,aberration:5,scanline:.1,bleed:3,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.07,flicker:.05}, color:{on:1,saturate:1.15,contrast:1.05,hue:15,tint:.25,vignette:.4}, warp:{on:1,amp:6,freq:4,speed:2} },
   'Wormhole':    { vhs:{on:1,aberration:10,scanline:.15,bleed:4,tracking:.1,wobble:2}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.03}, color:{on:1,saturate:1.5,contrast:1.05,hue:-60,tint:0,vignette:.5}, feedback:{on:1,amount:.6,zoom:.84,copies:6,flow:1,rotate:20,speed:0,pulse:.5} },
+  'Sunwashed':   { vhs:{on:1,aberration:5,scanline:.08,bleed:3,tracking:.1,wobble:1}, noise:{on:1,grain:.06,flicker:.03}, color:{on:1,saturate:1.15,contrast:1.0,bright:1.28,hue:0,tint:.18,vignette:.12}, bloom:{on:1,amount:.5,size:12,glow:.6}, leak:{on:1,amount:.55,tone:1,pos:1,size:.6,drift:.4} },
   // ---- Art ----
   'Cinematic':   { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.05,flicker:.02}, color:{on:1,saturate:1.0,contrast:1.1,hue:0,tint:0,vignette:.45}, bloom:{on:1,amount:.3,size:8}, duotone:{on:1,preset:0,amount:.7} },
   'Acid':        { vhs:{on:1,aberration:6,scanline:.1,bleed:2,tracking:.1,wobble:2}, glitch:{on:1,amount:.25,slices:16,shift:20,rgb:8}, noise:{on:1,grain:.06,flicker:.05}, color:{on:1,saturate:1.5,contrast:1.1,hue:40,tint:0,vignette:.3}, solarize:{on:1,threshold:.5,amount:.85} },
@@ -413,7 +423,7 @@ const PRESET_GROUPS = [
   ['Horror',  ['Cursed Tape','Haunted Film','Corruption','Red Room','Meltdown']],
   ['Vivid',   ['Y2K','Neon','Vaporwave','LED Board','Arcade']],
   ['Camera',  ['Security Cam','Camcorder','Broadcast','Analog TV','Interlaced','Bad Reception','Fisheye Cam','Retro Game','Underwater']],
-  ['Lens/FX', ['Peephole','Trip','Newsprint','Dream Bloom','Heat Haze','Wormhole','Degauss']],
+  ['Lens/FX', ['Peephole','Trip','Newsprint','Dream Bloom','Heat Haze','Wormhole','Sunwashed','Degauss']],
   ['Art',     ['Cinematic','Acid','Risograph','Metal','Relief']],
 ];
 

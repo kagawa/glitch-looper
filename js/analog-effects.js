@@ -82,8 +82,13 @@ function applyBloom(w,h){
 // ---- bloom: blurred bright pass screened back over ----
 const bl = state.bloom;
 if (bl.on && bl.amount>0){
+  // Halation lowers the contrast of the bright pass so mid-tones survive it too — the glow spreads
+  // across the whole frame and lifts it (high-key), instead of only blooming the highlights.
+  const g = P('bloom','glow');
+  const contrast = 1.8 - 1.15*g;      // 1.8 (tight highlights) → 0.65 (whole frame veils)
+  const bright   = 1.5 + 0.45*g;      // push it brighter as the veil widens
   sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h);
-  sctx.filter=`blur(${bl.size}px) brightness(1.5) contrast(1.8)`;
+  sctx.filter=`blur(${bl.size}px) brightness(${bright}) contrast(${contrast})`;
   sctx.drawImage(canvas,0,0); sctx.filter='none';
   ctx.save(); ctx.globalCompositeOperation='screen'; ctx.globalAlpha=P('bloom','amount'); ctx.drawImage(sc,0,0); ctx.restore();
 }

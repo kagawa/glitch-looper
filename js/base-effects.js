@@ -13,7 +13,7 @@ function rollEase(p, mode){
 function drawBaseFrame(w,h,phase,t,c,v,rl,fm,fseed){
 // ---- base image into scratch canvas, with color/sepia filter ----
 let fp = [];
-if (c.on){ fp.push(`saturate(${c.saturate})`, `contrast(${c.contrast})`); if (c.hue) fp.push(`hue-rotate(${c.hue}deg)`); }
+if (c.on){ fp.push(`saturate(${c.saturate})`, `contrast(${c.contrast})`, `brightness(${P('color','bright')})`); if (c.hue) fp.push(`hue-rotate(${c.hue}deg)`); }
 if (fm.on && fm.sepia>0){ fp.push(`sepia(${fm.sepia})`); }
 // pick base image: real PNG glitch > real JPEG databend > real WebP databend > original
 let base = img;

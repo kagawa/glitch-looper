@@ -127,6 +127,35 @@ if (state.zoom.on){
 }
 }
 
+function applyLightLeak(w,h,phase){
+// ---- Light Leak: a warm glow bleeds in from an edge and drifts over the loop, screened on top ----
+//      A brightening counterpart to all the darkening effects — screen blend only ever lifts pixels.
+const lk = state.leak;
+if (lk.on && lk.amount>0){
+  const TONE = [[255,150,60],[255,200,95],[255,80,55],[255,244,224],[150,205,255]];  // warm/gold/red/white/cool
+  const col = TONE[lk.tone|0] || TONE[0];
+  const spread = 0.3 + lk.size*0.7;                    // gradient reach as a fraction of the frame
+  const r = Math.max(w,h)*spread;
+  const bob = Math.sin(phase*Math.PI*2)*0.42*lk.drift; // seamless drift along the entering edge
+  let cx, cy;
+  switch (lk.pos|0){
+    case 1: cx=w*1.02; cy=h*(0.5+bob); break;          // right
+    case 2: cx=w*(0.5+bob); cy=-h*0.02; break;         // top
+    case 3: cx=w*(0.5+bob); cy=h*1.02; break;          // bottom
+    case 4: cx=w*(0.04+0.12*(bob+0.42)); cy=h*(0.04+0.12*(bob+0.42)); break;   // corner
+    default: cx=-w*0.02; cy=h*(0.5+bob);               // left
+  }
+  const g = ctx.createRadialGradient(cx,cy,0, cx,cy,r);
+  const cs = a=> `rgba(${col[0]},${col[1]},${col[2]},${a})`;
+  g.addColorStop(0, cs(1)); g.addColorStop(0.45, cs(0.4)); g.addColorStop(1, cs(0));
+  ctx.save();
+  ctx.globalCompositeOperation='screen';
+  ctx.globalAlpha = P('leak','amount');
+  ctx.fillStyle = g; ctx.fillRect(0,0,w,h);
+  ctx.restore();
+}
+}
+
 function applyCrtBezel(w,h,cr){
 // ---- CRT screen bezel: bulged-rectangle (barrel) silhouette, not a plain round-rect ----
 if (cr.on && (cr.round>0 || cr.frame>0)){

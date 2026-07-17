@@ -163,6 +163,8 @@ function drawFrame(phase){    // phase in [0,1)
 
   applyFinalZoom(w,h);
 
+  applyLightLeak(w,h,phase);
+
   // ---- HUD / text overlay (drawn last so it stays crisp) ----
   if (state.hud.on) drawHUD(w,h,phase);
 
