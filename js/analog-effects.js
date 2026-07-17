@@ -27,12 +27,15 @@ if (n.on && (n.grain>0 || n.flicker>0)){
     const type = n.type|0;
     const sz = 1 + Math.round((n.size||0)*11);       // grain cell size: 1px (fine) → chunky blocks
     const cw = Math.ceil(w/sz);                       // cells per row (a whole cell shares one noise value)
-    const density = type===2 ? P('noise','grain')*0.15 : 0;
+    const density = (type===2||type===3) ? P('noise','grain')*0.15 : 0;
     for (let p=0,i=0;i<d.length;i+=4,p++){
       const cid = ((p/w|0)/sz|0)*cw + ((p%w)/sz|0);   // cell index → coarse when sz>1, per-pixel when sz==1
-      if (type===2){                                  // salt & pepper: sparse white/black specks
-        if (rand(cid*0.37+seed*1.7)<density){ const v=rand(cid*0.53+seed)>0.5?255:0; d[i]=v; d[i+1]=v; d[i+2]=v; }
-      } else if (type===1){                           // colour: independent per channel → chroma static
+      if (type>=2){                                   // sparse specks
+        if (rand(cid*0.37+seed*1.7)<density){
+          if (type===3){ const c=hsv(rand(cid*0.71+seed)*360,0.95,1); d[i]=c[0]; d[i+1]=c[1]; d[i+2]=c[2]; }  // vivid colour specks
+          else { const v=rand(cid*0.53+seed)>0.5?255:0; d[i]=v; d[i+1]=v; d[i+2]=v; }                          // salt & pepper
+        }
+      } else if (type===1){                           // chroma: independent per channel → RGB static
         d[i]+=(rand(cid*0.37+seed)-0.5)*amp; d[i+1]+=(rand(cid*0.37+seed+11.3)-0.5)*amp; d[i+2]+=(rand(cid*0.37+seed+27.7)-0.5)*amp;
       } else {                                        // luma: same value on every channel (mono grain)
         const nz=(rand(cid*0.37+seed)-0.5)*amp; d[i]+=nz; d[i+1]+=nz; d[i+2]+=nz;

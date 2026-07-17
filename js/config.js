@@ -21,7 +21,7 @@ const FX = [
   { id:'noise', name:'Noise', hint:'grain — luma / colour / salt & pepper', on:false, open:false, params:[
     { k:'grain',    label:'Grain',   min:0, max:1, step:.01, def:.18, env:1, envd:1 },
     { k:'size',     label:'Grain Size', min:0, max:1, step:.01, def:0 },
-    { k:'type',     label:'Type', type:'select', def:0, options:[[0,'Luma'],[1,'Colour'],[2,'Salt & Pepper']] },
+    { k:'type',     label:'Type', type:'select', def:0, options:[[0,'Luma'],[1,'Chroma'],[2,'Salt & Pepper'],[3,'Colour Specks']] },
     { k:'flicker',  label:'Flicker',  min:0, max:1, step:.01, def:.1, env:1, envd:1 },
   ]},
   { id:'color', name:'Color', hint:'grade · fade', on:false, open:false, params:[
