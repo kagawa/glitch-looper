@@ -76,6 +76,7 @@ const resetBtn = document.getElementById('resetBtn');
 const rndBtn = document.getElementById('rndBtn');
 const randSeg = document.getElementById('randLevel');
 let randLevelVal = 'normal';                                  // default = weakest tier
+let randMin = 1, randMax = 5;   // clamp how many effects a roll turns on (declared early: used by applyLevelRange)
 randSeg.querySelectorAll('button').forEach(b=>{
   b.onclick = ()=>{ randLevelVal = b.dataset.v;
     randSeg.querySelectorAll('button').forEach(x=> x.classList.toggle('active', x===b));
@@ -188,7 +189,6 @@ function randomSeqPattern(){
   if (s.every(v=>v))  s[Math.floor(Math.random()*n)] = false;  // never all-on (pointless → keep it a pattern)
   return s;
 }
-let randMin = 1, randMax = 5;              // clamp how many effects a roll turns on (UI: random popover)
 function randomizeFX(){
   const lv = RAND_LEVELS[randLevelVal] || RAND_LEVELS.normal;
   if (!seedLocked){ randomSeed = Math.floor(Math.random()*1_000_000); syncSeedUI(); }
