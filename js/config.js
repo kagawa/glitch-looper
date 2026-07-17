@@ -52,7 +52,7 @@ const FX = [
     { k:'chaos',     label:'Jitter', min:0, max:1, step:.01, def:.6 },
     { k:'rate',      label:'Change Rate', min:1, max:30, step:1, def:10 },
   ]},
-  { id:'jpeg', name:'JPEG Databend', hint:'real byte corruption · DCT block melt', on:false, open:false, params:[
+  { id:'jpeg', name:'JPEG Glitch', hint:'real byte corruption · DCT block melt', on:false, open:false, params:[
     { k:'amount',  label:'Corruption', min:0, max:1, step:.01, def:.3 },
     { k:'quality', label:'Quality (coarse)', min:.05, max:.95, step:.01, def:.35 },
     { k:'frames',  label:'Frames', min:1, max:16, step:1, def:6 },
@@ -117,12 +117,12 @@ const FX = [
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
     { k:'bits',   label:'Bit Split', min:2, max:7, step:1, def:6 },
   ]},
-  { id:'webp', name:'WebP Databend', hint:'real WebP re-encode + byte corruption (VP8 predictive glitch)', on:false, open:false, params:[
+  { id:'webp', name:'WebP Glitch', hint:'real WebP re-encode + byte corruption (VP8 predictive glitch)', on:false, open:false, params:[
     { k:'amount', label:'Corruption', min:0, max:1, step:.01, def:.3 },
     { k:'quality',label:'Quality', min:1, max:90, step:1, def:40 },
     { k:'frames', label:'Frames', min:1, max:12, step:1, def:6 },
   ]},
-  { id:'gifg', name:'GIF Databend', hint:'real GIF encode + byte corruption — LZW image data & colour table (separate)', on:false, open:false, params:[
+  { id:'gifg', name:'GIF Glitch', hint:'real GIF encode + byte corruption — LZW image data & colour table (separate)', on:false, open:false, params:[
     { k:'data',    label:'Data (LZW)', min:0, max:1, step:.01, def:.5 },
     { k:'palette', label:'Palette', min:0, max:1, step:.01, def:.4 },
     { k:'frames',  label:'Frames', min:1, max:12, step:1, def:6 },
@@ -466,7 +466,7 @@ const PRESETS = {
   // temporal (Video) showcases — each carries its own frame motion (roll / warp) so the effects bite
   'Frame Skip':  { vhs:{on:1,aberration:3,scanline:.1,bleed:2,tracking:.2,wobble:2}, noise:{on:1,grain:.08,flicker:.05}, color:{on:1,saturate:.95,contrast:1.12,hue:0,tint:-.03,vignette:.35}, warp:{on:1,amp:3,freq:4,speed:1,warpmode:0}, roll:{on:1,hspeed:.3,hstep:0,vspeed:.35,band:.4}, time:{on:1,hold:3,drop:.25,trail:0,gap:5,trailn:3}, playback:{on:1,order:3,olen:6} },
   'Signal Tear': { vhs:{on:1,aberration:5,scanline:.15,bleed:2,tracking:.35,wobble:3}, noise:{on:1,grain:.12,flicker:.1}, color:{on:1,saturate:1.0,contrast:1.12,hue:0,tint:0,vignette:.4}, roll:{on:1,hspeed:.4,hstep:0,vspeed:.4,band:.5}, synctear:{on:1,amount:.8,tears:4,shift:40,delay:3,rate:6,edge:0}, stale:{on:1,amount:.4,block:16,age:5,steps:2,gop:0,rate:5} },
-  'JPEG Databend':{ vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.05}, color:{on:0}, roll:{on:0}, film:{on:0}, mosh:{on:0}, jpeg:{on:1,amount:.35,quality:.3,frames:8}, png:{on:0} },
+  'JPEG Glitch':{ vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.06,flicker:.05}, color:{on:0}, roll:{on:0}, film:{on:0}, mosh:{on:0}, jpeg:{on:1,amount:.35,quality:.3,frames:8}, png:{on:0} },
   'PNG Glitch':  { vhs:{on:0}, glitch:{on:0}, noise:{on:0}, color:{on:0}, roll:{on:0}, film:{on:0}, mosh:{on:0}, jpeg:{on:0}, png:{on:1,amount:.3,noise:.15,dir:0,frames:8} },
   'Roll Break':  { vhs:{on:1,aberration:6,scanline:.3,bleed:2,tracking:.5,wobble:4}, glitch:{on:1,amount:.22,slices:16,shift:18,rgb:6}, noise:{on:1,grain:.15,flicker:.1}, color:{on:0}, roll:{on:1,hspeed:1.5,hstep:.4,vspeed:.5,band:.5}, film:{on:0}, mosh:{on:0} },
   // ---- Horror ----
@@ -525,7 +525,7 @@ const PRESETS = {
 // select layout (group label → preset names)
 const PRESET_GROUPS = [
   ['Analog / Camera',      ['VHS Tape','8mm Film','CRT','Trinitron','Analog TV','Security Cam','Camcorder','Broadcast','Interlaced','Bad Reception','Broken TV','Dead Channel','Roll Break','Degauss']],
-  ['Digital Glitch',       ['Digital Decay','Datamosh','Dead Stream','Frame Skip','Signal Tear','JPEG Databend','PNG Glitch','Pixel Flow','Corruption']],
+  ['Digital Glitch',       ['Digital Decay','Datamosh','Dead Stream','Frame Skip','Signal Tear','JPEG Glitch','PNG Glitch','Pixel Flow','Corruption']],
   ['Horror',               ['Cursed Tape','Haunted Film','Red Room','Meltdown','Backrooms']],
   ['Vivid / Hype',         ['Jackpot','Gold Rush','Fever','Prism Rush','Y2K','Neon','Vaporwave']],
   ['Dream / Light',        ['Pastel Dream','Angelcore','Fairy Dust','Hologram','Oil Slick','Aqua Glass','Sunwashed','Teal & Peach','Dreamy']],
