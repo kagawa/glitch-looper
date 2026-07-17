@@ -152,6 +152,48 @@ function hypeColor(tone, frac, sat, count){
   return HYPE_TONE[tone]||HYPE_TONE[0];
 }
 
+function applyBokeh(w,h,phase){
+// ---- Bokeh Bloom: soft light discs grown from the picture's own highlights, breathing over the loop ----
+const bk = state.bokeh;
+if (bk.on && bk.amount>0){
+  const amt=P('bokeh','amount'), N=Math.round(10+bk.density*80), thr=bk.thresh, base=5+P('bokeh','size')*48, shape=bk.shape|0;
+  const id=ctx.getImageData(0,0,w,h), d=id.data;
+  ctx.save(); ctx.globalCompositeOperation='screen';
+  for (let i=0;i<N;i++){
+    const px=(rand(i*12.9+1)*w)|0, py=(rand(i*78.2+3)*h)|0, si=(py*w+px)*4;
+    const lum=(d[si]*0.299+d[si+1]*0.587+d[si+2]*0.114)/255; if (lum<thr) continue;
+    const str=(lum-thr)/(1-thr+1e-3);
+    const bob=Math.sin(phase*Math.PI*2 + rand(i*5.7)*6)*10;                        // gentle drift (seamless)
+    const pulse=1+0.16*Math.sin(phase*Math.PI*2 + rand(i*3.3)*6);
+    const s=base*(0.5+rand(i*9.1)*1.0)*pulse;
+    drawBokeh(px, py+bob, s, [d[si],d[si+1],d[si+2]], amt*str*0.6, shape);
+  }
+  ctx.restore();
+}
+}
+function drawBokeh(x,y,s,col,alpha,shape){
+  if (s<1 || alpha<=0.01) return;
+  const [r,g,b]=col; ctx.globalAlpha=Math.min(1,alpha);
+  if (shape===0){                                                                 // circle: soft disc with a brighter rim
+    const rg=ctx.createRadialGradient(x,y,0,x,y,s);
+    rg.addColorStop(0,`rgba(${r},${g},${b},0.55)`); rg.addColorStop(0.75,`rgba(${r},${g},${b},0.32)`);
+    rg.addColorStop(0.92,`rgba(${r},${g},${b},0.7)`); rg.addColorStop(1,`rgba(${r},${g},${b},0)`);
+    ctx.fillStyle=rg; ctx.beginPath(); ctx.arc(x,y,s,0,7); ctx.fill(); return;
+  }
+  ctx.fillStyle=`rgba(${r},${g},${b},0.55)`; ctx.beginPath();
+  if (shape===3){ const t=s*0.95;                                                 // heart
+    ctx.moveTo(x,y+t*0.55);
+    ctx.bezierCurveTo(x+t,y-t*0.35, x+t*0.5,y-t, x,y-t*0.3);
+    ctx.bezierCurveTo(x-t*0.5,y-t, x-t,y-t*0.35, x,y+t*0.55);
+  } else {
+    const pts = shape===1?6 : shape===4?4 : 10;                                   // hexagon / diamond / 5-point star
+    for (let k=0;k<pts;k++){ const rad=(shape===2 && k%2)?s*0.45:s, a=-Math.PI/2+k*(Math.PI*2/pts);
+      const vx=x+Math.cos(a)*rad, vy=y+Math.sin(a)*rad; k===0?ctx.moveTo(vx,vy):ctx.lineTo(vx,vy); }
+    ctx.closePath();
+  }
+  ctx.fill();
+}
+
 function applySparkle(w,h,phase){
 // ---- Sparkle: seeded twinkling glints, screened on top — each twinkles an integer number of times
 //      over the loop so it lands back where it started (seamless), positions fixed by the seed ----

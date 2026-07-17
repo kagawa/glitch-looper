@@ -241,6 +241,34 @@ const FX = [
     { k:'speed',     label:'Shift Speed', min:0, max:4, step:1, def:1 },
     { k:'edge',      label:'Apply To', type:'select', def:0, options:[[0,'All'],[1,'Edges only']] },
   ]},
+  { id:'bokeh', name:'Bokeh Bloom', hint:'soft light discs bloom from the highlights', on:false, open:false, params:[
+    { k:'amount',  label:'Amount', min:0, max:1, step:.01, def:.6, env:1 },
+    { k:'density', label:'Density', min:0, max:1, step:.01, def:.4 },
+    { k:'size',    label:'Size', min:0, max:1, step:.01, def:.5, env:1 },
+    { k:'thresh',  label:'Threshold', min:0, max:1, step:.01, def:.6 },
+    { k:'shape',   label:'Shape', type:'select', def:0, options:[[0,'Circle'],[1,'Hexagon'],[2,'Star'],[3,'Heart'],[4,'Diamond']] },
+  ]},
+  { id:'foil', name:'Holographic Foil', hint:'diagonal rainbow diffraction — hologram sticker', on:false, open:false, params:[
+    { k:'amount',  label:'Amount', min:0, max:1, step:.01, def:.6, env:1 },
+    { k:'density', label:'Bands', min:1, max:12, step:1, def:5 },
+    { k:'angle',   label:'Angle', min:0, max:345, step:15, def:45 },
+    { k:'speed',   label:'Shift Speed', min:0, max:4, step:1, def:1 },
+    { k:'sheen',   label:'Sheen', min:0, max:1, step:.01, def:.5 },
+  ]},
+  { id:'liquid', name:'Liquid Glass', hint:'flowing 2D refraction — water / glass', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:1, env:1 },
+    { k:'amp',    label:'Refraction', min:0, max:1, step:.01, def:.4, env:1 },
+    { k:'scale',  label:'Scale', min:0, max:1, step:.01, def:.5 },
+    { k:'speed',  label:'Flow', min:0, max:4, step:1, def:1 },
+    { k:'chroma', label:'Chromatic Edge', min:0, max:1, step:.01, def:.3 },
+  ]},
+  { id:'paper', name:'Paper Cutout', hint:'posterized paper layers with drop shadows', on:false, open:false, params:[
+    { k:'amount',  label:'Amount', min:0, max:1, step:.01, def:1, env:1 },
+    { k:'levels',  label:'Layers', min:2, max:8, step:1, def:4 },
+    { k:'depth',   label:'Shadow', min:0, max:1, step:.01, def:.5 },
+    { k:'angle',   label:'Light Angle', min:0, max:345, step:15, def:135 },
+    { k:'texture', label:'Paper Grain', min:0, max:1, step:.01, def:.2 },
+  ]},
   { id:'halftone', name:'Halftone', hint:'dot-matrix / newsprint dots', on:false, open:false, params:[
     { k:'cell', label:'Cell Size', min:3, max:20, step:1, def:6 },
     { k:'bg',   label:'Background', type:'select', def:0, options:[[0,'Dark (LED)'],[1,'Light (print)']] },
@@ -409,9 +437,9 @@ const FX_GROUPS = [
   ['Pixel Glitch',    ['glitch','mosh','compress','pixsort','databend','bmpmisread','gif']],
   ['Analog / Tape',   ['vhs','sync','roll','film','noise','ghost','dotcrawl','hum','herring']],
   ['Screen / Optics', ['crt','degauss','halftone','hud','bloom','leak','sparkle','burst']],
-  ['Dream / Optics',  ['prism','iris','starf','kaleido']],
-  ['Distort',         ['warp','melt','extrude','feedback','pixelate']],
-  ['Colour / Tone',   ['color','duotone','solarize','posterize','emboss','gold','rainbow']],
+  ['Dream / Optics',  ['prism','iris','starf','kaleido','bokeh','foil']],
+  ['Distort',         ['warp','melt','extrude','feedback','pixelate','liquid']],
+  ['Colour / Tone',   ['color','duotone','solarize','posterize','emboss','gold','rainbow','paper']],
   ['Video',           ['time','playback','stale','synctear','interlace','chroma']],          // acts on the footage, not on any one frame
   ['Global',          ['zoom','mask','motion']],
 ];
@@ -477,6 +505,7 @@ const PRESETS = {
   'Risograph':   { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.12,flicker:.03}, color:{on:1,saturate:1.1,contrast:1.15,hue:0,tint:0,vignette:.35}, posterize:{on:1,levels:4,dither:.6}, duotone:{on:1,preset:1,amount:.55} },
   'Metal':       { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.04,flicker:.02}, color:{on:1,saturate:.8,contrast:1.3,hue:0,tint:0,vignette:.4}, emboss:{on:1,amount:.8,angle:135,mix:.4} },
   'Relief':      { noise:{on:1,grain:.05,flicker:.02}, color:{on:1,saturate:1.0,contrast:1.18,hue:0,tint:0,vignette:.4}, extrude:{on:1,key:0,center:.72,width:.3,angle:135,dist:.4,shade:.7}, bloom:{on:1,amount:.22,size:6} },
+  'Papercraft':  { vhs:{on:0}, noise:{on:1,grain:.03,flicker:.01}, color:{on:1,saturate:1.15,contrast:1.05,bright:1.05,hue:0,tint:.05,vignette:.2}, paper:{on:1,amount:1,levels:5,depth:.55,angle:135,texture:.25} },
   // ---- Hype (dopamine) ----
   'Jackpot':     { color:{on:1,saturate:1.3,contrast:1.1,bright:1.05,hue:0,tint:.05,vignette:.15}, gold:{on:1,amount:.9,shine:.7,speed:1,angle:45,tone:0}, burst:{on:1,amount:.55,lines:.6,reach:.7,spin:.2,tone:0,blend:0}, sparkle:{on:1,amount:.85,density:.5,size:.45,speed:1,tone:0}, rainbow:{on:1,amount:.4,speed:2,angle:45,blend:0} },
   'Gold Rush':   { color:{on:1,saturate:1.25,contrast:1.15,bright:1.05,hue:0,tint:.08,vignette:.1}, gold:{on:1,amount:1,shine:.85,speed:2,angle:45,tone:0}, sparkle:{on:1,amount:.9,density:.4,size:.5,speed:1,tone:0}, bloom:{on:1,amount:.45,size:12,glow:.4} },
@@ -488,6 +517,9 @@ const PRESETS = {
   'Angelcore':   { color:{on:1,saturate:.9,contrast:1.0,bright:1.15,hue:0,tint:.05,vignette:.15}, starf:{on:1,amount:.6,thresh:.6,length:.55,rays:0,angle:45}, prism:{on:1,amount:.3,spread:.3,blur:.3,rot:1}, bloom:{on:1,amount:.5,size:16,glow:.7}, leak:{on:1,amount:.4,tone:3,pos:2,size:.7,drift:.4} },
   'Kaleidoscope':{ color:{on:1,saturate:1.3,contrast:1.05,bright:1.02,hue:0,tint:0,vignette:.25}, kaleido:{on:1,amount:.9,mode:1,seg:6,spin:1,angle:0,spread:.4,zoom:.2,cx:.5,cy:.5}, bloom:{on:1,amount:.3,size:10,glow:.3} },
   'Oil Slick':   { color:{on:1,saturate:1.1,contrast:1.05,bright:1.0,hue:0,tint:0,vignette:.3}, iris:{on:1,amount:.7,angscale:.6,lumascale:1.2,speed:2,edge:0}, prism:{on:1,amount:.3,spread:.3,blur:.2,rot:2} },
+  'Fairy Dust':  { color:{on:1,saturate:1.0,contrast:1.0,bright:1.12,hue:0,tint:.05,vignette:.2}, bokeh:{on:1,amount:.6,density:.4,size:.55,thresh:.5,shape:0}, sparkle:{on:1,amount:.6,density:.4,size:.35,speed:1,shape:2,tone:9}, iris:{on:1,amount:.3,angscale:.5,lumascale:1,speed:1,edge:0}, leak:{on:1,amount:.3,tone:3,pos:1,size:.6,drift:.4} },
+  'Hologram':    { color:{on:1,saturate:1.2,contrast:1.05,bright:1.02,hue:0,tint:0,vignette:.25}, foil:{on:1,amount:.7,density:5,angle:45,speed:1,sheen:.6}, bloom:{on:1,amount:.35,size:10,glow:.3} },
+  'Aqua Glass':  { color:{on:1,saturate:1.15,contrast:1.0,bright:1.02,hue:100,tint:-.1,vignette:.35}, liquid:{on:1,amount:1,amp:.5,scale:.5,speed:1,chroma:.35}, prism:{on:1,amount:.25,spread:.3,blur:.3,rot:1}, bloom:{on:1,amount:.3,size:12,glow:.4} },
   // ---- Reset ----
   'Clean':       { vhs:{on:0}, glitch:{on:0}, noise:{on:0}, color:{on:0} },
 };
@@ -500,8 +532,8 @@ const PRESET_GROUPS = [
   ['Vivid',   ['Y2K','Neon','Vaporwave','LED Board','Arcade']],
   ['Camera',  ['Security Cam','Camcorder','Broadcast','Analog TV','Interlaced','Bad Reception','Fisheye Cam','Retro Game','Underwater']],
   ['Lens/FX', ['Peephole','Trip','Newsprint','Dream Bloom','Heat Haze','Wormhole','Sunwashed','Degauss']],
-  ['Art',     ['Cinematic','Acid','Risograph','Metal','Relief','Manga']],
-  ['Dream',   ['Pastel Dream','Angelcore','Kaleidoscope','Oil Slick']],
+  ['Art',     ['Cinematic','Acid','Risograph','Metal','Relief','Manga','Papercraft']],
+  ['Dream',   ['Pastel Dream','Angelcore','Kaleidoscope','Oil Slick','Fairy Dust','Hologram','Aqua Glass']],
 ];
 
 // duotone palettes: [shadow rgb, highlight rgb]

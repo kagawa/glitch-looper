@@ -287,3 +287,54 @@ if (ir.on && ir.amount>0){
   ctx.putImageData(id,0,0);
 }
 }
+
+function applyFoil(w,h,phase){
+// ---- Holographic Foil: diagonal rainbow diffraction bands + a moving sheen, screened on the highlights ----
+const fl = state.foil;
+if (fl.on && fl.amount>0){
+  const amt=P('foil','amount'), dens=fl.density|0||1, ang=(fl.angle|0)*Math.PI/180, speed=fl.speed|0, sheen=fl.sheen;
+  const cs=Math.cos(ang), sn=Math.sin(ang), span=(Math.abs(cs)*w+Math.abs(sn)*h)||1, off0=Math.min(0,cs)*w+Math.min(0,sn)*h;
+  const sweep=((phase*speed)%1+1)%1;
+  const id=ctx.getImageData(0,0,w,h), d=id.data;
+  for (let y=0;y<h;y++) for (let x=0;x<w;x++){
+    const i=(y*w+x)*4, lum=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255;
+    const proj=(x*cs+y*sn-off0)/span;
+    const col=hsv(proj*dens*360 + phase*360*speed, 0.75, 1);             // rainbow bands, hue cycling → seamless
+    const band=0.5+0.5*Math.sin(proj*dens*Math.PI*4);                    // fine diffraction ripple
+    const shDist=Math.abs(((proj-sweep+1.5)%1)-0.5)*2, sh=Math.max(0,1-shDist*4)*sheen;   // moving sheen band
+    const wc=Math.min(1, amt*(0.3+0.7*lum)*(0.4+0.6*band) + amt*sh*lum);
+    d[i]  += (255-d[i])  *(col[0]/255)*wc;
+    d[i+1]+= (255-d[i+1])*(col[1]/255)*wc;
+    d[i+2]+= (255-d[i+2])*(col[2]/255)*wc;
+  }
+  ctx.putImageData(id,0,0);
+}
+}
+
+function applyPaper(w,h){
+// ---- Paper Cutout: posterise into flat layers and drop a soft shadow where a taller layer sits above ----
+const pp = state.paper;
+if (pp.on && (pp.amount==null || pp.amount>0)){
+  const amt=pp.amount==null?1:P('paper','amount'), N=Math.max(2,pp.levels|0);
+  const depth=Math.round(pp.depth*Math.min(w,h)*0.03)+1, ang=(pp.angle|0)*Math.PI/180, tex=pp.texture;
+  const ldx=Math.cos(ang), ldy=Math.sin(ang);
+  const src=ctx.getImageData(0,0,w,h), s=src.data, L=new Uint8Array(w*h);
+  for (let p=0,i=0;i<s.length;i+=4,p++){ const lum=(s[i]*0.299+s[i+1]*0.587+s[i+2]*0.114)/255; L[p]=Math.min(N-1,(lum*N)|0); }
+  const q=(v)=>Math.min(255, Math.round(((v/255*N|0)+0.5)/N*255));       // flatten a channel toward its band
+  const out=ctx.createImageData(w,h), o=out.data;
+  for (let y=0;y<h;y++) for (let x=0;x<w;x++){
+    const p=y*w+x, i=p*4, lv=L[p];
+    let R=q(s[i]), G=q(s[i+1]), B=q(s[i+2]);
+    let shadow=0;
+    for (let dd=1; dd<=depth; dd++){ const nx=(x-ldx*dd)|0, ny=(y-ldy*dd)|0; if(nx<0||ny<0||nx>=w||ny>=h) break;
+      if (L[ny*w+nx]>lv){ shadow=1-(dd-1)/depth; break; } }
+    const sh=1-shadow*0.5; R*=sh; G*=sh; B*=sh;
+    if (tex>0){ const n=(rand(x*0.7+y*1.3+0.5)-0.5)*tex*38; R+=n; G+=n; B+=n; }
+    o[i]  = s[i]  +(R-s[i])  *amt;
+    o[i+1]= s[i+1]+(G-s[i+1])*amt;
+    o[i+2]= s[i+2]+(B-s[i+2])*amt;
+    o[i+3]= 255;
+  }
+  ctx.putImageData(out,0,0);
+}
+}

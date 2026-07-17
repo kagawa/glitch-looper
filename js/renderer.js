@@ -105,6 +105,8 @@ function drawFrame(phase){    // phase in [0,1)
 
   applyKaleido(w,h,phase);
 
+  applyLiquid(w,h,phase);
+
   applyMelt(w,h,phase);
 
   applyExtrude(w,h);
@@ -122,6 +124,8 @@ function drawFrame(phase){    // phase in [0,1)
   applyGold(w,h,phase);
 
   applyRainbow(w,h,phase);
+
+  applyPaper(w,h);
 
   applyTracking(w,h,phase,v);
 
@@ -168,6 +172,10 @@ function drawFrame(phase){    // phase in [0,1)
   applyPrism(w,h,phase);
 
   applyStarFilter(w,h,phase);
+
+  applyFoil(w,h,phase);
+
+  applyBokeh(w,h,phase);
 
   const cr = applyCrtTube(w,h);
 
