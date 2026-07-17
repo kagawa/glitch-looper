@@ -154,7 +154,31 @@ const RAND_PROB = { png:.12, jpeg:.15, warp:.18, halftone:.12, feedback:.12, mel
                     duotone:.14, solarize:.14, posterize:.14, emboss:.04 };
 // three strength levels: prob = on-probability scale, str = how far params stray from their default.
 // str stays low at Normal so params sit near their (gentle) defaults instead of jumping to extremes.
-const RAND_LEVELS = { normal:{prob:.5, str:.22}, strong:{prob:.9, str:.55}, wild:{prob:1.4, str:1} };
+// seq/seqHeavy = chance a roll gives an effect a Sequencer pattern (heavy = higher, for destructive fx).
+const RAND_LEVELS = {
+  normal:{prob:.5,  str:.22, seq:.08, seqHeavy:.20},
+  strong:{prob:.9,  str:.55, seq:.14, seqHeavy:.32},
+  wild:  {prob:1.4, str:1,   seq:.22, seqHeavy:.48} };
+// destructive effects that read well flickering in and out — bump their pattern chance
+const RAND_SEQ_HEAVY = new Set(['jpeg','png','webp','gifg','mosh','databend','bmpmisread','sonify',
+                                'byteshift','bitplane','glitch','sync','pixsort','stale','synctear']);
+// a random Sequencer pattern: bursts / alternations read better than salt-and-pepper, and it always
+// keeps at least one step on and one off (else it is either always-on or invisible)
+function randomSeqPattern(){
+  const n = SEQ_STEPS; let s; const style = Math.random();
+  if (style < 0.55){                              // one contiguous burst
+    const len = 1 + Math.floor(Math.random()*(n-1)), start = Math.floor(Math.random()*n);
+    s = Array.from({length:n},(_,i)=> ((i-start+n)%n) < len);
+  } else if (style < 0.8){                         // every-other / periodic
+    const period = [2,2,3,4][Math.floor(Math.random()*4)], off = Math.floor(Math.random()*period);
+    s = Array.from({length:n},(_,i)=> (i+off)%period===0);
+  } else {                                         // random subset
+    s = Array.from({length:n},()=> Math.random()<0.5);
+  }
+  if (!s.some(v=>v))  s[Math.floor(Math.random()*n)] = true;    // never all-off (invisible)
+  if (s.every(v=>v))  s[Math.floor(Math.random()*n)] = false;  // never all-on (pointless → keep it a pattern)
+  return s;
+}
 let randMin = 1, randMax = 5;              // clamp how many effects a roll turns on (UI: random popover)
 function randomizeFX(){
   const lv = RAND_LEVELS[randLevelVal] || RAND_LEVELS.normal;
@@ -173,6 +197,11 @@ function randomizeFX(){
         state[f.id][p.k] = parseFloat((Math.round(val/p.step)*p.step).toFixed(4));
       }
     });
+    // reset the Sequencer to always-on, then occasionally hand this effect a pattern (more often
+    // for the destructive ones, which read well flickering in and out)
+    state[f.id]._seq = null;
+    if (state[f.id].on && Math.random() < (RAND_SEQ_HEAVY.has(f.id) ? lv.seqHeavy : lv.seq))
+      state[f.id]._seq = randomSeqPattern();
   });
   // keep the heavy colour-mapping effects from stacking into mush — cap how many run at once
   const TONE = ['duotone','solarize','posterize','emboss'];
