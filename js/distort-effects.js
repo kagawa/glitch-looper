@@ -164,6 +164,31 @@ if (fb.on && fb.amount>0){
 }
 }
 
+function applyKaleido(w,h,phase){
+// ---- Kaleidoscope: fold the frame into N mirrored wedges around a centre; spin by whole sectors ----
+//      The output has N-fold symmetry, so rotating by a whole sector maps it onto itself — that lets
+//      the spin be slow (one sector per loop) and still meet itself at the seam. Only one source wedge
+//      is ever sampled (chosen by Source Angle), so the sample content never rotates.
+const kd = state.kaleido;
+if (kd.on){
+  const seg=Math.max(3,kd.seg|0), sector=Math.PI*2/seg, half=sector/2;
+  const cx=w*kd.cx, cy=h*kd.cy, off=(kd.angle|0)*Math.PI/180;
+  const rot=(kd.spin|0)*sector*phase;                        // whole sectors/loop → seamless
+  const src=ctx.getImageData(0,0,w,h), s=src.data;
+  const out=ctx.createImageData(w,h), o=out.data;
+  for (let y=0;y<h;y++) for (let x=0;x<w;x++){
+    const dx=x-cx, dy=y-cy, r=Math.sqrt(dx*dx+dy*dy);
+    let a=(Math.atan2(dy,dx)-rot)%sector; if (a<0) a+=sector; if (a>half) a=sector-a;   // fold into a mirror wedge
+    a+=off;
+    let sx=(cx+r*Math.cos(a))|0, sy=(cy+r*Math.sin(a))|0;
+    sx = sx<0?0:sx>=w?w-1:sx; sy = sy<0?0:sy>=h?h-1:sy;
+    const si=(sy*w+sx)*4, oi=(y*w+x)*4;
+    o[oi]=s[si]; o[oi+1]=s[si+1]; o[oi+2]=s[si+2]; o[oi+3]=255;
+  }
+  ctx.putImageData(out,0,0);
+}
+}
+
 function applyExtrude(w,h){
 // ---- Extrude: pick a band of the picture by tone or colour and push it out — pseudo-3D ----
 //      The shading is what sells it. Drag a region along a direction with its own colour and you

@@ -209,6 +209,34 @@ const FX = [
     { k:'tone',   label:'Tone', type:'select', def:0, options:[[0,'Gold'],[1,'White'],[2,'Rainbow'],[3,'Ice'],[4,'Pink'],[5,'Emerald'],[6,'Violet'],[7,'Ink (dark)'],[8,'Fire'],[9,'Candy'],[10,'Festive'],[11,'Black']] },
     { k:'blend',  label:'Blend', type:'select', def:0, options:[[0,'Screen'],[1,'Add'],[2,'Overlay'],[3,'Solid'],[4,'Multiply (dark)']] },
   ]},
+  // ---- Dream / Optics ----
+  { id:'kaleido', name:'Kaleidoscope', hint:'mirror the frame into rotating wedges — geometric symmetry', on:false, open:false, params:[
+    { k:'seg',   label:'Segments', min:3, max:16, step:1, def:6 },
+    { k:'spin',  label:'Spin (sectors/loop)', min:-6, max:6, step:1, def:1 },
+    { k:'angle', label:'Source Angle', min:0, max:345, step:15, def:0 },
+    { k:'cx',    label:'Centre X', min:0, max:1, step:.01, def:.5 },
+    { k:'cy',    label:'Centre Y', min:0, max:1, step:.01, def:.5 },
+  ]},
+  { id:'prism', name:'Soft Prism', hint:'smooth chromatic dispersion — glass / dream sheen', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
+    { k:'spread', label:'Spread', min:0, max:1, step:.01, def:.4, env:1 },
+    { k:'blur',   label:'Blur', min:0, max:1, step:.01, def:.3 },
+    { k:'rot',    label:'Rotation (turns/loop)', min:0, max:4, step:1, def:1 },
+  ]},
+  { id:'starf', name:'Star Filter', hint:'cross-filter light rays streaming from highlights', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.6, env:1 },
+    { k:'thresh', label:'Threshold', min:0, max:1, step:.01, def:.6 },
+    { k:'length', label:'Length', min:0, max:1, step:.01, def:.5, env:1 },
+    { k:'rays',   label:'Rays', type:'select', def:0, options:[[0,'4-point'],[1,'6-point'],[2,'8-point'],[3,'Anamorphic']] },
+    { k:'angle',  label:'Angle', min:0, max:345, step:15, def:45 },
+  ]},
+  { id:'iris', name:'Iridescent Film', hint:'oil-slick / soap-bubble rainbow on edges & tones', on:false, open:false, params:[
+    { k:'amount',    label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
+    { k:'angscale',  label:'Edge Hue', min:0, max:1, step:.01, def:.5 },
+    { k:'lumascale', label:'Tone Hue', min:0, max:2, step:.01, def:1 },
+    { k:'speed',     label:'Shift Speed', min:0, max:4, step:1, def:1 },
+    { k:'edge',      label:'Apply To', type:'select', def:0, options:[[0,'All'],[1,'Edges only']] },
+  ]},
   { id:'halftone', name:'Halftone', hint:'dot-matrix / newsprint dots', on:false, open:false, params:[
     { k:'cell', label:'Cell Size', min:3, max:20, step:1, def:6 },
     { k:'bg',   label:'Background', type:'select', def:0, options:[[0,'Dark (LED)'],[1,'Light (print)']] },
@@ -377,6 +405,7 @@ const FX_GROUPS = [
   ['Pixel Glitch',    ['glitch','mosh','compress','pixsort','databend','bmpmisread','gif']],
   ['Analog / Tape',   ['vhs','sync','roll','film','noise','ghost','dotcrawl','hum','herring']],
   ['Screen / Optics', ['crt','degauss','halftone','hud','bloom','leak','sparkle','burst']],
+  ['Dream / Optics',  ['prism','iris','starf','kaleido']],
   ['Distort',         ['warp','melt','extrude','feedback','pixelate']],
   ['Colour / Tone',   ['color','duotone','solarize','posterize','emboss','gold','rainbow']],
   ['Video',           ['time','playback','stale','synctear','interlace','chroma']],          // acts on the footage, not on any one frame
@@ -450,6 +479,11 @@ const PRESETS = {
   'Fever':       { vhs:{on:1,aberration:6,scanline:.1,bleed:3,tracking:.1,wobble:2}, color:{on:1,saturate:1.6,contrast:1.1,bright:1.05,hue:0,tint:0,vignette:.15}, rainbow:{on:1,amount:.55,speed:2,angle:45,blend:0}, burst:{on:1,amount:.7,lines:.6,reach:.8,spin:.2,tone:2,blend:0}, sparkle:{on:1,amount:.9,density:.6,size:.4,speed:2,tone:2}, bloom:{on:1,amount:.4,size:10,glow:.3} },
   'Prism Rush':  { color:{on:1,saturate:1.5,contrast:1.08,bright:1.05,hue:0,tint:0,vignette:.2}, rainbow:{on:1,amount:.7,speed:3,angle:60,blend:2}, sparkle:{on:1,amount:.7,density:.4,size:.4,speed:2,tone:2}, bloom:{on:1,amount:.45,size:12,glow:.5} },
   'Manga':       { color:{on:1,saturate:.15,contrast:1.55,bright:1.08,hue:0,tint:0,vignette:.15}, burst:{on:1,amount:.95,lines:.7,jitter:.85,reach:.55,spin:0,tone:7,blend:4}, sparkle:{on:1,amount:.5,density:.25,size:.4,speed:1,shape:2,tone:11} },
+  // ---- Dream / Optics ----
+  'Pastel Dream':{ color:{on:1,saturate:.85,contrast:1.0,bright:1.1,hue:0,tint:-.1,vignette:.2}, prism:{on:1,amount:.5,spread:.4,blur:.35,rot:1}, iris:{on:1,amount:.35,angscale:.5,lumascale:1,speed:1,edge:0}, bloom:{on:1,amount:.4,size:14,glow:.6}, leak:{on:1,amount:.35,tone:3,pos:1,size:.6,drift:.4} },
+  'Angelcore':   { color:{on:1,saturate:.9,contrast:1.0,bright:1.15,hue:0,tint:.05,vignette:.15}, starf:{on:1,amount:.6,thresh:.6,length:.55,rays:0,angle:45}, prism:{on:1,amount:.3,spread:.3,blur:.3,rot:1}, bloom:{on:1,amount:.5,size:16,glow:.7}, leak:{on:1,amount:.4,tone:3,pos:2,size:.7,drift:.4} },
+  'Kaleidoscope':{ color:{on:1,saturate:1.3,contrast:1.05,bright:1.02,hue:0,tint:0,vignette:.25}, kaleido:{on:1,seg:8,spin:1,angle:0,cx:.5,cy:.5}, bloom:{on:1,amount:.3,size:10,glow:.3} },
+  'Oil Slick':   { color:{on:1,saturate:1.1,contrast:1.05,bright:1.0,hue:0,tint:0,vignette:.3}, iris:{on:1,amount:.7,angscale:.6,lumascale:1.2,speed:2,edge:0}, prism:{on:1,amount:.3,spread:.3,blur:.2,rot:2} },
   // ---- Reset ----
   'Clean':       { vhs:{on:0}, glitch:{on:0}, noise:{on:0}, color:{on:0} },
 };
@@ -463,6 +497,7 @@ const PRESET_GROUPS = [
   ['Camera',  ['Security Cam','Camcorder','Broadcast','Analog TV','Interlaced','Bad Reception','Fisheye Cam','Retro Game','Underwater']],
   ['Lens/FX', ['Peephole','Trip','Newsprint','Dream Bloom','Heat Haze','Wormhole','Sunwashed','Degauss']],
   ['Art',     ['Cinematic','Acid','Risograph','Metal','Relief','Manga']],
+  ['Dream',   ['Pastel Dream','Angelcore','Kaleidoscope','Oil Slick']],
 ];
 
 // duotone palettes: [shadow rgb, highlight rgb]

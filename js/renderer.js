@@ -103,6 +103,8 @@ function drawFrame(phase){    // phase in [0,1)
 
   applyFeedbackZoom(w,h,phase);
 
+  applyKaleido(w,h,phase);
+
   applyMelt(w,h,phase);
 
   applyExtrude(w,h);
@@ -160,6 +162,12 @@ function drawFrame(phase){    // phase in [0,1)
   applyHerringbone(w,h,phase);
 
   applySignalSync(w,h,phase,fseed);
+
+  applyIridescence(w,h,phase);
+
+  applyPrism(w,h,phase);
+
+  applyStarFilter(w,h,phase);
 
   const cr = applyCrtTube(w,h);
 

@@ -212,3 +212,67 @@ if (rb.on && rb.amount>0){
   ctx.fillStyle=g; ctx.fillRect(0,0,w,h); ctx.restore();
 }
 }
+
+function applyPrism(w,h,phase){
+// ---- Soft Prism: a few tinted, offset, blurred copies screened on top — smooth chromatic dispersion ----
+const pr = state.prism;
+if (pr.on && pr.amount>0){
+  const amt=P('prism','amount'), spread=P('prism','spread')*22, blur=pr.blur*4;
+  const rot=(pr.rot|0)*phase*Math.PI*2;                      // integer turns/loop → seamless
+  const COLS=[[255,60,150],[70,220,255],[240,235,70]];       // magenta / cyan / yellow dispersion
+  ctx.save(); ctx.globalCompositeOperation='screen'; ctx.globalAlpha=amt;
+  for (let i=0;i<3;i++){
+    const a=rot + i*(Math.PI*2/3), dx=Math.cos(a)*spread, dy=Math.sin(a)*spread;
+    sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h);
+    sctx.filter = blur>0?`blur(${blur}px)`:'none'; sctx.drawImage(canvas,dx,dy); sctx.filter='none';
+    sctx.globalCompositeOperation='multiply'; sctx.fillStyle=`rgb(${COLS[i][0]},${COLS[i][1]},${COLS[i][2]})`; sctx.fillRect(0,0,w,h);
+    sctx.globalCompositeOperation='destination-in'; sctx.drawImage(canvas,dx,dy);   // keep only the shifted copy (no edge fill)
+    sctx.globalCompositeOperation='source-over';
+    ctx.drawImage(sc,0,0);
+  }
+  ctx.restore();
+}
+}
+
+function applyStarFilter(w,h,phase){
+// ---- Star Filter: isolate highlights, streak them along a few ray directions, screen back on ----
+const st = state.starf;
+if (st.on && st.amount>0){
+  const amt=P('starf','amount'), thr=st.thresh, len=P('starf','length')*Math.max(w,h)*0.3;
+  if (len<1) return;
+  const RAYS=[4,6,8,2][st.rays|0]||4, base=(st.angle|0)*Math.PI/180;
+  // bright pass: crush everything below the threshold so screen only spreads the highlights (black = no-op)
+  sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h);
+  sctx.filter=`brightness(${(1-thr*0.55).toFixed(3)}) contrast(${(1.6+thr*3.5).toFixed(3)})`;
+  sctx.drawImage(canvas,0,0); sctx.filter='none';
+  const K=10;
+  ctx.save(); ctx.globalCompositeOperation='screen';
+  const dirs = st.rays===3 ? [0,Math.PI] : Array.from({length:RAYS},(_,d)=>base+d*(Math.PI*2/RAYS));
+  for (const a of dirs){
+    const ux=Math.cos(a), uy=Math.sin(a);
+    for (let k=1;k<=K;k++){ const t=k/K; ctx.globalAlpha=amt*(1-t)*0.5; ctx.drawImage(sc, ux*len*t, uy*len*t); }
+  }
+  ctx.restore();
+}
+}
+
+function applyIridescence(w,h,phase){
+// ---- Iridescent Film: an oil-slick sheen whose hue rides the edges and tones, drifting over the loop ----
+const ir = state.iris;
+if (ir.on && ir.amount>0){
+  const amt=P('iris','amount'), aScale=ir.angscale, lScale=ir.lumascale, t=phase*360*(ir.speed|0), edgeOnly=(ir.edge|0)===1;
+  const id=ctx.getImageData(0,0,w,h), d=id.data, luma=new Float32Array(w*h);
+  for (let p=0,i=0;i<d.length;i+=4,p++) luma[p]=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255;
+  for (let y=0;y<h;y++) for (let x=0;x<w;x++){
+    const p=y*w+x, lum=luma[p];
+    const gx=luma[y*w+Math.min(w-1,x+1)]-lum, gy=luma[Math.min(h-1,y+1)*w+x]-lum;
+    const edge=Math.min(1,Math.hypot(gx,gy)*6), edgeAng=Math.atan2(gy,gx)/(Math.PI*2)*360;
+    const col=hsv(edgeAng*aScale + lum*360*lScale + t, 0.8, 1);
+    const wgt=amt*(edgeOnly ? edge : 0.35+0.65*edge), i4=p*4;
+    d[i4]  += (255-d[i4])  *(col[0]/255)*wgt;
+    d[i4+1]+= (255-d[i4+1])*(col[1]/255)*wgt;
+    d[i4+2]+= (255-d[i4+2])*(col[2]/255)*wgt;
+  }
+  ctx.putImageData(id,0,0);
+}
+}
