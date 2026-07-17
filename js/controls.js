@@ -78,8 +78,16 @@ const randSeg = document.getElementById('randLevel');
 let randLevelVal = 'normal';                                  // default = weakest tier
 randSeg.querySelectorAll('button').forEach(b=>{
   b.onclick = ()=>{ randLevelVal = b.dataset.v;
-    randSeg.querySelectorAll('button').forEach(x=> x.classList.toggle('active', x===b)); };
+    randSeg.querySelectorAll('button').forEach(x=> x.classList.toggle('active', x===b));
+    applyLevelRange(randLevelVal); };   // preset the effect-count range for this strength
 });
+// each strength has its own default effect-count range; switching strength moves the sliders to it
+function applyLevelRange(level){
+  const lv = RAND_LEVELS[level]; if (!lv) return;
+  randMin = lv.min; randMax = lv.max;
+  if (randMinRange){ randMinRange.value = randMin; randMinVal.textContent = randMin; }
+  if (randMaxRange){ randMaxRange.value = randMax; randMaxVal.textContent = randMax; }
+}
 const linkBtn = document.getElementById('linkBtn');
 const shareBtn = document.getElementById('shareBtn');
 // popovers: random settings (strength + auto/drift) and share (link / X)
@@ -139,6 +147,7 @@ randMaxRange.addEventListener('input', ()=>{
   if (randMax < randMin){ randMin = randMax; randMinRange.value = randMin; randMinVal.textContent = randMin; }
   randMaxVal.textContent = randMax;
 });
+applyLevelRange(randLevelVal);   // start the sliders on the current strength's range (Normal = 1–3)
 const statusEl = document.getElementById('status');
 function setStatus(s){ statusEl.innerHTML = s; }
 
@@ -156,9 +165,9 @@ const RAND_PROB = { png:.12, jpeg:.15, warp:.18, halftone:.12, feedback:.12, mel
 // str stays low at Normal so params sit near their (gentle) defaults instead of jumping to extremes.
 // seq/seqHeavy = chance a roll gives an effect a Sequencer pattern (heavy = higher, for destructive fx).
 const RAND_LEVELS = {
-  normal:{prob:.5,  str:.22, seq:.08, seqHeavy:.20},
-  strong:{prob:.9,  str:.55, seq:.14, seqHeavy:.32},
-  wild:  {prob:1.4, str:1,   seq:.22, seqHeavy:.48} };
+  normal:{prob:.5,  str:.22, seq:.08, seqHeavy:.20, min:1, max:3},
+  strong:{prob:.9,  str:.55, seq:.14, seqHeavy:.32, min:2, max:5},
+  wild:  {prob:1.4, str:1,   seq:.22, seqHeavy:.48, min:3, max:8} };
 // destructive effects that read well flickering in and out — bump their pattern chance
 const RAND_SEQ_HEAVY = new Set(['jpeg','png','webp','gifg','mosh','databend','bmpmisread','sonify',
                                 'byteshift','bitplane','glitch','sync','pixsort','stale','synctear']);
