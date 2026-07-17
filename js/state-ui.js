@@ -83,7 +83,7 @@ function buildUI(){
     ids = ids.filter(id=> byId[id] && !placed.has(id));
     if (!ids.length) return;
     CAT_IDS[label] = ids;
-    const cat = document.createElement('div'); cat.className = 'cat';   // collapsed by default
+    const cat = document.createElement('div'); cat.className = 'cat'; cat.dataset.cat = label;   // collapsed by default
     const head = document.createElement('div'); head.className = 'cathead';
     head.innerHTML = `<span class="catname">${label}</span><span class="catcount" data-cat="${label}"></span><span class="caret">▶</span>`;
     const body = document.createElement('div'); body.className = 'catbody';

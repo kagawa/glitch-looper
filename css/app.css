@@ -120,6 +120,8 @@ canvas {
 /* effect sub-genre sections */
 .cat { border-top: 2px solid var(--line); }
 .cat:first-child { border-top: none; }
+/* set Global (zoom/mask/envelope) apart — it's whole-frame settings, not image effects */
+.cat[data-cat="Global"] { margin-top: 12px; border-top-color: var(--line); }
 .cathead {
   display: flex; align-items: center; gap: 8px;
   padding: 7px 12px; cursor: pointer; user-select: none;
