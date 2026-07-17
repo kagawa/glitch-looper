@@ -197,14 +197,15 @@ const FX = [
     { k:'density', label:'Density', min:0, max:1, step:.01, def:.4 },
     { k:'size',    label:'Size', min:0, max:1, step:.01, def:.4 },
     { k:'speed',   label:'Twinkle Speed', min:1, max:4, step:1, def:1 },
-    { k:'tone',    label:'Tone', type:'select', def:0, options:[[0,'Gold'],[1,'White'],[2,'Rainbow'],[3,'Ice'],[4,'Pink'],[5,'Emerald'],[6,'Violet']] },
+    { k:'shape',   label:'Shape', type:'select', def:0, options:[[0,'Star (4pt)'],[1,'Star (6pt)'],[2,'Sparkle (8pt)'],[3,'Dot'],[4,'Diamond']] },
+    { k:'tone',    label:'Tone', type:'select', def:0, options:[[0,'Gold'],[1,'White'],[2,'Rainbow'],[3,'Ice'],[4,'Pink'],[5,'Emerald'],[6,'Violet'],[8,'Fire'],[9,'Candy'],[10,'Festive'],[11,'Black (light bg)']] },
   ]},
   { id:'burst', name:'Burst Lines', hint:'radial 集中線 — spinning speed-lines, pachinko hype', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.6, env:1 },
     { k:'lines',  label:'Lines', min:0, max:1, step:.01, def:.5 },
     { k:'reach',  label:'Reach (to centre)', min:0, max:1, step:.01, def:.7 },
-    { k:'spin',   label:'Spin (turns/loop)', min:-2, max:2, step:1, def:1 },
-    { k:'tone',   label:'Tone', type:'select', def:0, options:[[0,'Gold'],[1,'White'],[2,'Rainbow'],[3,'Ice'],[4,'Pink'],[5,'Emerald'],[6,'Violet'],[7,'Ink (dark)']] },
+    { k:'spin',   label:'Spin (turns/loop)', min:-1, max:1, step:.05, def:.15 },
+    { k:'tone',   label:'Tone', type:'select', def:0, options:[[0,'Gold'],[1,'White'],[2,'Rainbow'],[3,'Ice'],[4,'Pink'],[5,'Emerald'],[6,'Violet'],[7,'Ink (dark)'],[8,'Fire'],[9,'Candy'],[10,'Festive'],[11,'Black']] },
     { k:'blend',  label:'Blend', type:'select', def:0, options:[[0,'Screen'],[1,'Add'],[2,'Overlay'],[3,'Solid'],[4,'Multiply (dark)']] },
   ]},
   { id:'halftone', name:'Halftone', hint:'dot-matrix / newsprint dots', on:false, open:false, params:[
@@ -443,11 +444,11 @@ const PRESETS = {
   'Metal':       { vhs:{on:0}, glitch:{on:0}, noise:{on:1,grain:.04,flicker:.02}, color:{on:1,saturate:.8,contrast:1.3,hue:0,tint:0,vignette:.4}, emboss:{on:1,amount:.8,angle:135,mix:.4} },
   'Relief':      { noise:{on:1,grain:.05,flicker:.02}, color:{on:1,saturate:1.0,contrast:1.18,hue:0,tint:0,vignette:.4}, extrude:{on:1,key:0,center:.72,width:.3,angle:135,dist:.4,shade:.7}, bloom:{on:1,amount:.22,size:6} },
   // ---- Hype (dopamine) ----
-  'Jackpot':     { color:{on:1,saturate:1.3,contrast:1.1,bright:1.05,hue:0,tint:.05,vignette:.15}, gold:{on:1,amount:.9,shine:.7,speed:1,angle:45,tone:0}, burst:{on:1,amount:.55,lines:.6,reach:.7,spin:1,tone:0,blend:0}, sparkle:{on:1,amount:.85,density:.5,size:.45,speed:1,tone:0}, bloom:{on:1,amount:.4,size:10,glow:.3} },
+  'Jackpot':     { color:{on:1,saturate:1.3,contrast:1.1,bright:1.05,hue:0,tint:.05,vignette:.15}, gold:{on:1,amount:.9,shine:.7,speed:1,angle:45,tone:0}, burst:{on:1,amount:.55,lines:.6,reach:.7,spin:.2,tone:0,blend:0}, sparkle:{on:1,amount:.85,density:.5,size:.45,speed:1,tone:0}, bloom:{on:1,amount:.4,size:10,glow:.3} },
   'Gold Rush':   { color:{on:1,saturate:1.25,contrast:1.15,bright:1.05,hue:0,tint:.08,vignette:.1}, gold:{on:1,amount:1,shine:.85,speed:2,angle:45,tone:0}, sparkle:{on:1,amount:.9,density:.4,size:.5,speed:1,tone:0}, bloom:{on:1,amount:.45,size:12,glow:.4} },
-  'Fever':       { vhs:{on:1,aberration:6,scanline:.1,bleed:3,tracking:.1,wobble:2}, color:{on:1,saturate:1.6,contrast:1.1,bright:1.05,hue:0,tint:0,vignette:.15}, rainbow:{on:1,amount:.55,speed:2,angle:45,blend:0}, burst:{on:1,amount:.7,lines:.6,reach:.8,spin:1,tone:2,blend:0}, sparkle:{on:1,amount:.9,density:.6,size:.4,speed:2,tone:2}, bloom:{on:1,amount:.4,size:10,glow:.3} },
+  'Fever':       { vhs:{on:1,aberration:6,scanline:.1,bleed:3,tracking:.1,wobble:2}, color:{on:1,saturate:1.6,contrast:1.1,bright:1.05,hue:0,tint:0,vignette:.15}, rainbow:{on:1,amount:.55,speed:2,angle:45,blend:0}, burst:{on:1,amount:.7,lines:.6,reach:.8,spin:.2,tone:2,blend:0}, sparkle:{on:1,amount:.9,density:.6,size:.4,speed:2,tone:2}, bloom:{on:1,amount:.4,size:10,glow:.3} },
   'Prism Rush':  { color:{on:1,saturate:1.5,contrast:1.08,bright:1.05,hue:0,tint:0,vignette:.2}, rainbow:{on:1,amount:.7,speed:3,angle:60,blend:2}, sparkle:{on:1,amount:.7,density:.4,size:.4,speed:2,tone:2}, bloom:{on:1,amount:.45,size:12,glow:.5} },
-  'Manga':       { color:{on:1,saturate:.15,contrast:1.55,bright:1.08,hue:0,tint:0,vignette:.15}, burst:{on:1,amount:.95,lines:.7,reach:.55,spin:0,tone:7,blend:4}, sparkle:{on:1,amount:.5,density:.25,size:.4,speed:1,tone:1} },
+  'Manga':       { color:{on:1,saturate:.15,contrast:1.55,bright:1.08,hue:0,tint:0,vignette:.15}, burst:{on:1,amount:.95,lines:.7,reach:.55,spin:0,tone:7,blend:4}, sparkle:{on:1,amount:.5,density:.25,size:.4,speed:1,shape:2,tone:11} },
   // ---- Reset ----
   'Clean':       { vhs:{on:0}, glitch:{on:0}, noise:{on:0}, color:{on:0} },
 };

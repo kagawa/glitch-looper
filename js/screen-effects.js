@@ -128,50 +128,81 @@ if (state.zoom.on){
 }
 
 // shared flat-colour palette for Sparkle / Burst (index 2 = Rainbow, handled per-element via hsv())
-const HYPE_TONE = [[255,222,120],[255,255,255],null,[150,225,255],[255,150,220],[130,255,180],[200,150,255],[24,24,34]];
+const HYPE_TONE = [[255,222,120],[255,255,255],null,[150,225,255],[255,150,220],[130,255,180],[200,150,255],[24,24,34],null,null,null,[12,12,15]];
+const HYPE_DARK = new Set([7,11]);   // Ink / Black — need a darkening blend to show on a light background
+// multi-colour patterns: each element picks from a curated set (distinct from the full-spectrum Rainbow)
+const HYPE_MULTI = {
+  8:[[255,95,35],[255,175,45],[255,70,70]],                    // Fire
+  9:[[255,120,205],[160,120,255],[120,220,255]],               // Candy
+ 10:[[255,215,90],[255,120,180],[120,230,255],[150,255,170]],  // Festive
+};
+// pick a colour for tone at fraction frac∈[0,1): rainbow → hue, multi → set entry, else the flat tone.
+// frac lets a spinning burst colour by world position (seamless) and a sparkle scatter by its seed.
+function hypeColor(tone, frac, sat, count){
+  frac=((frac%1)+1)%1;
+  if (tone===2) return hsv(frac*360, sat, 1);
+  const m=HYPE_MULTI[tone];
+  if (m){ const c=count||m.length; return m[((Math.floor(frac*c+1e-6)%m.length)+m.length)%m.length]; }
+  return HYPE_TONE[tone]||HYPE_TONE[0];
+}
 
 function applySparkle(w,h,phase){
 // ---- Sparkle: seeded twinkling glints, screened on top — each twinkles an integer number of times
 //      over the loop so it lands back where it started (seamless), positions fixed by the seed ----
 const sp = state.sparkle;
 if (sp.on && sp.amount>0){
-  const a=P('sparkle','amount'), N=Math.round(8+sp.density*90), base=2+sp.size*11, tone=sp.tone|0, spd=sp.speed|0||1;
-  ctx.save(); ctx.globalCompositeOperation='screen';
+  const a=P('sparkle','amount'), N=Math.round(8+sp.density*90), base=2+sp.size*11, tone=sp.tone|0, spd=sp.speed|0||1, shape=sp.shape|0;
+  ctx.save(); ctx.globalCompositeOperation = HYPE_DARK.has(tone) ? 'multiply' : 'screen';   // dark tones darken (for light backgrounds)
   for (let i=0;i<N;i++){
     const freq=(1+(rand(i*3.3)*3|0))*spd, ph=rand(i*5.7+.2);   // integer twinkles/loop → seamless
     const tw=Math.sin((phase*freq+ph)*Math.PI*2); if (tw<=0.05) continue;
     const pop=tw*tw;                                            // sharpen the flash
     const x=rand(i*12.9+1)*w, y=rand(i*78.2+3)*h, s=base*(0.5+rand(i*9.1)*0.9);
-    const col= tone===2 ? hsv(rand(i*2.1)*360,0.55,1) : (HYPE_TONE[tone]||HYPE_TONE[0]);
-    drawGlint(x,y, s*pop, col, a*pop);
+    const col=hypeColor(tone, rand(i*2.1), 0.55);              // seed picks the hue / palette entry
+    drawGlint(x,y, s*pop, col, a*pop, shape);
   }
   ctx.restore();
 }
 }
-function drawGlint(x,y,s,col,alpha){
+function drawGlint(x,y,s,col,alpha,shape){
   if (s<0.4 || alpha<=0.01) return;
-  const [r,g,b]=col;
-  ctx.globalAlpha=Math.min(1,alpha);
-  const rg=ctx.createRadialGradient(x,y,0,x,y,s);
+  const [r,g,b]=col, A=Math.min(1,alpha);
+  ctx.globalAlpha=A;
+  const core=(shape===3)?s*1.15:s*0.7;                         // Dot uses a bigger soft core
+  const rg=ctx.createRadialGradient(x,y,0,x,y,core);
   rg.addColorStop(0,`rgba(${r},${g},${b},1)`); rg.addColorStop(1,`rgba(${r},${g},${b},0)`);
-  ctx.fillStyle=rg; ctx.beginPath(); ctx.arc(x,y,s,0,7); ctx.fill();
+  ctx.fillStyle=rg; ctx.beginPath(); ctx.arc(x,y,core,0,7); ctx.fill();
+  if (shape===3) return;                                       // Dot: no spikes
+  if (shape===4){                                              // Diamond: filled rhombus
+    const d=s*1.8; ctx.fillStyle=`rgb(${r},${g},${b})`;
+    ctx.beginPath(); ctx.moveTo(x,y-d); ctx.lineTo(x+d*0.62,y); ctx.lineTo(x,y+d); ctx.lineTo(x-d*0.62,y); ctx.closePath(); ctx.fill();
+    return;
+  }
   ctx.strokeStyle=`rgba(${r},${g},${b},0.9)`; ctx.lineWidth=Math.max(1,s*0.16);
-  const L=s*2.7; ctx.beginPath();
-  ctx.moveTo(x-L,y); ctx.lineTo(x+L,y); ctx.moveTo(x,y-L); ctx.lineTo(x,y+L); ctx.stroke();
+  const L=s*2.7, ray=(th,len)=>{ ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+Math.cos(th)*len,y+Math.sin(th)*len); ctx.stroke(); };
+  if (shape===1){ for(let k=0;k<6;k++) ray(k*Math.PI/3, L); }                                             // 6-point
+  else if (shape===2){ for(let k=0;k<4;k++) ray(k*Math.PI/2, L); for(let k=0;k<4;k++) ray(Math.PI/4+k*Math.PI/2, L*0.5); }  // 8-point
+  else { for(let k=0;k<4;k++) ray(k*Math.PI/2, L); }                                                     // 4-point (default)
 }
 
 function applyBurst(w,h,phase){
-// ---- Burst / 集中線: radial speed-lines from the centre, faded in from a clear middle, spinning
-//      an integer number of turns over the loop (seamless), screened on top ----
+// ---- Burst / 集中線: radial speed-lines from the centre, faded in from a clear middle, screened on top.
+//      Spinning it slowly and seamlessly needs rotational symmetry, so a spinning burst uses uniform
+//      wedges (N-fold symmetric) and rotates by a whole number of line-spacings; a static burst (spin 0)
+//      keeps the irregular, jittered widths for a hand-drawn manga look. ----
 const bs = state.burst;
 if (bs.on && bs.amount>0){
-  const a=P('burst','amount'), cx=w/2, cy=h/2, R=Math.hypot(w,h)/2*1.1;
-  const N=Math.round(12+bs.lines*44), spin=(bs.spin|0)*phase*Math.PI*2, tone=bs.tone|0;
+  const a=P('burst','amount'), cx=w/2, cy=h/2, R=Math.hypot(w,h)/2*1.1, TWO=Math.PI*2;
+  const N=Math.round(12+bs.lines*44), tone=bs.tone|0;
+  const spinT=bs.spin==null?0:bs.spin, spinning=Math.abs(spinT)>1e-6;
+  let k=Math.round(spinT*N); if (spinning && k===0) k=spinT>0?1:-1;          // snap to a line-spacing step
+  const rot=spinning ? k*(TWO/N)*phase : 0;                                  // multiple of 2π/N → seamless
   sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h);
-  sctx.save(); sctx.translate(cx,cy); sctx.rotate(spin);
+  sctx.save(); sctx.translate(cx,cy); sctx.rotate(rot);
   for (let i=0;i<N;i++){
-    const t=i/N, ang=t*Math.PI*2, half=(Math.PI/N)*(0.25+rand(i*7.3)*0.75);   // jittered wedge width
-    const col= tone===2 ? hsv(t*360,0.9,1) : (HYPE_TONE[tone]||HYPE_TONE[0]);
+    const ang=i*(TWO/N), half=(Math.PI/N)*(spinning?0.5:(0.25+rand(i*7.3)*0.75));
+    const frac=spinning ? (i/N)+rot/TWO : i/N;                              // colour by world position when spinning
+    const col=hypeColor(tone, frac, 0.9, N);
     sctx.fillStyle=`rgb(${col[0]},${col[1]},${col[2]})`;
     sctx.beginPath(); sctx.moveTo(0,0);
     sctx.lineTo(Math.cos(ang-half)*R, Math.sin(ang-half)*R);
