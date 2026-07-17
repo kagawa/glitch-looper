@@ -216,7 +216,7 @@ const FX = [
     { k:'seg',    label:'Segments', min:2, max:16, step:1, def:6 },
     { k:'spin',   label:'Spin (sectors/loop)', min:-6, max:6, step:1, def:1 },
     { k:'angle',  label:'Source Angle', min:0, max:345, step:15, def:0 },
-    { k:'spread', label:'Fan Spread', min:0, max:1, step:.01, def:.35, show:s=> (s.mode|0)===1 },
+    { k:'spread', label:'Fan Spread', min:0, max:1, step:.01, def:.35 },
     { k:'zoom',   label:'Zoom Out', min:0, max:1, step:.01, def:.3 },
     { k:'cx',     label:'Hub X', min:0, max:1, step:.01, def:.5 },
     { k:'cy',     label:'Hub Y', min:0, max:1, step:.01, def:.5 },

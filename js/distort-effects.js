@@ -194,11 +194,13 @@ if (kd.on && (kd.amount==null || kd.amount>0)){
     kctx.setTransform(1,0,0,1,0,0); kctx.globalAlpha=1;
     ctx.save(); ctx.globalAlpha=amt; ctx.drawImage(kcanvas,0,0); ctx.restore();        // fan over the original by Amount
   } else {
-    // Mirror: per-pixel radial fold with a reflection — a crisp, symmetric kaleidoscope (one wedge)
-    const cx=w*kd.cx, cy=h*kd.cy, scale=1+(kd.zoom||0)*2.5;
+    // Mirror: per-pixel radial fold with a reflection — a crisp, symmetric kaleidoscope (one wedge).
+    // Fan Spread shifts the sampled radius outward (|r-spread|), so the picture's centre lands on a ring
+    // out in the wedges instead of at the hub — the mirror-mode counterpart of the fan's push-out.
+    const cx=w*kd.cx, cy=h*kd.cy, scale=1+(kd.zoom||0)*2.5, bladeR=(kd.spread||0)*Math.min(w,h)*0.6;
     const src=ctx.getImageData(0,0,w,h), s=src.data, out=ctx.createImageData(w,h), o=out.data;
     for (let y=0;y<h;y++) for (let x=0;x<w;x++){
-      const oi=(y*w+x)*4, dx=x-cx, dy=y-cy, r=Math.sqrt(dx*dx+dy*dy)*scale;
+      const oi=(y*w+x)*4, dx=x-cx, dy=y-cy, r=Math.abs(Math.sqrt(dx*dx+dy*dy)*scale-bladeR);
       let a=(Math.atan2(dy,dx)-rot)%sector; if (a<0) a+=sector; if (a>half) a=sector-a; a+=off;
       let sx=(cx+r*Math.cos(a))|0, sy=(cy+r*Math.sin(a))|0;
       sx = sx<0?0:sx>=w?w-1:sx; sy = sy<0?0:sy>=h?h-1:sy;
