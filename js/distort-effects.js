@@ -1,21 +1,32 @@
 const kcanvas = document.createElement('canvas'), kctx = kcanvas.getContext('2d');  // Kaleidoscope fan scratch
 
 function applyLiquid(w,h,phase){
-// ---- Liquid Glass: a flowing 2D displacement map (sum of sines) refracts the frame, with a touch of
-//      chromatic edge. Temporal terms are whole loop cycles (speed integer), so it flows seamlessly. ----
+// ---- Liquid Glass: scattered water/glass droplets, each a little lens that magnifies the picture under
+//      it (with a chromatic rim), drifting slowly over the loop. Localised — unlike a full-frame ripple. ----
 const lq = state.liquid;
 if (lq.on && (lq.amount==null || lq.amount>0) && lq.amp>0){
-  const amt=lq.amount==null?1:P('liquid','amount'), amp=P('liquid','amp')*Math.min(w,h)*0.06;
-  const f=(0.5+lq.scale*3)*0.02, speed=lq.speed|0, chroma=lq.chroma, t=phase*Math.PI*2*speed;
+  const amt=lq.amount==null?1:P('liquid','amount'), refr=P('liquid','amp')*0.6, chroma=lq.chroma;
+  const M=Math.round(4+(lq.count||0)*26), baseR=(0.05+(lq.size||0)*0.15)*Math.min(w,h);
+  const dcx=new Float64Array(M), dcy=new Float64Array(M), dr=new Float64Array(M), dr2=new Float64Array(M);
+  for (let k=0;k<M;k++){                                                     // seeded positions, gently drifting
+    const cx=(rand(k*12.9+1)+0.06*Math.sin(phase*Math.PI*2+rand(k*5.7)*6))*w;
+    const cy=(rand(k*78.2+3)+0.06*Math.cos(phase*Math.PI*2+rand(k*2.3)*6))*h;
+    const r=baseR*(0.55+rand(k*3.3)*1.0);
+    dcx[k]=cx; dcy[k]=cy; dr[k]=r; dr2[k]=r*r;
+  }
   const cl=(v,m)=>v<0?0:v>=m?m-1:v;
   const src=ctx.getImageData(0,0,w,h), s=src.data, out=ctx.createImageData(w,h), o=out.data;
   for (let y=0;y<h;y++) for (let x=0;x<w;x++){
-    const dx=amp*(Math.sin(y*f + x*f*0.6 + t) + 0.5*Math.sin(y*f*1.7 - x*f + t*2));
-    const dy=amp*(Math.cos(x*f + y*f*0.6 - t) + 0.5*Math.cos(x*f*1.7 + y*f + t*2));
-    const oi=(y*w+x)*4, cxo=chroma*dx*0.4, cyo=chroma*dy*0.4;
-    const R=s[(cl(y+dy+cyo|0,h)*w+cl(x+dx+cxo|0,w))*4];
-    const G=s[(cl(y+dy|0,h)*w+cl(x+dx|0,w))*4+1];
-    const B=s[(cl(y+dy-cyo|0,h)*w+cl(x+dx-cxo|0,w))*4+2];
+    const oi=(y*w+x)*4;
+    let best=-1, bestT=2;
+    for (let k=0;k<M;k++){ const ddx=x-dcx[k], ddy=y-dcy[k], d2=ddx*ddx+ddy*ddy;
+      if (d2<dr2[k]){ const t=Math.sqrt(d2)/dr[k]; if (t<bestT){ bestT=t; best=k; } } }
+    let sx=x, sy=y, co=0;
+    if (best>=0){ const bend=refr*(1-bestT*bestT);                          // magnify toward the droplet centre
+      sx=dcx[best]+(x-dcx[best])*(1-bend); sy=dcy[best]+(y-dcy[best])*(1-bend); co=chroma*bestT*bestT*4; }
+    const R=s[(cl(sy|0,h)*w+cl((sx+co)|0,w))*4];
+    const G=s[(cl(sy|0,h)*w+cl(sx|0,w))*4+1];
+    const B=s[(cl(sy|0,h)*w+cl((sx-co)|0,w))*4+2];
     o[oi]=s[oi]+(R-s[oi])*amt; o[oi+1]=s[oi+1]+(G-s[oi+1])*amt; o[oi+2]=s[oi+2]+(B-s[oi+2])*amt; o[oi+3]=255;
   }
   ctx.putImageData(out,0,0);

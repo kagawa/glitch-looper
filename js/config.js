@@ -246,6 +246,7 @@ const FX = [
     { k:'density', label:'Density', min:0, max:1, step:.01, def:.4 },
     { k:'size',    label:'Size', min:0, max:1, step:.01, def:.5, env:1 },
     { k:'thresh',  label:'Threshold', min:0, max:1, step:.01, def:.6 },
+    { k:'from',    label:'From', type:'select', def:0, options:[[0,'Highlights'],[1,'Saturated'],[2,'Any bright/vivid']] },
     { k:'shape',   label:'Shape', type:'select', def:0, options:[[0,'Circle'],[1,'Hexagon'],[2,'Star'],[3,'Heart'],[4,'Diamond']] },
   ]},
   { id:'foil', name:'Holographic Foil', hint:'diagonal rainbow diffraction — hologram sticker', on:false, open:false, params:[
@@ -255,11 +256,11 @@ const FX = [
     { k:'speed',   label:'Shift Speed', min:0, max:4, step:1, def:1 },
     { k:'sheen',   label:'Sheen', min:0, max:1, step:.01, def:.5 },
   ]},
-  { id:'liquid', name:'Liquid Glass', hint:'flowing 2D refraction — water / glass', on:false, open:false, params:[
+  { id:'liquid', name:'Liquid Glass', hint:'scattered water/glass droplets that lens the picture', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:1, env:1 },
-    { k:'amp',    label:'Refraction', min:0, max:1, step:.01, def:.4, env:1 },
-    { k:'scale',  label:'Scale', min:0, max:1, step:.01, def:.5 },
-    { k:'speed',  label:'Flow', min:0, max:4, step:1, def:1 },
+    { k:'amp',    label:'Refraction', min:0, max:1, step:.01, def:.5, env:1 },
+    { k:'count',  label:'Droplets', min:0, max:1, step:.01, def:.5 },
+    { k:'size',   label:'Droplet Size', min:0, max:1, step:.01, def:.5 },
     { k:'chroma', label:'Chromatic Edge', min:0, max:1, step:.01, def:.3 },
   ]},
   { id:'paper', name:'Paper Cutout', hint:'posterized paper layers with drop shadows', on:false, open:false, params:[
@@ -519,7 +520,7 @@ const PRESETS = {
   'Oil Slick':   { color:{on:1,saturate:1.1,contrast:1.05,bright:1.0,hue:0,tint:0,vignette:.3}, iris:{on:1,amount:.7,angscale:.6,lumascale:1.2,speed:2,edge:0}, prism:{on:1,amount:.3,spread:.3,blur:.2,rot:2} },
   'Fairy Dust':  { color:{on:1,saturate:1.0,contrast:1.0,bright:1.12,hue:0,tint:.05,vignette:.2}, bokeh:{on:1,amount:.6,density:.4,size:.55,thresh:.5,shape:0}, sparkle:{on:1,amount:.6,density:.4,size:.35,speed:1,shape:2,tone:9}, iris:{on:1,amount:.3,angscale:.5,lumascale:1,speed:1,edge:0}, leak:{on:1,amount:.3,tone:3,pos:1,size:.6,drift:.4} },
   'Hologram':    { color:{on:1,saturate:1.2,contrast:1.05,bright:1.02,hue:0,tint:0,vignette:.25}, foil:{on:1,amount:.7,density:5,angle:45,speed:1,sheen:.6}, bloom:{on:1,amount:.35,size:10,glow:.3} },
-  'Aqua Glass':  { color:{on:1,saturate:1.15,contrast:1.0,bright:1.02,hue:100,tint:-.1,vignette:.35}, liquid:{on:1,amount:1,amp:.5,scale:.5,speed:1,chroma:.35}, prism:{on:1,amount:.25,spread:.3,blur:.3,rot:1}, bloom:{on:1,amount:.3,size:12,glow:.4} },
+  'Aqua Glass':  { color:{on:1,saturate:1.15,contrast:1.0,bright:1.02,hue:100,tint:-.1,vignette:.35}, liquid:{on:1,amount:1,amp:.55,count:.55,size:.5,chroma:.35}, prism:{on:1,amount:.25,spread:.3,blur:.3,rot:1}, bloom:{on:1,amount:.3,size:12,glow:.4} },
   // ---- Reset ----
   'Clean':       { vhs:{on:0}, glitch:{on:0}, noise:{on:0}, color:{on:0} },
 };

@@ -156,13 +156,16 @@ function applyBokeh(w,h,phase){
 // ---- Bokeh Bloom: soft light discs grown from the picture's own highlights, breathing over the loop ----
 const bk = state.bokeh;
 if (bk.on && bk.amount>0){
-  const amt=P('bokeh','amount'), N=Math.round(10+bk.density*80), thr=bk.thresh, base=5+P('bokeh','size')*48, shape=bk.shape|0;
+  const amt=P('bokeh','amount'), N=Math.round(10+bk.density*80), thr=bk.thresh, base=5+P('bokeh','size')*48, shape=bk.shape|0, from=bk.from|0;
   const id=ctx.getImageData(0,0,w,h), d=id.data;
   ctx.save(); ctx.globalCompositeOperation='screen';
   for (let i=0;i<N;i++){
     const px=(rand(i*12.9+1)*w)|0, py=(rand(i*78.2+3)*h)|0, si=(py*w+px)*4;
-    const lum=(d[si]*0.299+d[si+1]*0.587+d[si+2]*0.114)/255; if (lum<thr) continue;
-    const str=(lum-thr)/(1-thr+1e-3);
+    const R0=d[si],G0=d[si+1],B0=d[si+2], lum=(R0*0.299+G0*0.587+B0*0.114)/255;
+    const mx=Math.max(R0,G0,B0), sat=mx? (mx-Math.min(R0,G0,B0))/mx : 0;      // trigger metric: bright, vivid, or either
+    const metric = from===1 ? sat : from===2 ? Math.max(lum,sat) : lum;
+    if (metric<thr) continue;
+    const str=(metric-thr)/(1-thr+1e-3);
     const bob=Math.sin(phase*Math.PI*2 + rand(i*5.7)*6)*10;                        // gentle drift (seamless)
     const pulse=1+0.16*Math.sin(phase*Math.PI*2 + rand(i*3.3)*6);
     const s=base*(0.5+rand(i*9.1)*1.0)*pulse;
