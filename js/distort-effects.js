@@ -75,12 +75,17 @@ if (gl.on && gl.amount>0){
       continue;
     }
     // ease the shift in over the top edge and back out over the bottom, so the slice doesn't
-    // jump to full offset in one line — a hump that returns to the neighbours at both edges
-    const e = Math.min(0.49, ew/sh);
+    // jump to full offset in one line — a hump that returns to the neighbours at both edges.
+    // Give every slice its own top and bottom ease widths (seeded on the slice + loop step so it
+    // stays seamless) — a fixed width makes every edge ramp at the same angle, which reads as
+    // mechanical; scattering them 0.5–1.5× and letting top≠bottom breaks that uniformity.
+    const ewTop = ew*(0.5+rand(i*9.3+step*2.1)*1.0);
+    const ewBot = ew*(0.5+rand(i*6.1+step*3.7)*1.0);
+    const eTop = Math.min(0.49, ewTop/sh), eBot = Math.min(0.49, ewBot/sh);
     ctx.clearRect(0,sy,w,sh);
     for (let yy=0; yy<sh; yy++){
       const t=(yy+0.5)/sh;
-      const prof=Math.min(edgeEase(Math.min(1,t/e),edge), edgeEase(Math.min(1,(1-t)/e),edge));
+      const prof=Math.min(edgeEase(Math.min(1,t/eTop),edge), edgeEase(Math.min(1,(1-t)/eBot),edge));
       const shf=((Math.round(off*prof)%w)+w)%w, y=sy+yy;
       ctx.drawImage(sc, 0,y,w-shf,1, shf,y,w-shf,1);
       if (shf>0) ctx.drawImage(sc, w-shf,y,shf,1, 0,y,shf,1);

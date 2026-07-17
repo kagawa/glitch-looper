@@ -326,12 +326,13 @@ function draw(phase){
     const ys=[0]; for (let i=1;i<nT;i++) ys.push(Math.round(h*i/nT + (rand(pat*5.3+i*1.7)-0.5)*(h/nT)*0.7));
     ys.push(h); ys.sort((a,b)=>a-b);
     const band=[];
+    const edge = sy.edge|0, ew = Math.max(1, sy.edgew|0);
     for (let i=0;i<nT;i++){
       const lag = Math.round(rand(pat*2.1+i*3.7)*maxD*amt);           // amt scales both, so amt 0 = clean
       const sh  = Math.round((rand(pat*8.9+i*0.53)*2-1)*maxS*amt);
-      band.push({ y0:ys[i], y1:ys[i+1], lag, sh });
+      const bew = Math.max(1, ew*(0.5+rand(pat*4.3+i*2.9)*1.0));      // per-tear ease width so the slips
+      band.push({ y0:ys[i], y1:ys[i+1], lag, sh, ew:bew });          // don't all ramp at the same angle
     }
-    const edge = sy.edge|0, ew = Math.max(1, sy.edgew|0);
     sacc.width=w; sacc.height=h; sax.clearRect(0,0,w,h);
     if (edge===0){
       for (const lag of [...new Set(band.map(b=>b.lag))]){            // render each distinct lag once
@@ -350,10 +351,10 @@ function draw(phase){
       const bandOf=new Int32Array(h), rowShift=new Float32Array(h);
       for (let i=0;i<nT;i++) for (let y=band[i].y0;y<band[i].y1;y++) bandOf[y]=i;
       for (let y=0;y<h;y++){
-        const bi=bandOf[y], b=band[bi]; let sh=b.sh;
+        const bi=bandOf[y], b=band[bi]; let sh=b.sh; const bew=b.ew;
         const dTop=y-b.y0, dBot=b.y1-1-y;
-        if (bi>0 && dTop<ew && dTop<=dBot)      sh = band[bi-1].sh + (b.sh-band[bi-1].sh)*edgeEase((dTop+0.5)/ew, edge);
-        else if (bi<nT-1 && dBot<ew)            sh = band[bi+1].sh + (b.sh-band[bi+1].sh)*edgeEase((dBot+0.5)/ew, edge);
+        if (bi>0 && dTop<bew && dTop<=dBot)      sh = band[bi-1].sh + (b.sh-band[bi-1].sh)*edgeEase((dTop+0.5)/bew, edge);
+        else if (bi<nT-1 && dBot<bew)            sh = band[bi+1].sh + (b.sh-band[bi+1].sh)*edgeEase((dBot+0.5)/bew, edge);
         rowShift[y]=sh;
       }
       for (const lag of [...new Set(band.map(b=>b.lag))]){
