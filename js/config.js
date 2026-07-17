@@ -197,7 +197,7 @@ const FX = [
     { k:'density', label:'Density', min:0, max:1, step:.01, def:.4 },
     { k:'size',    label:'Size', min:0, max:1, step:.01, def:.4 },
     { k:'speed',   label:'Twinkle Speed', min:1, max:4, step:1, def:1 },
-    { k:'shape',   label:'Shape', type:'select', def:0, options:[[0,'Star (4pt)'],[1,'Star (6pt)'],[2,'Sparkle (8pt)'],[3,'Dot'],[4,'Diamond']] },
+    { k:'shape',   label:'Shape', type:'select', def:0, options:[[0,'Star (4pt)'],[1,'Star (6pt)'],[2,'Sparkle (8pt)'],[3,'Dot'],[4,'Diamond'],[5,'Hexagon'],[6,'Star (5pt)'],[7,'Heart']] },
     { k:'tone',    label:'Tone', type:'select', def:0, options:[[0,'Gold'],[1,'White'],[2,'Rainbow'],[3,'Ice'],[4,'Pink'],[5,'Emerald'],[6,'Violet'],[8,'Fire'],[9,'Candy'],[10,'Festive'],[11,'Black (light bg)']] },
   ]},
   { id:'burst', name:'Burst Lines', hint:'radial 集中線 — spinning speed-lines, pachinko hype', on:false, open:false, params:[
@@ -247,7 +247,7 @@ const FX = [
     { k:'size',    label:'Size', min:0, max:1, step:.01, def:.5, env:1 },
     { k:'thresh',  label:'Threshold', min:0, max:1, step:.01, def:.6 },
     { k:'from',    label:'From', type:'select', def:0, options:[[0,'Highlights'],[1,'Saturated'],[2,'Any bright/vivid']] },
-    { k:'shape',   label:'Shape', type:'select', def:0, options:[[0,'Circle'],[1,'Hexagon'],[2,'Star'],[3,'Heart'],[4,'Diamond']] },
+    { k:'shape',   label:'Shape', type:'select', def:0, options:[[0,'Circle'],[1,'Hexagon'],[2,'Star (5pt)'],[3,'Heart'],[4,'Diamond'],[5,'Star (4pt)'],[6,'Star (6pt)'],[7,'Sparkle (8pt)']] },
   ]},
   { id:'foil', name:'Holographic Foil', hint:'diagonal rainbow diffraction — hologram sticker', on:false, open:false, params:[
     { k:'amount',  label:'Amount', min:0, max:1, step:.01, def:.6, env:1 },

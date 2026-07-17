@@ -174,6 +174,14 @@ if (bk.on && bk.amount>0){
   ctx.restore();
 }
 }
+// shared shape paths (used by both Bokeh discs and Sparkle glints)
+function _starPath(x,y,s,points,inner){ ctx.beginPath();
+  for (let k=0;k<points*2;k++){ const rad=(k%2)?s*inner:s, a=-Math.PI/2+k*Math.PI/points, vx=x+Math.cos(a)*rad, vy=y+Math.sin(a)*rad; k?ctx.lineTo(vx,vy):ctx.moveTo(vx,vy); } ctx.closePath(); }
+function _polyPath(x,y,s,sides){ ctx.beginPath();
+  for (let k=0;k<sides;k++){ const a=-Math.PI/2+k*(Math.PI*2/sides), vx=x+Math.cos(a)*s, vy=y+Math.sin(a)*s; k?ctx.lineTo(vx,vy):ctx.moveTo(vx,vy); } ctx.closePath(); }
+function _heartPath(x,y,s){ const t=s*0.95; ctx.beginPath(); ctx.moveTo(x,y+t*0.55);
+  ctx.bezierCurveTo(x+t,y-t*0.35, x+t*0.5,y-t, x,y-t*0.3); ctx.bezierCurveTo(x-t*0.5,y-t, x-t,y-t*0.35, x,y+t*0.55); ctx.closePath(); }
+
 function drawBokeh(x,y,s,col,alpha,shape){
   if (s<1 || alpha<=0.01) return;
   const [r,g,b]=col; ctx.globalAlpha=Math.min(1,alpha);
@@ -183,16 +191,16 @@ function drawBokeh(x,y,s,col,alpha,shape){
     rg.addColorStop(0.92,`rgba(${r},${g},${b},0.7)`); rg.addColorStop(1,`rgba(${r},${g},${b},0)`);
     ctx.fillStyle=rg; ctx.beginPath(); ctx.arc(x,y,s,0,7); ctx.fill(); return;
   }
-  ctx.fillStyle=`rgba(${r},${g},${b},0.55)`; ctx.beginPath();
-  if (shape===3){ const t=s*0.95;                                                 // heart
-    ctx.moveTo(x,y+t*0.55);
-    ctx.bezierCurveTo(x+t,y-t*0.35, x+t*0.5,y-t, x,y-t*0.3);
-    ctx.bezierCurveTo(x-t*0.5,y-t, x-t,y-t*0.35, x,y+t*0.55);
-  } else {
-    const pts = shape===1?6 : shape===4?4 : 10;                                   // hexagon / diamond / 5-point star
-    for (let k=0;k<pts;k++){ const rad=(shape===2 && k%2)?s*0.45:s, a=-Math.PI/2+k*(Math.PI*2/pts);
-      const vx=x+Math.cos(a)*rad, vy=y+Math.sin(a)*rad; k===0?ctx.moveTo(vx,vy):ctx.lineTo(vx,vy); }
-    ctx.closePath();
+  ctx.fillStyle=`rgba(${r},${g},${b},0.55)`;
+  switch (shape){                                                                 // hexagon / star5 / heart / diamond, + ported star4/6/8
+    case 1: _polyPath(x,y,s,6); break;
+    case 2: _starPath(x,y,s,5,0.45); break;
+    case 3: _heartPath(x,y,s); break;
+    case 4: _polyPath(x,y,s,4); break;
+    case 5: _starPath(x,y,s,4,0.45); break;
+    case 6: _starPath(x,y,s,6,0.5); break;
+    case 7: _starPath(x,y,s,8,0.55); break;
+    default: _polyPath(x,y,s,6);
   }
   ctx.fill();
 }
@@ -224,10 +232,13 @@ function drawGlint(x,y,s,col,alpha,shape){
   rg.addColorStop(0,`rgba(${r},${g},${b},1)`); rg.addColorStop(1,`rgba(${r},${g},${b},0)`);
   ctx.fillStyle=rg; ctx.beginPath(); ctx.arc(x,y,core,0,7); ctx.fill();
   if (shape===3) return;                                       // Dot: no spikes
-  if (shape===4){                                              // Diamond: filled rhombus
-    const d=s*1.8; ctx.fillStyle=`rgb(${r},${g},${b})`;
-    ctx.beginPath(); ctx.moveTo(x,y-d); ctx.lineTo(x+d*0.62,y); ctx.lineTo(x,y+d); ctx.lineTo(x-d*0.62,y); ctx.closePath(); ctx.fill();
-    return;
+  if (shape>=4){                                               // filled glints: diamond / hexagon / star5 / heart
+    ctx.fillStyle=`rgb(${r},${g},${b})`;
+    if (shape===4){ const d=s*1.8; ctx.beginPath(); ctx.moveTo(x,y-d); ctx.lineTo(x+d*0.62,y); ctx.lineTo(x,y+d); ctx.lineTo(x-d*0.62,y); ctx.closePath(); }
+    else if (shape===5) _polyPath(x,y,s*1.5,6);                // Hexagon
+    else if (shape===6) _starPath(x,y,s*1.9,5,0.45);           // Star (5pt)
+    else _heartPath(x,y,s*1.5);                                // Heart
+    ctx.fill(); return;
   }
   ctx.strokeStyle=`rgba(${r},${g},${b},0.9)`; ctx.lineWidth=Math.max(1,s*0.16);
   const L=s*2.7, ray=(th,len)=>{ ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+Math.cos(th)*len,y+Math.sin(th)*len); ctx.stroke(); };
