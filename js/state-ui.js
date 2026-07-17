@@ -248,7 +248,7 @@ function applyPreset(name){
     // fiddled with before it was picked, and picking it twice gives two different looks.
     f.params.forEach(par=>{
       state[f.id][par.k] = pp[par.k] !== undefined ? pp[par.k] : par.def;
-      if (par.env) state[f.id][par.k+'_env'] = !!par.envd;
+      if (par.env) state[f.id][par.k+'_env'] = pp[par.k+'_env'] !== undefined ? !!pp[par.k+'_env'] : !!par.envd;
     });
   });
   applyHudPreset(state.hud.layout|0);   // fill the text slots to match the preset's layout (on or off)
