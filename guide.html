@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GLITCH LOOPER — How to Use</title>
+<meta name="description" content="How to use GLITCH LOOPER — load, glitch, loop, export (EN / 日本語).">
+<style>
+  :root{ --bg:#0d0d10; --panel:#16161c; --panel2:#1e1e26; --line:#2c2c38;
+         --fg:#e6e6ee; --muted:#8a8a9a; --accent:#6cf; --accent2:#f6c; }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{ background:var(--bg); color:var(--fg); line-height:1.6;
+        font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans JP",sans-serif;
+        -webkit-font-smoothing:antialiased; }
+  a{ color:var(--accent); text-decoration:none } a:hover{ text-decoration:underline }
+  .wrap{ max-width:820px; margin:0 auto; padding:28px 20px 80px }
+  header{ display:flex; flex-wrap:wrap; align-items:center; gap:12px 18px; margin-bottom:6px }
+  h1{ font-size:26px; letter-spacing:.02em; margin:0; font-weight:800 }
+  h1 small{ color:var(--muted); font-weight:500; font-size:13px; letter-spacing:.06em; text-transform:uppercase }
+  .back{ font-size:13px; color:var(--muted) }
+  .lead{ color:var(--muted); font-size:15px; margin:10px 0 22px }
+  .langbar{ margin-left:auto; display:flex; gap:6px; background:var(--panel2); padding:4px; border-radius:10px; border:1px solid var(--line) }
+  .langbar button{ font:inherit; font-size:13px; color:var(--muted); background:none; border:0; padding:5px 12px; border-radius:7px; cursor:pointer }
+  .langbar button.on{ background:var(--accent); color:#001018; font-weight:700 }
+
+  .step{ margin:26px 0 0; padding:18px 0 4px; border-top:1px solid var(--line) }
+  .step h2{ font-size:16px; margin:0 0 10px; font-weight:700; display:flex; align-items:baseline; gap:10px }
+  .step h2 .n{ font-size:12px; font-weight:700; color:#001018; background:var(--accent2);
+               width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; flex:none }
+  .step h2 .jp{ color:var(--muted); font-weight:500; font-size:13px }
+  ul.items{ margin:8px 0 0; padding-left:18px }
+  ul.items li{ margin:7px 0 }
+  .en{ } .jp{ color:#c9c9d6 }
+  li .jp{ display:block; margin-top:2px }
+  body.lang-en .jp{ display:none } body.lang-jp .en{ display:none }
+  b, strong{ color:var(--fg); font-weight:600 }
+  .k{ font-size:12px; font-weight:700; background:var(--panel2); border:1px solid var(--line);
+      border-radius:6px; padding:1px 7px; color:var(--fg) }
+
+  table.keys{ border-collapse:collapse; width:100%; margin-top:6px; font-size:14px }
+  table.keys td{ padding:7px 10px; border-bottom:1px solid var(--line); vertical-align:top }
+  table.keys td:first-child{ white-space:nowrap; width:1%; }
+  .tip{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-top:10px }
+  .tip ul{ margin:0; padding-left:18px } .tip li{ margin:6px 0 }
+  footer{ margin-top:36px; color:var(--muted); font-size:13px; border-top:1px solid var(--line); padding-top:16px }
+</style>
+</head>
+<body class="lang-both">
+<div class="wrap">
+  <header>
+    <h1>GLITCH LOOPER <small>How to Use</small></h1>
+    <div class="langbar" role="group" aria-label="language">
+      <button data-lang="both" class="on">Both</button>
+      <button data-lang="en">EN</button>
+      <button data-lang="jp">日本語</button>
+    </div>
+  </header>
+  <p class="back"><a href="./">← back to the app</a> · <a href="effects.html">effect reference →</a></p>
+  <p class="lead">
+    <span class="en">GLITCH LOOPER turns any image into a seamless 3-second looping glitch video, entirely in your browser — nothing is uploaded. Here is the whole workflow, from dropping an image to saving the loop.</span>
+    <span class="jp">GLITCH LOOPER は任意の画像を、3秒でシームレスにループするグリッチ動画に変換します。処理はすべてブラウザ内で完結し、画像はアップロードされません。以下は画像を入れてからループを保存するまでの一連の流れです。</span>
+  </p>
+
+  <main id="doc"></main>
+
+  <footer>
+    <span class="en">Made by <a href="https://x.com/kagawa">@kagawa</a>. See the <a href="effects.html">effect reference</a> for what every effect does. Runs on canvas + MediaRecorder, no AI, no server.</span>
+    <span class="jp">制作 <a href="https://x.com/kagawa">@kagawa</a>。各エフェクトの詳細は<a href="effects.html">エフェクト説明</a>を参照。canvas + MediaRecorder で動作、AI なし・サーバーなし。</span>
+  </footer>
+</div>
+
+<script>
+// [ sectionTitleEN, sectionTitleJP, [ [en, jp], ... ] ]
+const STEPS = [
+  ['Load an image','画像を読み込む', [
+    [`A sample image is loaded already, so you can start playing right away. To use your own, <b>drop an image onto the page</b> or <b>click to choose</b> one (PNG · JPG · WEBP).`,
+     `最初からサンプル画像が読み込まれているので、すぐに試せます。自分の画像を使うには、<b>ページに画像をドロップ</b>するか、<b>クリックして選択</b>します（PNG・JPG・WEBP）。`],
+    [`Once loaded, the image instantly becomes a looping preview. <b>Tap or click the image</b> at any time to swap in a different one.`,
+     `読み込むと画像はそのままループ再生されます。<b>画像をタップ/クリック</b>すれば、いつでも別の画像に差し替えられます。`],
+    [`Everything runs on your device — your image is never uploaded and never leaves the browser.`,
+     `処理はすべて端末内で行われます。画像がアップロードされることはなく、ブラウザの外に出ません。`],
+  ]],
+  ['Get a look fast','手早く仕上げる', [
+    [`Two shortcuts to a finished look: pick a <b>Preset</b> from the dropdown (40+ ready-made styles), or hit <b>🎲 Random</b> to roll a fresh combination. Keep pressing Random until something clicks.`,
+     `仕上がりへの近道は2つ。ドロップダウンから<b>プリセット</b>（40種類以上の既成スタイル）を選ぶか、<b>🎲 Random</b> で組み合わせをランダム生成する。気に入るまで Random を押し続けてOK。`],
+    [`The <b>⋯</b> next to Random opens its settings — <b>Strength</b> (Normal / Strong / Wild) sets how hard and how many effects come on, and <b>Effects min / max</b> clamp the count.`,
+     `Random 隣の <b>⋯</b> で設定を開ける。<b>Strength</b>（Normal / Strong / Wild）で強さと発生数を、<b>Effects min / max</b> で発生数の下限・上限を決める。`],
+    [`Landed on something great but want to vary just part of it? <b>Lock it.</b> Click the <span class="k">🔓</span> on any effect's header to protect that effect from Random and Drift, then keep rerolling the rest.`,
+     `良い形になったが一部だけ変えたい時は<b>ロック</b>する。各エフェクト見出しの <span class="k">🔓</span> を押すとそのエフェクトを Random / Drift から保護でき、残りだけ振り直せる。`],
+  ]],
+  ['Tune the effects','エフェクトを調整する', [
+    [`The panel lists every effect by category. Flip a switch to turn one on, and <b>click the row to expand its sliders</b>. Effects <b>stack</b> — the picture flows through them top to bottom.`,
+     `パネルにはエフェクトがカテゴリ別に並ぶ。スイッチでオンにし、<b>行をクリックするとスライダーが開く</b>。エフェクトは<b>重ねがけ</b>で、画像は上から下へ順に処理される。`],
+    [`Each effect is tagged <b>real</b> (genuinely corrupts encoded file bytes, so it is unpredictable) or <b>sim</b> (deterministic processing). The <a href="effects.html">effect reference</a> explains every effect and its parameters.`,
+     `各エフェクトには <b>real</b>（エンコード済みバイトを実際に破壊＝予測不能）か <b>sim</b>（決定的な処理）のタグが付く。全エフェクトとパラメータの説明は<a href="effects.html">エフェクト説明</a>にある。`],
+  ]],
+  ['Make it move — Envelope','動きを付ける — Envelope', [
+    [`Many parameters show a small <span class="k">ⓔ</span> box. Tick it and that parameter <b>breathes over the loop</b> instead of holding a flat value.`,
+     `多くのパラメータには小さな <span class="k">ⓔ</span> のチェックがある。オンにすると、その値が固定ではなく<b>ループの中で抑揚を持って変化</b>する。`],
+    [`The <b>Envelope</b> effect (in Global) sets the shape they follow — peak, pulse, build→drop, swell, bounce, wander and more — with its own <b>Depth</b> and <b>Rate</b>.`,
+     `<b>Envelope</b> エフェクト（Global 内）がその変化の形を決める — peak / pulse / build→drop / swell / bounce / wander など — <b>Depth</b> と <b>Rate</b> で調整。`],
+  ]],
+  ['Make it rhythmic — Sequencer','リズムを付ける — Sequencer', [
+    [`The loop is split into <b>8 steps</b>. Open the <b>⏱ Sequencer</b> panel at the bottom: it shows one row per active effect. <b>Tap cells</b> to gate that effect on or off per step, so effects blink in and out in time instead of running the whole loop.`,
+     `ループは<b>8ステップ</b>に分かれる。下部の <b>⏱ Sequencer</b> パネルを開くと、オンのエフェクトごとに1行表示される。<b>セルをタップ</b>してステップ単位でオン/オフを切り替えると、エフェクトが常時ではなくリズミカルに点滅する。`],
+    [`Random can also hand out rhythmic patterns on its own — the more effects are on, the more likely they get sequenced.`,
+     `Random 自身もリズムパターンを割り当てる — オンのエフェクトが多いほど、シーケンス化されやすくなる。`],
+  ]],
+  ['Confine it — Region Mask','範囲を絞る — Region Mask', [
+    [`<b>Region Mask</b> (in Global) restricts every effect to part of the frame: a <b>fixed or roaming rectangle</b>, or a region chosen by tone (shadows / midtones / highlights), edges, or noise. Non-rectangle masks have a threshold; all masks can be inverted and feathered.`,
+     `<b>Region Mask</b>（Global 内）は全エフェクトを画面の一部に限定する。<b>固定/移動する矩形</b>や、明暗（暗部/中間調/明部）・エッジ・ノイズで選んだ領域。矩形以外はしきい値を持ち、すべて反転・縁ぼかしができる。`],
+    [`The roaming and noise masks move in discrete steps per loop. Set <b>Roam Steps to 8 or 16</b> to line those moves up with the Sequencer's 8 steps.`,
+     `移動する矩形とノイズのマスクは、ループ内を離散的なステップで動く。<b>Roam Steps を 8 か 16</b> にすると、Sequencer の8ステップと動きが揃う。`],
+  ]],
+  ['Save the loop','ループを保存する', [
+    [`Press <b>⏺ Rec</b> to record one clean loop as an <b>MP4</b> (WebM where MP4 isn't supported). On phones this opens the <b>share sheet</b> — Save Video, or share straight to an app.`,
+     `<b>⏺ Rec</b> を押すと、1周ぶんのループを <b>MP4</b>（MP4 非対応環境では WebM）として保存する。スマホでは<b>共有シート</b>が開く — 「ビデオを保存」やアプリへ直接共有。`],
+    [`Prefer an animated image? <span class="k">G</span> exports a <b>GIF</b> and <span class="k">P</span> exports an <b>APNG</b>. Every export is one seamless 3-second loop.`,
+     `動く画像が欲しい場合は <span class="k">G</span> で <b>GIF</b>、<span class="k">P</span> で <b>APNG</b> を書き出せる。どの書き出しも3秒のシームレスなループになる。`],
+  ]],
+  ['Share the settings','設定を共有する', [
+    [`The <b>⤴</b> button holds <b>🔗 Copy link</b> and <b>𝕏 Post</b>. The link stores the <b>exact settings</b> — every parameter, the pattern seed, the sequencer and your locks — so opening it reproduces the same look.`,
+     `<b>⤴</b> ボタンに <b>🔗 Copy link</b> と <b>𝕏 Post</b> がある。リンクには<b>設定一式</b>（全パラメータ・パターンSeed・シーケンサー・ロック）が入り、開くと同じ見た目が再現される。`],
+    [`The link carries settings only, <b>not the image</b> — so share it alongside whatever image you started from.`,
+     `リンクに含まれるのは設定だけで、<b>画像は入らない</b>。元にした画像と一緒に共有する形になる。`],
+  ]],
+];
+
+const KEYS = [
+  ['Click / tap image', `Swap in a different image`, `画像を差し替える`],
+  ['R', `Auto-reroll on/off — rolls a new look every few seconds (default 6s = two loops)`, `自動リロールの切替 — 数秒ごとに新しい見た目に（既定6秒＝2ループ）`],
+  ['D', `Param drift on/off — slowly wanders the live parameters for constant motion`, `パラメータドリフトの切替 — 値をゆっくり動かし続ける`],
+  ['F', `Fullscreen "zen" view — just the loop`, `全画面「zen」表示 — ループだけを表示`],
+  ['G', `Export a GIF`, `GIF を書き出す`],
+  ['P', `Export an APNG`, `APNG を書き出す`],
+  ['Esc', `Close popovers / exit fullscreen`, `ポップアップを閉じる／全画面を抜ける`],
+];
+
+const TIPS = [
+  [`<b>Lock, then reroll.</b> Lock the one effect you love and spam Random for everything around it.`,
+   `<b>ロックして振り直す。</b> 気に入ったエフェクトをロックし、その周りだけ Random で回す。`],
+  [`<b>Fix the seed to reproduce a databend.</b> The real JPEG/PNG/WebP/GIF glitches are genuinely unpredictable; set a <b>Pattern Seed</b> (in the Random settings) to pin the exact corruption — share links carry it.`,
+   `<b>Seed を固定してデータベンドを再現。</b> 本物の JPEG/PNG/WebP/GIF グリッチは予測不能。Random 設定の <b>Pattern Seed</b> を固定すると同じ破壊を再現できる（共有リンクにも含まれる）。`],
+  [`<b>Pulse the glitch in time.</b> Combine the Sequencer with a roaming Region Mask on 8 or 16 steps to make the damage move in rhythm.`,
+   `<b>グリッチを拍で脈打たせる。</b> Sequencer と、8/16 ステップに設定した移動 Region Mask を組み合わせると、破壊がリズムに乗って動く。`],
+  [`<b>Start from a preset, then tweak.</b> Pick the closest preset and adjust a few sliders rather than building from zero.`,
+   `<b>プリセットから始めて微調整。</b> ゼロから作るより、近いプリセットを選んでスライダーを少しいじる方が早い。`],
+];
+
+const doc = document.getElementById('doc');
+STEPS.forEach(([en, jp, items], i)=>{
+  const sec = document.createElement('section'); sec.className='step';
+  sec.innerHTML = `<h2><span class="n">${i+1}</span><span class="en">${en}</span><span class="jp">${jp}</span></h2>`;
+  const ul = document.createElement('ul'); ul.className='items';
+  for (const [e,j] of items){
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="en">${e}</span><span class="jp">${j}</span>`;
+    ul.appendChild(li);
+  }
+  sec.appendChild(ul);
+  doc.appendChild(sec);
+});
+
+// shortcuts section
+const ks = document.createElement('section'); ks.className='step';
+ks.innerHTML = `<h2><span class="n">⌨</span><span class="en">Keyboard &amp; shortcuts</span><span class="jp">キーボード・ショートカット</span></h2>`;
+const tbl = document.createElement('table'); tbl.className='keys';
+tbl.innerHTML = KEYS.map(([k,e,j])=>
+  `<tr><td><span class="k">${k}</span></td><td><span class="en">${e}</span><span class="jp">${j}</span></td></tr>`).join('');
+ks.appendChild(tbl); doc.appendChild(ks);
+
+// tips
+const tp = document.createElement('section'); tp.className='step';
+tp.innerHTML = `<h2><span class="n">★</span><span class="en">Tips</span><span class="jp">コツ</span></h2>`;
+const box = document.createElement('div'); box.className='tip';
+const tul = document.createElement('ul');
+tul.innerHTML = TIPS.map(([e,j])=>`<li><span class="en">${e}</span><span class="jp">${j}</span></li>`).join('');
+box.appendChild(tul); tp.appendChild(box); doc.appendChild(tp);
+
+document.querySelectorAll('.langbar button').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.body.className = 'lang-'+b.dataset.lang;
+    document.querySelectorAll('.langbar button').forEach(x=>x.classList.toggle('on', x===b));
+  });
+});
+</script>
+</body>
+</html>
