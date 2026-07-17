@@ -47,10 +47,10 @@ if (dg.on){
       if (dg.color>0){                        // moving rainbow hue patches ("acid" purity error)
         ctx.save(); ctx.globalCompositeOperation='overlay';
         for (let k=0;k<3;k++){
-          const bx=w*(0.15+0.7*(0.5+0.5*Math.sin(wob+k*2.1)));
-          const by=h*(0.15+0.7*(0.5+0.5*Math.cos(wob*2+k*1.7)));
+          const bx=w*(0.15+0.7*(0.5+0.5*Math.sin(wA+k*2.1)));
+          const by=h*(0.15+0.7*(0.5+0.5*Math.cos(wA*2+k*1.7)));
           const rad=Math.max(w,h)*(0.3+0.1*k);
-          const hue=(Math.round(phase*720 + k*120 + Math.sin(wob)*40)%360+360)%360;
+          const hue=(Math.round(phase*720 + k*120 + Math.sin(wA)*40)%360+360)%360;
           const g=ctx.createRadialGradient(bx,by,0,bx,by,rad);
           g.addColorStop(0,`hsla(${hue},100%,50%,${0.45*str*dg.color})`);
           g.addColorStop(1,'hsla(0,0%,50%,0)');
