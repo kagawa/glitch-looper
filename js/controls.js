@@ -202,8 +202,14 @@ function randomizeFX(){
       if (p.type==='select'){
         if (f.id==='glitch' && p.k==='edge')     // Slice reads best as a clean hard cut — favour Hard heavily
           state[f.id][p.k] = Math.random()<0.8 ? 0 : [3,1,2][Math.floor(Math.random()*3)];  // 80% Hard, else Round/Ramp/Overshoot
+        else if (f.id==='pixsort' && p.k==='ivl')  // the picture-aware intervals stay legible; the tiling ones shred
+          state[f.id][p.k] = Math.random()<0.8 ? [0,2][Math.floor(Math.random()*2)]           // 80% Threshold/Edges
+                                               : [1,3,4][Math.floor(Math.random()*3)];        // 20% Random/Waves/Whole line
         else
           state[f.id][p.k] = p.options[Math.floor(Math.random()*p.options.length)][0];
+      }
+      else if (f.id==='melt' && p.k==='width'){    // the fine per-column drip is the good default; wide blobs are the exception
+        state[f.id][p.k] = Math.random()<0.7 ? 1 : (2 + Math.floor(Math.random()*15));         // 70% 1px, else 2–16
       }
       else {
         const rnd = p.min + Math.random()*(p.max-p.min);
