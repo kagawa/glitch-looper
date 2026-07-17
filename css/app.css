@@ -84,6 +84,9 @@ canvas {
 }
 #canvas.hidden { display: none; }
 
+.panelcol {                        /* right column: two stacked tables (image effects · whole-frame + sequencer) */
+  display: flex; flex-direction: column; gap: 12px; min-width: 0; align-self: start;
+}
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -128,8 +131,6 @@ canvas {
 /* effect sub-genre sections */
 .cat { border-top: 2px solid var(--line); }
 .cat:first-child { border-top: none; }
-/* set Global (zoom/mask/envelope) apart — it's whole-frame settings, not image effects */
-.cat[data-cat="Global"] { margin-top: 12px; border-top-color: var(--line); }
 .cathead {
   display: flex; align-items: center; gap: 8px;
   padding: 7px 12px; cursor: pointer; user-select: none;

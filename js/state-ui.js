@@ -29,7 +29,9 @@ const psrc = document.createElement('canvas');
 const pctx = psrc.getContext('2d', { willReadFrequently:true });
 
 // ---------- build UI ----------
-const controls = document.getElementById('controls');
+const controls = document.getElementById('controls');   // wrapper: queries/delegation span both inner panels
+const fxPanel = document.getElementById('fxPanel');      // per-frame image effects
+const metaPanel = document.getElementById('metaPanel');  // whole-frame (Global) + Sequencer, its own table
 const presetsEl = document.getElementById('presets');
 let presetSel;
 const CAT_IDS = {};   // sub-genre label → effect ids (filled by buildUI)
@@ -95,7 +97,8 @@ function buildUI(){
     const body = document.createElement('div'); body.className = 'catbody';
     ids.forEach(id=>{ placed.add(id); body.appendChild(makeCard(byId[id])); });
     head.addEventListener('click', ()=>{ cat.classList.toggle('open'); head.querySelector('.caret').textContent = cat.classList.contains('open')?'▼':'▶'; });
-    cat.appendChild(head); cat.appendChild(body); controls.appendChild(cat);
+    cat.appendChild(head); cat.appendChild(body);
+    (label==='Global' ? metaPanel : fxPanel).appendChild(cat);   // Global goes in the separate table
   };
   FX_GROUPS.forEach(([label,ids])=> addGroup(label, ids));
   addGroup('Other', FX.map(f=>f.id));   // catch any effect missing from FX_GROUPS
@@ -170,7 +173,7 @@ function buildUI(){
   seqHead.addEventListener('click', ()=>{ seqCat.classList.toggle('open');
     seqHead.querySelector('.caret').textContent = seqCat.classList.contains('open')?'▼':'▶';
     if (seqCat.classList.contains('open')) buildSeqGrid(); });
-  seqCat.appendChild(seqHead); seqCat.appendChild(seqBody); controls.appendChild(seqCat);
+  seqCat.appendChild(seqHead); seqCat.appendChild(seqBody); metaPanel.appendChild(seqCat);
 
   updateRows();
 }
