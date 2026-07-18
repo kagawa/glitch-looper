@@ -502,60 +502,72 @@ function drawHUD(w,h,phase){
   ctx.restore();
 }
 
-// ---- Deco Text: a big 3D-extruded title with chunky stacked outlines — pachinko / gacha 大当り look.
-//      The "3D" is exactly the edge-repeat idea: the word is drawn many times, each offset a little
-//      further along the light direction, building an extruded body; then a few concentric strokes
-//      make the thick multi-outline, and a gradient face + a swept highlight sell the shine. Rendered
-//      to an offscreen so the highlight can be clipped to the letterforms with source-atop. ----
-const DECO_FONTS=[
-  '900 {s}px "Arial Black","Helvetica Neue","Hiragino Sans",system-ui,sans-serif',
-  '800 {s}px "Arial Rounded MT Bold","Hiragino Maru Gothic ProN","Quicksand",system-ui,sans-serif',
-  '900 {s}px Georgia,"Times New Roman","Hiragino Mincho ProN",serif',
-  '900 {s}px "Arial Narrow","Helvetica Neue",'+"'"+'Impact'+"'"+',system-ui,sans-serif',
-];
-const DECO_OUT=['#141018','#ffffff','#f6c540','#e0243a'];
+// ---- Edge Extrude: detect the picture's edges, then repeat that edge map along a light direction.
+//      The image itself stays where it is; only its contours are "pushed out" — the pachinko/jackpot
+//      3D-title look applied to any picture. A Sobel-style luminance gradient locates the edges,
+//      they're rendered in the outline colour into an edge map, and drawn onto the canvas many
+//      times each shifted a bit further along the light angle so they stack into an extruded body,
+//      with a bright keyline on top and (optionally) an opposing "bevel highlight" edge for the lit
+//      side of the extrusion. Runs every frame so the extrude follows whatever the other effects
+//      are doing to the picture. ----
+const DECO_OUT_RGB=[[20,16,24],[255,255,255],[246,197,64],[224,36,58]];   // Black / White / Gold / Red
 function drawDecoText(w,h,phase){
-const dt=state.decotext;
-const text=(dt&&dt.text!=null)?String(dt.text):'';
-if (!(dt.on && dt.amount>0 && text.length)) return;
-const size=Math.max(8, Math.round(h*0.16*dt.size));
-const fam=(DECO_FONTS[dt.font|0]||DECO_FONTS[0]).replace('{s}',size);
-sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h);
-sctx.save();
-sctx.font=fam; sctx.textAlign='center'; sctx.textBaseline='middle'; sctx.lineJoin='round';
-const pop=1+dt.bounce*0.12*Math.sin(phase*Math.PI*2);                 // seamless pop
-sctx.translate(dt.cx*w, dt.cy*h); sctx.rotate((dt.tilt||0)*Math.PI/180); sctx.scale(pop,pop);
-const tw=sctx.measureText(text).width;
-// 1) 3D extrude — repeated offset copies, darkening with depth (light from upper-left)
-const depth=Math.round(dt.depth*size*0.3), dx=0.52, dy=0.86;
-for (let i=depth;i>=1;i--){ const t=depth?i/depth:0;
-  sctx.fillStyle=`rgb(${(48*(1-t))|0},${(34*(1-t))|0},${(14*(1-t))|0})`;
-  sctx.fillText(text, dx*i, dy*i);
+const df=state.decotext;
+if (!(df.on && df.amount>0)) return;
+const oc=DECO_OUT_RGB[df.outcol|0]||DECO_OUT_RGB[0];
+const thresh=Math.max(4, df.thresh*90);                               // 4..94 (higher → sparser, cleaner edges)
+const depth=Math.round(P('decotext','depth')*Math.min(w,h)*0.09);     // enveloped depth: extrude can breathe with the loop
+const ang=(df.angle||0)*Math.PI/180, dx=Math.cos(ang), dy=Math.sin(ang);
+const w4=w*4, np=w*h;
+
+// 1. capture current canvas (all prior effects applied) → sc
+sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h); sctx.drawImage(canvas,0,0);
+const src=sctx.getImageData(0,0,w,h).data;
+
+// 2. Sobel-lite luminance-gradient edge detect. Fill em[] with outline-colour RGB and alpha=magnitude
+//    so drawImage()ing em[] anywhere paints the edges in the chosen colour with anti-aliasing.
+const em=new Uint8ClampedArray(np*4);
+for (let y=1; y<h-1; y++){
+  let i=(y*w+1)*4;
+  for (let x=1; x<w-1; x++, i+=4){
+    const c =0.299*src[i]     +0.587*src[i+1]     +0.114*src[i+2];
+    const rr=0.299*src[i+4]   +0.587*src[i+5]     +0.114*src[i+6];
+    const dd=0.299*src[i+w4]  +0.587*src[i+w4+1]  +0.114*src[i+w4+2];
+    const mag=(Math.abs(rr-c)+Math.abs(dd-c))*2;
+    if (mag>thresh){ em[i]=oc[0]; em[i+1]=oc[1]; em[i+2]=oc[2]; em[i+3]=mag>255?255:mag; }
+  }
 }
-// 2) chunky outline — a thick keyline plus a thin white inner line (the stacked look)
-if (dt.outline>0){
-  sctx.strokeStyle=DECO_OUT[dt.outcol|0]||DECO_OUT[0]; sctx.lineWidth=Math.max(2, dt.outline*size*0.17); sctx.strokeText(text,0,0);
-  sctx.strokeStyle='rgba(255,255,255,.85)'; sctx.lineWidth=Math.max(1, dt.outline*size*0.045); sctx.strokeText(text,0,0);
+tmp.width=w; tmp.height=h; tctx.clearRect(0,0,w,h);
+tctx.putImageData(new ImageData(em, w, h), 0, 0);
+
+// 3. extrude — draw the edge map many times along the light direction, farthest first. Each layer
+//    is slightly transparent so they stack into a continuous body rather than N distinct copies.
+ctx.save();
+const strokeA=df.outline*df.amount;
+for (let i=depth; i>=1; i--){
+  const t=depth?i/depth:0;                                             // 0=near, 1=far
+  ctx.globalAlpha=strokeA*(0.6+0.3*(1-t));
+  ctx.drawImage(tmp, dx*i, dy*i);
 }
-// 3) front face — gradient by Fill style
-const fill=dt.fill|0; let grad;
-const vgrad=stops=>{ const g=sctx.createLinearGradient(0,-size*0.58,0,size*0.58); stops.forEach(([o,c])=>g.addColorStop(o,c)); return g; };
-if (fill===1||fill===4||fill===5){ const tone=fill===1?2:fill===4?8:9;
-  const g=sctx.createLinearGradient(0,-size*0.58,0,size*0.58);
-  for(let s=0;s<=6;s++){ const c=hypeLerp(tone,s/6,1); g.addColorStop(s/6,`rgb(${c[0]|0},${c[1]|0},${c[2]|0})`); }
-  grad=g;
-} else if (fill===2){ grad=vgrad([[0,'#f2f6ff'],[.44,'#9fb0c8'],[.5,'#59687f'],[.56,'#cdd8ea'],[1,'#eef4ff']]); }
-else if (fill===3){ grad='#ffffff'; }
-else { grad=vgrad([[0,'#fff2b0'],[.4,'#f6c540'],[.55,'#c8951c'],[.74,'#ffe58a'],[1,'#a9741a']]); }
-sctx.fillStyle=grad; sctx.fillText(text,0,0);
-// 4) swept highlight, clipped to the letters via source-atop
-if (dt.shine>0){
-  sctx.save(); sctx.globalCompositeOperation='source-atop';
-  const sweep=((phase*2)%1)*1.6-0.3, gx=-tw/2+sweep*tw;               // 2 sweeps/loop (integer) → seamless
-  const sg=sctx.createLinearGradient(gx-size*0.35,0,gx+size*0.35,0);
-  sg.addColorStop(0,'rgba(255,255,255,0)'); sg.addColorStop(.5,`rgba(255,255,255,${(0.75*dt.shine).toFixed(3)})`); sg.addColorStop(1,'rgba(255,255,255,0)');
-  sctx.fillStyle=sg; sctx.fillRect(-w,-h,w*2,h*2); sctx.restore();
+// 4. keyline: front-most edge at full outline strength (crisp black/coloured border on top of the body)
+ctx.globalAlpha=strokeA;
+ctx.drawImage(tmp, 0, 0);
+ctx.restore();
+
+// 5. bevel highlight — draw the SAME edges shifted the opposite way, in white; reads as the lit
+//    side of the extruded ridge (opposite the shadow). Reuses sc as a scratch (it already served
+//    its purpose as the source snapshot).
+if (df.bevel>0){
+  const bh=1.5;
+  const bem=new Uint8ClampedArray(np*4);
+  for (let p=3; p<bem.length; p+=4){                                   // copy alpha, paint RGB white
+    const a=em[p]; if (a){ bem[p-3]=255; bem[p-2]=255; bem[p-1]=255; bem[p]=a; }
+  }
+  sctx.clearRect(0,0,w,h); sctx.putImageData(new ImageData(bem, w, h), 0, 0);
+  ctx.save();
+  ctx.globalAlpha=df.bevel*df.amount*0.8;
+  ctx.globalCompositeOperation='screen';
+  ctx.drawImage(sc, -dx*bh, -dy*bh);
+  ctx.restore();
 }
-sctx.restore();
-ctx.save(); ctx.globalAlpha=Math.min(1,dt.amount); ctx.drawImage(sc,0,0); ctx.restore();
 }
