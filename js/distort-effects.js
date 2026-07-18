@@ -248,96 +248,141 @@ if (kd.on && (kd.amount==null || kd.amount>0)){
 }
 }
 
+const EXTRUDE_TINT_RGB=[null,[0,0,0],[255,255,255],[246,197,64],[224,36,58]];   // Original / Black / White / Gold / Red
+const EXTRUDE_TINT_TONE={5:2, 6:8, 7:9, 8:10};                                  // Rainbow / Fire / Candy / Festive → hypeLerp tones
 function applyExtrude(w,h){
-// ---- Extrude: pick a band of the picture by tone or colour and push it out — pseudo-3D ----
-//      The shading is what sells it. Drag a region along a direction with its own colour and you
-//      get a smear; a real extrusion shows a SIDE, lit differently from the face, so the pixels
-//      trailing behind darken with depth. Without that this is a directional blur.
-//      The face keeps its original pixels; only the body behind it is shaded.
+// ---- Extrude: pick a band of the picture (tone / colour / edges) and push it out — pseudo-3D.
+//      Select By decides what makes it into the "face" that gets pushed: Lightness / Saturation /
+//      Hue pick a coloured or tonal region, Edges runs a Sobel-style detect so contours become the
+//      face (a pachinko/大当り-style extrusion of the picture's outlines). Push Mode picks the
+//      shape of the extrusion — Angle is a single direction, Radial fans it out from a point in
+//      the frame (outward or inward). Shading is what sells the pseudo-3D: pixels trailing behind
+//      the face darken with depth. Tint replaces the side's colour with a solid or palette-driven
+//      colour (Rainbow/Fire/Candy/Festive cycle along the extrusion's depth), blended by Tint
+//      Amount so you can keep some of the underlying colour or go all-in. ----
 const ex = state.extrude;
-if (ex.on){
-  const dist = P('extrude','dist');
-  // 0.12: at 0.35 the top of the slider pushed ~190px on a 540-tall frame, well past anything
-  // readable, and every useful setting was crammed into the bottom of the travel. Top is now ~65px.
-  const D = Math.round(dist * Math.min(w,h) * 0.12);
-  if (D>0){
-    const im = ctx.getImageData(0,0,w,h), d = im.data;
-    const src = new Uint8ClampedArray(d);
-    const key = ex.key|0, c0 = ex.center, wd = ex.width;
-    // which pixels get pushed: distance from the range centre, in the chosen key
-    const sel = new Uint8Array(w*h);
-    let minX=w, maxX=-1, minY=h, maxY=-1;
-    for (let y=0,i=0;y<h;y++) for (let x=0;x<w;x++,i++){
-      const j=i*4, r=src[j], g=src[j+1], b=src[j+2];
-      let dd;
-      if (key===2){                                   // Hue
-        const mx=Math.max(r,g,b), ch=mx-Math.min(r,g,b);
-        if (ch===0) continue;                         // a grey pixel has no hue to match against
-        let hh = mx===r ? ((g-b)/ch)%6 : mx===g ? (b-r)/ch+2 : (r-g)/ch+4;
-        hh*=60; if (hh<0) hh+=360;
-        dd = Math.abs(hh - c0*360);
-        if (dd>180) dd = 360-dd;                      // hue is a circle — the short way round
-        dd /= 180;
-      } else if (key===1){                            // Saturation
-        const mx=Math.max(r,g,b);
-        dd = Math.abs((mx ? (mx-Math.min(r,g,b))/mx : 0) - c0);
-      } else {                                        // Lightness
-        dd = Math.abs((0.299*r+0.587*g+0.114*b)/255 - c0);
-      }
-      if (dd<=wd){ sel[i]=1;
-        if (x<minX)minX=x; if (x>maxX)maxX=x; if (y<minY)minY=y; if (y>maxY)maxY=y; }
-    }
-    if (maxX<0) return;                               // nothing in range → nothing to push
-    const a = ex.angle*Math.PI/180, dx = Math.cos(a), dy = Math.sin(a), shade = ex.shade;
-    // Sweep along the push instead of searching back from every pixel. Asking each pixel "what is
-    // behind me?" costs the whole distance for every pixel that finds nothing — the emptier the
-    // selection the slower it got, which is backwards. Walking in the direction of the push lets
-    // each pixel inherit its answer from the one behind it, already solved: one pass, whatever the
-    // distance. dist carries ray length so the diagonals don't come out short.
-    const adx=Math.abs(dx), ady=Math.abs(dy);
-    const dist=new Float32Array(w*h).fill(-1), from=new Int32Array(w*h).fill(-1);
-    if (adx>=ady){                                    // mostly sideways → walk columns
-      const step = dx>=0?1:-1, ky = dy/adx, per = 1/adx;
-      for (let n=0;n<w;n++){
-        const x = dx>=0 ? n : w-1-n;
-        for (let y=0;y<h;y++){
-          const i=y*w+x;
-          if (sel[i]){ dist[i]=0; from[i]=i; continue; }   // the face seeds the sweep
-          const px=x-step, py=Math.round(y-ky);
-          if (px<0||px>=w||py<0||py>=h) continue;
-          const pi=py*w+px, pd=dist[pi];
-          if (pd<0) continue;
-          const nd=pd+per;
-          if (nd>D) continue;                              // past the extrusion's reach
-          dist[i]=nd; from[i]=from[pi];
-        }
-      }
-    } else {                                          // mostly up/down → walk rows
-      const step = dy>=0?1:-1, kx = dx/ady, per = 1/ady;
-      for (let n=0;n<h;n++){
-        const y = dy>=0 ? n : h-1-n;
-        for (let x=0;x<w;x++){
-          const i=y*w+x;
-          if (sel[i]){ dist[i]=0; from[i]=i; continue; }
-          const py=y-step, px=Math.round(x-kx);
-          if (px<0||px>=w||py<0||py>=h) continue;
-          const pi=py*w+px, pd=dist[pi];
-          if (pd<0) continue;
-          const nd=pd+per;
-          if (nd>D) continue;
-          dist[i]=nd; from[i]=from[pi];
-        }
+if (!ex.on) return;
+const dist = P('extrude','dist');
+const D = Math.round(dist * Math.min(w,h) * 0.12);
+if (D<=0) return;
+const im = ctx.getImageData(0,0,w,h), d = im.data;
+const src = new Uint8ClampedArray(d);
+const key = ex.key|0, c0 = ex.center, wd = ex.width;
+// 1. Select the face — one Uint8 mask covering every mode. Edges (key=3) runs a Sobel-style
+//    luminance-gradient detect; the tone/colour keys keep the original range logic.
+const sel = new Uint8Array(w*h);
+let minX=w, maxX=-1, minY=h, maxY=-1;
+if (key===3){
+  const thresh = Math.max(4, (ex.thresh||0.18)*90), w4=w*4;
+  for (let y=1; y<h-1; y++){
+    let j=(y*w+1)*4, i=y*w+1;
+    for (let x=1; x<w-1; x++, j+=4, i++){
+      const c =0.299*src[j]     +0.587*src[j+1]     +0.114*src[j+2];
+      const rr=0.299*src[j+4]   +0.587*src[j+5]     +0.114*src[j+6];
+      const dd=0.299*src[j+w4]  +0.587*src[j+w4+1]  +0.114*src[j+w4+2];
+      if ((Math.abs(rr-c)+Math.abs(dd-c))*2 > thresh){
+        sel[i]=1;
+        if (x<minX)minX=x; if (x>maxX)maxX=x; if (y<minY)minY=y; if (y>maxY)maxY=y;
       }
     }
-    for (let i=0;i<w*h;i++){
-      if (dist[i]<=0) continue;                       // 0 is the face, -1 was never reached
-      const f = 1 - shade*(dist[i]/D);                // the side falls away with depth
-      const o=i*4, s2=from[i]*4;
-      d[o]=src[s2]*f; d[o+1]=src[s2+1]*f; d[o+2]=src[s2+2]*f;
+  }
+} else {
+  for (let y=0,i=0;y<h;y++) for (let x=0;x<w;x++,i++){
+    const j=i*4, r=src[j], g=src[j+1], b=src[j+2];
+    let dd;
+    if (key===2){                                   // Hue
+      const mx=Math.max(r,g,b), ch=mx-Math.min(r,g,b);
+      if (ch===0) continue;                         // a grey pixel has no hue to match against
+      let hh = mx===r ? ((g-b)/ch)%6 : mx===g ? (b-r)/ch+2 : (r-g)/ch+4;
+      hh*=60; if (hh<0) hh+=360;
+      dd = Math.abs(hh - c0*360);
+      if (dd>180) dd = 360-dd;                      // hue is a circle — the short way round
+      dd /= 180;
+    } else if (key===1){                            // Saturation
+      const mx=Math.max(r,g,b);
+      dd = Math.abs((mx ? (mx-Math.min(r,g,b))/mx : 0) - c0);
+    } else {                                        // Lightness
+      dd = Math.abs((0.299*r+0.587*g+0.114*b)/255 - c0);
     }
-    ctx.putImageData(im,0,0);
+    if (dd<=wd){ sel[i]=1;
+      if (x<minX)minX=x; if (x>maxX)maxX=x; if (y<minY)minY=y; if (y>maxY)maxY=y; }
   }
 }
+if (maxX<0) return;                                  // nothing in range → nothing to push
+const shade = ex.shade, mode = ex.mode|0;
+const tint = ex.tint|0, tmix = (ex.tmix==null?0.7:ex.tmix);
+const tintCol = tint>0 ? (t=> EXTRUDE_TINT_RGB[tint] || hypeLerp(EXTRUDE_TINT_TONE[tint], t, 1)) : null;
+const dm = new Float32Array(w*h).fill(-1), from = new Int32Array(w*h).fill(-1);
+
+if (mode===1){
+  // Radial: every face pixel raycasts along its own direction (from/toward the radial centre). This
+  // costs O(N_face * D) rather than the linear sweep the Angle path uses, but that's still fine at
+  // typical Distance values. Later rays only overwrite earlier writes if they land nearer.
+  const rcx=ex.cx*w, rcy=ex.cy*h, invert=(ex.invert|0)===1;
+  for (let fy=0; fy<h; fy++) for (let fx=0; fx<w; fx++){
+    const fi=fy*w+fx; if (!sel[fi]) continue;
+    dm[fi]=0; from[fi]=fi;
+    const vx=fx-rcx, vy=fy-rcy, rl=Math.hypot(vx,vy)||1;
+    const stepx=(invert?-vx:vx)/rl, stepy=(invert?-vy:vy)/rl;
+    for (let k=1; k<=D; k++){
+      const nx=(fx+stepx*k)|0, ny=(fy+stepy*k)|0;
+      if (nx<0||nx>=w||ny<0||ny>=h) break;
+      const ni=ny*w+nx;
+      if (sel[ni]) break;                           // ran into another face — that face owns from here
+      if (dm[ni]<0 || dm[ni]>k){ dm[ni]=k; from[ni]=fi; }
+    }
+  }
+} else {
+  // Angle: sweep along the push direction so each pixel inherits its answer from the one behind it.
+  // dist carries ray length in pixels so diagonals don't come out short.
+  const a = ex.angle*Math.PI/180, dx = Math.cos(a), dy = Math.sin(a);
+  const adx=Math.abs(dx), ady=Math.abs(dy);
+  if (adx>=ady){                                    // mostly sideways → walk columns
+    const step = dx>=0?1:-1, ky = dy/adx, per = 1/adx;
+    for (let n=0;n<w;n++){
+      const x = dx>=0 ? n : w-1-n;
+      for (let y=0;y<h;y++){
+        const i=y*w+x;
+        if (sel[i]){ dm[i]=0; from[i]=i; continue; }
+        const px=x-step, py=Math.round(y-ky);
+        if (px<0||px>=w||py<0||py>=h) continue;
+        const pi=py*w+px, pd=dm[pi];
+        if (pd<0) continue;
+        const nd=pd+per;
+        if (nd>D) continue;
+        dm[i]=nd; from[i]=from[pi];
+      }
+    }
+  } else {                                          // mostly up/down → walk rows
+    const step = dy>=0?1:-1, kx = dx/ady, per = 1/ady;
+    for (let n=0;n<h;n++){
+      const y = dy>=0 ? n : h-1-n;
+      for (let x=0;x<w;x++){
+        const i=y*w+x;
+        if (sel[i]){ dm[i]=0; from[i]=i; continue; }
+        const py=y-step, px=Math.round(x-kx);
+        if (px<0||px>=w||py<0||py>=h) continue;
+        const pi=py*w+px, pd=dm[pi];
+        if (pd<0) continue;
+        const nd=pd+per;
+        if (nd>D) continue;
+        dm[i]=nd; from[i]=from[pi];
+      }
+    }
+  }
+}
+// 2. Paint. Face pixels stay untouched; the side (dm>0) is source-pixel × shade, then optionally
+//    lerped toward Tint's colour by Tint Amount. Palette tints cycle along t=depth/D → coloured
+//    stripes down the side.
+for (let i=0;i<w*h;i++){
+  if (dm[i]<=0) continue;                            // 0 is the face, -1 was never reached
+  const t=dm[i]/D, f=1 - shade*t;
+  const o=i*4, s2=from[i]*4;
+  let r=src[s2]*f, g=src[s2+1]*f, b=src[s2+2]*f;
+  if (tintCol && tmix>0){ const tc=tintCol(t); r+=(tc[0]-r)*tmix; g+=(tc[1]-g)*tmix; b+=(tc[2]-b)*tmix; }
+  d[o]=r; d[o+1]=g; d[o+2]=b;
+}
+ctx.putImageData(im,0,0);
 }
 
 // ---- melt: pixel drip, breathes 0→max→0 over the loop (seamless) ----

@@ -155,7 +155,7 @@ function setStatus(s){ statusEl.innerHTML = s; }
 // randomize every effect's on/off + params for instant new looks
 // per-effect on-probability for Random — keep the heavy/destructive ones rare
 const RAND_PROB = { png:.12, jpeg:.15, warp:.18, halftone:.12, feedback:.12, melt:.12,
-                    mosh:.25, crt:.2, pixelate:.3, hud:.3, decotext:.06, motion:.4,
+                    mosh:.25, crt:.2, pixelate:.3, hud:.3, motion:.4,
                     ghost:.14, dotcrawl:.1, hum:.12, herring:.08, sync:.14, zoom:0, leak:.12, bloom:.14,
                     compress:.14, pixsort:.14, databend:.12, degauss:.06, gif:.12, dct:.12,
                     sonify:.12, byteshift:.12, bitplane:.1, bmpmisread:.14, wrongfmt:.12, rle:.12, webp:.1, gifg:.1, audio:.08,
