@@ -144,8 +144,8 @@ const FX = [
   ]},
   { id:'audio', name:'Audio Databend', hint:'real — route the raw bytes through a WebAudio graph (echo / reverb / crush / filter / distortion / compressor / chorus)', on:false, open:false, params:[
     { k:'mode',   label:'Effect', type:'select', def:0, options:[[0,'Echo'],[1,'Reverb'],[2,'Bit-crush'],[3,'Low-pass Sweep'],[4,'High-pass'],[5,'Band-pass'],[6,'Notch'],[7,'Distortion'],[8,'Compressor'],[9,'Chorus']] },
-    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5 },
-    { k:'frames', label:'Frames', min:1, max:8, step:1, def:4 },
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1, envd:1 },
+    { k:'frames', label:'Steps', min:1, max:8, step:1, def:5 },
   ]},
   { id:'degauss', name:'Degauss', hint:'degaussing CRT — the picture ripples and the colour goes impure', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.6, env:1 },

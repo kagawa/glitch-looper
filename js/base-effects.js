@@ -25,8 +25,15 @@ else if (state.webp.on && webpReady && webpFrames.length)
   base = webpFrames[Math.floor(phase*webpFrames.length) % webpFrames.length];
 else if (state.gifg.on && gifgReady && gifgFrames.length)
   base = gifgFrames[Math.floor(phase*gifgFrames.length) % gifgFrames.length];
-else if (state.audio.on && audioReady && audioFrames.length)
-  base = audioFrames[Math.floor(phase*audioFrames.length) % audioFrames.length];
+else if (state.audio.on && audioReady && audioFrames.length){
+  // pool is an intensity ramp (weak→strong): drive it by the destruction envelope when Amount's ⓔ
+  // is on, else by a seamless triangle pulse so it still breathes.
+  const an=audioFrames.length;
+  const g = (state.motion.on && state.audio.amount_env)
+    ? Math.max(0, Math.min(1, (ENV-0.12)/0.88))
+    : 1-Math.abs(2*phase-1);
+  base = audioFrames[Math.round(g*(an-1))];
+}
 tctx.clearRect(0,0,w,h);
 tctx.filter = fp.length ? fp.join(' ') : 'none';
 tctx.drawImage(base, 0, 0, w, h);

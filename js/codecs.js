@@ -287,41 +287,54 @@ async function buildAudioFrames(){
     // (horizontal streaks) and keeps colour, instead of blending R/G/B into grey.
     for (let p=0,i=0;p<px;p++,i+=4){ ch[p]=sd[i]/127.5-1; ch[px+p]=sd[i+1]/127.5-1; ch[2*px+p]=sd[i+2]/127.5-1; }
     const source = octx.createBufferSource(); source.buffer = inBuf;
-    const t = nFrames>1 ? f/nFrames : 0;                            // per-frame drift → the pool animates
+    // Bake the pool as an intensity RAMP (weak→strong). The renderer indexes it by the destruction
+    // envelope (ENV) when Amount's ⓔ is on, or by a seamless triangle pulse otherwise — so the
+    // effect breathes/animates without a live audio graph. t rides the ramp for extra drift.
+    const t = nFrames>1 ? f/(nFrames-1) : 1;
+    const a = amt*(0.12 + 0.88*t);
     let node = source;
     if (mode===0){                                                  // echo — delayed copies smear down the scan
-      const delay=octx.createDelay(1); delay.delayTime.value = 0.002 + amt*0.02 + t*0.008;
-      const fb=octx.createGain(); fb.gain.value = amt*0.6; const mix=octx.createGain();
+      const delay=octx.createDelay(1); delay.delayTime.value = 0.002 + a*0.02 + t*0.008;
+      const fb=octx.createGain(); fb.gain.value = a*0.6; const mix=octx.createGain();
       source.connect(mix); source.connect(delay); delay.connect(fb); fb.connect(delay); delay.connect(mix); node=mix;
     } else if (mode===1){                                           // reverb — diffuse smear (noise impulse)
-      const conv=octx.createConvolver(); const L=Math.max(1,Math.floor(SR*(0.04+amt*0.18)));
+      const conv=octx.createConvolver(); const L=Math.max(1,Math.floor(SR*(0.04+a*0.18)));
       const ir=octx.createBuffer(1,L,SR), ird=ir.getChannelData(0);
       for (let i=0;i<L;i++) ird[i]=(Math.random()*2-1)*Math.pow(1-i/L,2); conv.buffer=ir;
-      const wet=octx.createGain(); wet.gain.value=amt; const dry=octx.createGain(); dry.gain.value=1-amt*0.4; const mix=octx.createGain();
+      const wet=octx.createGain(); wet.gain.value=a; const dry=octx.createGain(); dry.gain.value=1-a*0.4; const mix=octx.createGain();
       source.connect(dry); dry.connect(mix); source.connect(conv); conv.connect(wet); wet.connect(mix); node=mix;
     } else if (mode===2){                                           // bit-crush — quantise samples (posterise)
-      const ws=octx.createWaveShaper(); const steps=Math.max(2,Math.round(16-amt*14));   // 4-bit → 1-bit, visible across the slider
+      const ws=octx.createWaveShaper(); const steps=Math.max(2,Math.round(16-a*14));   // 4-bit → 1-bit, visible across the slider
       const curve=new Float32Array(1024); for (let i=0;i<1024;i++){ const x=i/511.5-1; curve[i]=Math.round(x*steps)/steps; }
       ws.curve=curve; source.connect(ws); node=ws;
-    } else if (mode>=3 && mode<=6){                                 // filter — soften / edge / band the byte stream
-      const bq=octx.createBiquadFilter();
-      bq.type = mode===3?'lowpass':mode===4?'highpass':mode===5?'bandpass':'notch';
-      if (mode===3){ bq.frequency.value=200+(1-amt)*8000+t*2500; bq.Q.value=1+amt*8; }        // low-pass sweep → smear
-      else if (mode===4){ bq.frequency.value=120+amt*6000+t*2000; bq.Q.value=1+amt*8; }        // high-pass → edges/emboss
-      else { bq.frequency.value=300+amt*5000+t*3000; bq.Q.value=2+amt*16; }                     // band-pass / notch → tinted band
+    } else if (mode===3){                                           // low-pass sweep → smear
+      const bq=octx.createBiquadFilter(); bq.type='lowpass'; bq.frequency.value=200+(1-a)*8000+t*2500; bq.Q.value=1+a*8;
       source.connect(bq); node=bq;
-    } else if (mode===7){                                           // distortion — real waveshaper fuzz
-      const ws=octx.createWaveShaper(), k=amt*100, deg=Math.PI/180, curve=new Float32Array(1024);
+    } else if (mode===4){                                           // high-pass → edge emphasis kept OVER the picture (no grey-out)
+      const bq=octx.createBiquadFilter(); bq.type='highpass'; bq.frequency.value=200+a*7000+t*2000; bq.Q.value=1+a*8;
+      const wet=octx.createGain(); wet.gain.value=0.6+a*0.8; const dry=octx.createGain(); dry.gain.value=1; const mix=octx.createGain();
+      source.connect(dry); dry.connect(mix); source.connect(bq); bq.connect(wet); wet.connect(mix); node=mix;
+    } else if (mode===5){                                           // band-pass → tinted band emphasised over the picture
+      const bq=octx.createBiquadFilter(); bq.type='bandpass'; bq.frequency.value=300+a*5000+t*4000; bq.Q.value=2+a*14;
+      const wet=octx.createGain(); wet.gain.value=0.5+a; const dry=octx.createGain(); dry.gain.value=0.7; const mix=octx.createGain();
+      source.connect(dry); dry.connect(mix); source.connect(bq); bq.connect(wet); wet.connect(mix); node=mix;
+    } else if (mode===6){                                           // notch — a resonant hole swept through → rippling gouge
+      const bq=octx.createBiquadFilter(); bq.type='notch'; bq.frequency.value=200+a*6000+t*5000; bq.Q.value=6+a*24;
+      const bq2=octx.createBiquadFilter(); bq2.type='notch'; bq2.frequency.value=800+a*9000+t*6000; bq2.Q.value=6+a*24;
+      source.connect(bq); bq.connect(bq2); node=bq2;
+    } else if (mode===7){                                           // distortion — real waveshaper fuzz (drive drifts per frame)
+      const ws=octx.createWaveShaper(), k=(20+a*100)*(0.5+t), deg=Math.PI/180, curve=new Float32Array(1024);
       for (let i=0;i<1024;i++){ const x=i/511.5-1; curve[i]=(3+k)*x*20*deg/(Math.PI+k*Math.abs(x)); }
       ws.curve=curve; ws.oversample='2x'; source.connect(ws); node=ws;
-    } else if (mode===8){                                           // compressor — pumping / tone flatten
+    } else if (mode===8){                                           // compressor — pumping; makeup gain restores level (no grey)
       const comp=octx.createDynamicsCompressor();
-      comp.threshold.value=-6-amt*44; comp.ratio.value=1+amt*19; comp.knee.value=6; comp.attack.value=0.003; comp.release.value=0.05+t*0.1;
-      source.connect(comp); node=comp;
+      comp.threshold.value=-6-a*44+t*24; comp.ratio.value=2+a*18; comp.knee.value=6; comp.attack.value=0.003; comp.release.value=0.05;
+      const makeup=octx.createGain(); makeup.gain.value=1+a*1.6;
+      source.connect(comp); comp.connect(makeup); node=makeup;
     } else {                                                        // chorus / flanger — LFO-modulated delay → wavy colour shimmer
-      const delay=octx.createDelay(0.05); delay.delayTime.value=0.004+amt*0.012;
-      const lfo=octx.createOscillator(); lfo.frequency.value=0.5+t*4+amt*3;
-      const lg=octx.createGain(); lg.gain.value=0.002+amt*0.01; lfo.connect(lg); lg.connect(delay.delayTime); lfo.start();
+      const delay=octx.createDelay(0.05); delay.delayTime.value=0.004+a*0.012;
+      const lfo=octx.createOscillator(); lfo.frequency.value=0.5+t*4+a*3;
+      const lg=octx.createGain(); lg.gain.value=0.002+a*0.01; lfo.connect(lg); lg.connect(delay.delayTime); lfo.start();
       const wet=octx.createGain(); wet.gain.value=0.7; const dry=octx.createGain(); dry.gain.value=0.7; const mix=octx.createGain();
       source.connect(dry); dry.connect(mix); source.connect(delay); delay.connect(wet); wet.connect(mix); node=mix;
     }
