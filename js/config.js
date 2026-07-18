@@ -54,8 +54,9 @@ const FX = [
     { k:'chaos',     label:'Jitter', min:0, max:1, step:.01, def:.6 },
     { k:'rate',      label:'Change Rate', min:1, max:30, step:1, def:10 },
   ]},
-  { id:'jpeg', name:'JPEG Glitch', hint:'real byte corruption · DCT block melt', on:false, open:false, params:[
+  { id:'jpeg', name:'JPEG Glitch', hint:'real byte corruption — entropy melt / quant tone-shift / Huffman collapse', on:false, open:false, params:[
     { k:'amount',  label:'Corruption', min:0, max:1, step:.01, def:.3 },
+    { k:'target',  label:'Target', type:'select', def:0, options:[[0,'Entropy (block melt)'],[1,'Quant table (tone shift)'],[2,'Huffman table (collapse)']] },
     { k:'quality', label:'Quality (coarse)', min:.05, max:.95, step:.01, def:.35 },
     { k:'frames',  label:'Frames', min:1, max:16, step:1, def:6 },
   ]},
@@ -72,6 +73,12 @@ const FX = [
     { k:'ring',   label:'Ringing', min:0, max:1, step:.01, def:0, env:1 },
     { k:'soft',   label:'Softness (detail loss)', min:0, max:1, step:.01, def:0, env:1 },
     { k:'block',  label:'Block', min:4, max:16, step:2, def:8 },
+  ]},
+  { id:'dct', name:'DCT Glitch', hint:'real 8×8 DCT — flatten / quantise / DC-shift / scramble coefficients (live)', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
+    { k:'mode',   label:'Mode', type:'select', def:0, options:[[0,'Flatten (blocky)'],[1,'Quantise (banding)'],[2,'DC Shift (block jumps)'],[3,'Scramble AC (ringing)']] },
+    { k:'block',  label:'Block', type:'select', def:8, options:[[8,'8 px'],[16,'16 px']] },
+    { k:'chroma', label:'Colour', min:0, max:1, step:.01, def:.5 },
   ]},
   { id:'pixsort', name:'Pixel Sort', hint:'reorder runs of pixels by a chosen key (glitch-art staple)', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.85, env:1 },
@@ -437,7 +444,7 @@ const FX = [
 // effect cards are shown grouped by sub-genre (order here = display order)
 const FX_GROUPS = [
   ['File Corruption',       ['jpeg','png','webp','gifg','sonify','byteshift','bitplane']],       // real encoded-byte damage + raw reinterpret
-  ['Digital Glitch',        ['glitch','mosh','compress','pixsort','databend','bmpmisread','gif','pixelate']],
+  ['Digital Glitch',        ['glitch','mosh','compress','dct','pixsort','databend','bmpmisread','gif','pixelate']],
   ['Analog Signal',         ['vhs','sync','roll','noise','ghost','dotcrawl','hum','herring','degauss']],
   ['Film / Display',        ['film','crt','hud','halftone']],
   ['Light / Optics',        ['bloom','leak','sparkle','burst','prism','iris','starf','bokeh','foil']],

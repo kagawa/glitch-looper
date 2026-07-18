@@ -137,6 +137,7 @@ function buildUI(){
   controls.querySelectorAll('.fxsel').forEach(s=>{
     s.addEventListener('change', ()=>{
       state[s.dataset.fx][s.dataset.k] = parseInt(s.value, 10);
+      if (s.dataset.fx==='jpeg') scheduleJpeg();   // e.g. the Target select re-corrupts a different segment
       if (s.dataset.fx==='png') schedulePng();
       if (s.dataset.fx==='mask' && s.dataset.k==='source') state.mask.mode=(state.mask.source|0)===6?1:0;
       if (s.dataset.fx==='hud' && s.dataset.k==='layout'){ applyHudPreset(state.hud.layout|0); syncUI(); }

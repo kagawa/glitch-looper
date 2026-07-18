@@ -1,3 +1,50 @@
+// ---- DCT Glitch: the genuine JPEG mechanism, run live — forward 8×8 DCT, bend the coefficients,
+//      inverse. Deterministic per block (seeded on block position) so it stays seamless, and because
+//      it recomputes every frame it takes an Envelope, unlike the baked real-JPEG pool. ----
+const DCT_MATS = {};
+function dctMat(N){
+  if (DCT_MATS[N]) return DCT_MATS[N];
+  const M=new Float32Array(N*N);
+  for (let u=0;u<N;u++){ const a=u===0?Math.sqrt(1/N):Math.sqrt(2/N);
+    for (let x=0;x<N;x++) M[u*N+x]=a*Math.cos((2*x+1)*u*Math.PI/(2*N)); }
+  return DCT_MATS[N]=M;
+}
+function applyDctGlitch(w,h){
+const dg = state.dct;
+if (dg.on && dg.amount>0){
+  const amt=P('dct','amount'), N=(dg.block|0)||8, mode=dg.mode|0, chroma=dg.chroma, NN=N*N, M=dctMat(N);
+  const id=ctx.getImageData(0,0,w,h), d=id.data, np=w*h;
+  const Y=new Float32Array(np), Cb=new Float32Array(np), Cr=new Float32Array(np);
+  for (let p=0,i=0;i<d.length;i+=4,p++){ const r=d[i],g=d[i+1],b=d[i+2];
+    Y[p]=0.299*r+0.587*g+0.114*b; Cb[p]=128-0.168736*r-0.331264*g+0.5*b; Cr[p]=128+0.5*r-0.418688*g-0.081312*b; }
+  const blk=new Float32Array(NN), tmp=new Float32Array(NN), co=new Float32Array(NN);
+  const proc=(plane,strength)=>{
+    if (strength<=0) return;
+    const s=amt*strength, q=1+s*36, keep=Math.max(1,Math.round(N*2*(1-s)));
+    for (let by=0;by<h;by+=N) for (let bx=0;bx<w;bx+=N){
+      const bw=Math.min(N,w-bx), bh=Math.min(N,h-by);
+      for (let y=0;y<N;y++){ const sy=by+Math.min(y,bh-1)*w; for (let x=0;x<N;x++) blk[y*N+x]=plane[sy+bx+Math.min(x,bw-1)]-128; }
+      // forward: rowT[y][v]=Σx blk[y][x]M[v][x] ; co[u][v]=Σy M[u][y]rowT[y][v]
+      for (let y=0;y<N;y++) for (let v=0;v<N;v++){ let a=0; for (let x=0;x<N;x++) a+=blk[y*N+x]*M[v*N+x]; tmp[y*N+v]=a; }
+      for (let u=0;u<N;u++) for (let v=0;v<N;v++){ let a=0; for (let y=0;y<N;y++) a+=M[u*N+y]*tmp[y*N+v]; co[u*N+v]=a; }
+      const seed=bx*13.1+by*7.7;
+      if (mode===0){ for (let u=0;u<N;u++) for (let v=0;v<N;v++) if (u+v>=keep) co[u*N+v]=0; }
+      else if (mode===1){ for (let k=0;k<NN;k++) co[k]=Math.round(co[k]/q)*q; }
+      else if (mode===2){ co[0]+=(rand(seed)-0.5)*s*420; }
+      else { for (let k=1;k<NN;k++) if (rand(seed+k*1.3)<s*0.6) co[k]+=(rand(seed+k*2.7)-0.5)*s*320; }
+      // inverse: t[u][x]=Σv co[u][v]M[v][x] ; blk[y][x]=Σu M[u][y]t[u][x]
+      for (let u=0;u<N;u++) for (let x=0;x<N;x++){ let a=0; for (let v=0;v<N;v++) a+=co[u*N+v]*M[v*N+x]; tmp[u*N+x]=a; }
+      for (let y=0;y<N;y++) for (let x=0;x<N;x++){ let a=0; for (let u=0;u<N;u++) a+=M[u*N+y]*tmp[u*N+x]; blk[y*N+x]=a; }
+      for (let y=0;y<bh;y++){ const dy=(by+y)*w+bx; for (let x=0;x<bw;x++) plane[dy+x]=blk[y*N+x]+128; }
+    }
+  };
+  proc(Y,1); proc(Cb,chroma); proc(Cr,chroma);
+  for (let p=0,i=0;i<d.length;i+=4,p++){ const y=Y[p], cb=Cb[p]-128, cr=Cr[p]-128;
+    d[i]=y+1.402*cr; d[i+1]=y-0.344136*cb-0.714136*cr; d[i+2]=y+1.772*cb; }
+  ctx.putImageData(id,0,0);
+}
+}
+
 function applyCompression(w,h){
 // ---- Compression: heavy-JPEG look — 8×8 block flatten + chroma subsample + luma banding ----
 const cp = state.compress;

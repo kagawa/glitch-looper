@@ -1,7 +1,28 @@
 // ---- real JPEG databending ----
-// re-encode current image as JPEG, corrupt bytes in the entropy-coded region
-// (after the SOS marker, leaving headers/EOI intact), then decode the broken bytes.
-// Produces a pool of frames we cycle through so the glitch animates seamlessly.
+// re-encode the current image as JPEG and corrupt real bytes, then decode the wreckage. The Target
+// picks which structure gets damaged, each a completely different genuine artifact:
+//   Entropy — bytes after the SOS marker → local DCT-block melt (leaves headers/EOI intact).
+//   Quant table (DQT) — every block dequantises wrong → global tone/colour ramps.
+//   Huffman table (DHT) — the symbol stream desyncs from the first hit → violent collapse.
+// A pool of frames is cycled so the glitch animates seamlessly.
+function jpegTargetRanges(buf, target){
+  if (target===0){                                   // entropy: after SOS → before EOI
+    let start=2; for (let i=2;i<buf.length-3;i++){ if (buf[i]===0xFF && buf[i+1]===0xDA){ start=i+2+((buf[i+2]<<8)|buf[i+3]); break; } }
+    return { ranges:[[start, buf.length-2]], safe:true };  // safe = avoid faking a marker (0xFF)
+  }
+  const want = target===1 ? 0xDB : 0xC4;             // DQT / DHT marker
+  const ranges=[]; let i=2;
+  while (i<buf.length-4){
+    if (buf[i]!==0xFF){ i++; continue; }
+    const m=buf[i+1];
+    if (m===0xDA || m===0xD9) break;                 // reached scan / end
+    if (m===0x01 || (m>=0xD0 && m<=0xD7)){ i+=2; continue; }   // standalone markers (no length)
+    const len=(buf[i+2]<<8)|buf[i+3];
+    if (m===want && len>2) ranges.push([i+4, i+2+len]);        // the table data (skip marker + length)
+    i+=2+len;
+  }
+  return { ranges, safe:false };                     // table data is length-delimited → any byte is fine
+}
 async function buildJpegFrames(){
   if (!img) return;
   const j = state.jpeg, w = canvas.width, h = canvas.height;
@@ -11,24 +32,23 @@ async function buildJpegFrames(){
   const blob = await new Promise(r=> jsrc.toBlob(r, 'image/jpeg', j.quality));
   const buf = new Uint8Array(await blob.arrayBuffer());
 
-  // find where entropy-coded scan data begins (skip all headers)
-  let start = 2;
-  for (let i=2;i<buf.length-3;i++){
-    if (buf[i]===0xFF && buf[i+1]===0xDA){ start = i + 2 + ((buf[i+2]<<8)|buf[i+3]); break; }
-  }
-  const end = buf.length - 2;                 // keep the EOI marker
-  const span = Math.max(1, end - start);
+  const target = j.target|0;
+  const { ranges, safe } = jpegTargetRanges(buf, target);
+  if (!ranges.length){ jpegReady=false; if (state.png.on) schedulePng(); return; }   // no such segment → nothing to glitch
+  const total = ranges.reduce((a,r)=>a+(r[1]-r[0]),0);
+  const maxHits = target===2 ? 4 : target===1 ? 10 : 40;   // tables desync hard → far fewer hits
   const nFrames = Math.max(1, Math.round(j.frames));
   const out = [];
   for (let f=0; f<nFrames; f++){
     const R = makeRng(RNG_TAG.jpeg + f*101);        // per-frame stream: frames differ, but deterministically
     const copy = buf.slice();
-    const hits = 1 + Math.floor(j.amount * 40);
+    const hits = 1 + Math.floor(j.amount * maxHits);
     for (let k=0;k<hits;k++){
-      const pos = start + Math.floor(R()*span);
-      if (copy[pos]===0xFF || copy[pos-1]===0xFF) continue;  // don't fake a marker
-      let v = Math.floor(R()*255);
-      copy[pos] = v===0xFF ? 0xFE : v;
+      let pos = Math.floor(R()*total);              // pick a byte across the target ranges
+      for (const r of ranges){ const n=r[1]-r[0]; if (pos<n){ pos=r[0]+pos; break; } pos-=n; }
+      if (safe && (copy[pos]===0xFF || copy[pos-1]===0xFF)) continue;   // entropy: don't fake a marker
+      const v = Math.floor(R()*255);
+      copy[pos] = (safe && v===0xFF) ? 0xFE : v;
     }
     try { out.push(await createImageBitmap(new Blob([copy], {type:'image/jpeg'}))); }
     catch(e){ /* some corruptions are undecodable — just drop that frame */ }

@@ -141,6 +141,8 @@ function drawFrame(phase){    // phase in [0,1)
 
   applyCompression(w,h);
 
+  applyDctGlitch(w,h);
+
   applyPixelSort(w,h);
 
   applyDatabendShift(w,h,phase);
