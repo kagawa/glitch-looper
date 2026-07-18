@@ -213,6 +213,32 @@ if (rb.on && rb.amount>0){
 }
 }
 
+function applyRgbWave(w,h,phase){
+// ---- RGB Wave Sweep: discrete glowing colour band(s) travelling across the frame, fading to
+//      nothing between them and drifting hue as they go — the RGB-software "colour wave" pulse
+//      look (Corsair iCUE etc). Unlike Rainbow (a full-bleed gradient tinting the whole image at
+//      once), most of the frame stays clear between passes; only the travelling band lights up. ----
+const rw = state.rgbwave;
+if (rw.on && rw.amount>0){
+  const amt=P('rgbwave','amount'), ang=(rw.angle|0)*Math.PI/180, cs=Math.cos(ang), sn=Math.sin(ang);
+  const freq=Math.max(1,rw.freq|0), speed=rw.speed|0||1, sat=rw.sat;
+  const span=(Math.abs(cs)*w+Math.abs(sn)*h)||1, off0=Math.min(0,cs)*w+Math.min(0,sn)*h;
+  const scroll=phase*speed, hueBase=(phase*speed*97)%360;                    // integer turns/loop → seamless
+  const id=ctx.getImageData(0,0,w,h), d=id.data;
+  for (let p=0,i=0;i<d.length;i+=4,p++){
+    const x=p%w, y=(p/w)|0, proj=(x*cs+y*sn-off0)/span;
+    const bandFrac=((proj*freq-scroll)%1+1)%1;
+    const dist=Math.abs(bandFrac-0.5)*2;                                     // 0 at band centre, 1 between bands
+    const bright=Math.max(0,1-dist*1.7);
+    if (bright<=0.002) continue;
+    const [r,g,b]=hsv(hueBase+bandFrac*50, sat, 1);
+    const str=amt*bright*bright;                                            // squared falloff → a crisp travelling pulse, not a soft wash
+    d[i]+=(r-d[i])*str; d[i+1]+=(g-d[i+1])*str; d[i+2]+=(b-d[i+2])*str;
+  }
+  ctx.putImageData(id,0,0);
+}
+}
+
 function applyPrism(w,h,phase){
 // ---- Soft Prism: a few tinted, offset, blurred copies screened on top — smooth chromatic dispersion ----
 const pr = state.prism;
