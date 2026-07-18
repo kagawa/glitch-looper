@@ -8,5 +8,8 @@
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.2"
+  },
+  "devDependencies": {
+    "wrangler": "^4.112.0"
   }
 }
