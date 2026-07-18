@@ -30,7 +30,7 @@ if (!fromLink){
     const names = Object.keys(PRESETS).filter(n => n !== 'Clean');
     const pick = names[Math.floor(Math.random()*names.length)];
     applyPreset(pick);
-    if (presetSel) presetSel.value = pick;
+    if (presetSel) presetSel.value = 'builtin:' + pick;
     openedWith = 'Preset · ' + pick;
   }
 }

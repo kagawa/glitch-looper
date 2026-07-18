@@ -252,6 +252,7 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .presetlab { color: var(--muted); font-size: 11px; white-space: nowrap; }
 .presetsel { flex: 1; background: var(--panel2); color: var(--fg); border: 1px solid var(--line);
   border-radius: 7px; padding: 7px 8px; font-family: inherit; font-size: 12px; cursor: pointer; }
+.preseticon { flex: 0 0 auto; width: 32px; padding: 7px 0; font-size: 16px; line-height: 1; }
 a.dl { color: var(--accent); }
 
 footer { display: flex; align-items: center; gap: 14px; padding: 11px 18px;

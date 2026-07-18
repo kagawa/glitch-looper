@@ -39,7 +39,57 @@ const fxPanel = document.getElementById('fxPanel');      // per-frame image effe
 const metaPanel = document.getElementById('metaPanel');  // whole-frame (Global) + Sequencer, its own table
 const presetsEl = document.getElementById('presets');
 let presetSel;
+const USER_PRESETS_KEY = 'glitch-looper.user-presets.v1';
+let userPresets = loadUserPresets();
 const CAT_IDS = {};   // sub-genre label → effect ids (filled by buildUI)
+function loadUserPresets(){
+  try {
+    const saved = JSON.parse(localStorage.getItem(USER_PRESETS_KEY) || '[]');
+    if (!Array.isArray(saved)) return [];
+    return saved.filter(p=> p && typeof p.name==='string' && p.name.trim() && typeof p.state==='string')
+      .map(p=>({ name:p.name.trim(), state:p.state })).slice(0,100);
+  } catch(e){ return []; }
+}
+function storeUserPresets(){
+  try { localStorage.setItem(USER_PRESETS_KEY, JSON.stringify(userPresets)); return true; }
+  catch(e){ setStatus('Could not save preset — browser storage is unavailable'); return false; }
+}
+function fillPresetSelect(selected=''){
+  presetSel.innerHTML = `<option value="">Select…</option>` +
+    PRESET_GROUPS.map(([g,names])=>`<optgroup label="${g}">`+
+      names.map(n=>`<option value="builtin:${n}">${n}</option>`).join('')+`</optgroup>`).join('') +
+    (userPresets.length ? `<optgroup label="My Presets">`+
+      userPresets.map((p,i)=>`<option value="user:${i}">${escapeHtml(p.name)}</option>`).join('')+`</optgroup>` : '');
+  presetSel.value = selected;
+}
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function saveUserPreset(){
+  const current = presetSel.value.startsWith('user:') ? userPresets[+presetSel.value.slice(5)] : null;
+  const raw = prompt('Preset name:', current ? current.name : '');
+  if (raw===null) return;
+  const name = raw.trim();
+  if (!name){ setStatus('Preset name cannot be empty'); return; }
+  const existing = userPresets.findIndex(p=>p.name.toLocaleLowerCase()===name.toLocaleLowerCase());
+  if (existing>=0 && !confirm(`Overwrite “${userPresets[existing].name}”?`)) return;
+  const item = { name, state:encodeState() };
+  let index;
+  if (existing>=0){ userPresets[existing]=item; index=existing; }
+  else { userPresets.push(item); index=userPresets.length-1; }
+  if (!storeUserPresets()) return;
+  fillPresetSelect(`user:${index}`);
+  setStatus(`Saved preset · ${name}`);
+}
+function deleteUserPreset(){
+  if (!presetSel.value.startsWith('user:')) return;
+  const index=+presetSel.value.slice(5), item=userPresets[index];
+  if (!item || !confirm(`Delete “${item.name}”?`)) return;
+  userPresets.splice(index,1);
+  if (!storeUserPresets()) return;
+  fillPresetSelect();
+  setStatus(`Deleted preset · ${item.name}`);
+}
 function updateCatCounts(){
   controls.querySelectorAll('.catcount').forEach(el=>{
     const ids = CAT_IDS[el.dataset.cat] || [];
@@ -166,11 +216,23 @@ function buildUI(){
 
   const lab = document.createElement('span'); lab.className='presetlab'; lab.textContent='Preset';
   presetSel = document.createElement('select'); presetSel.className='presetsel';
-  presetSel.innerHTML = `<option value="">Select…</option>` +
-    PRESET_GROUPS.map(([g,names])=>`<optgroup label="${g}">`+
-      names.map(n=>`<option value="${n}">${n}</option>`).join('')+`</optgroup>`).join('');
-  presetSel.addEventListener('change', ()=>{ if (presetSel.value) applyPreset(presetSel.value); });
-  presetsEl.appendChild(lab); presetsEl.appendChild(presetSel);
+  fillPresetSelect();
+  presetSel.addEventListener('change', ()=>{
+    const value=presetSel.value;
+    if (value.startsWith('builtin:')) applyPreset(value.slice(8));
+    else if (value.startsWith('user:')){
+      const item=userPresets[+value.slice(5)];
+      if (item && !applyState(item.state)) setStatus('Could not load this preset');
+      else if (item) setStatus(`Loaded preset · ${item.name}`);
+    }
+    deletePresetBtn.disabled=!value.startsWith('user:');
+  });
+  const savePresetBtn=document.createElement('button'); savePresetBtn.type='button'; savePresetBtn.className='preseticon';
+  savePresetBtn.textContent='＋'; savePresetBtn.title='Save current settings as a browser preset'; savePresetBtn.setAttribute('aria-label','Save current settings as a preset');
+  const deletePresetBtn=document.createElement('button'); deletePresetBtn.type='button'; deletePresetBtn.className='preseticon';
+  deletePresetBtn.textContent='−'; deletePresetBtn.title='Delete selected user preset'; deletePresetBtn.setAttribute('aria-label','Delete selected user preset'); deletePresetBtn.disabled=true;
+  savePresetBtn.addEventListener('click', saveUserPreset); deletePresetBtn.addEventListener('click', deleteUserPreset);
+  presetsEl.appendChild(lab); presetsEl.appendChild(presetSel); presetsEl.appendChild(savePresetBtn); presetsEl.appendChild(deletePresetBtn);
 
   // ---- Sequencer: a step grid, one row per ON effect, tap a cell to gate that effect on/off ----
   const seqCat = document.createElement('div'); seqCat.className='cat seqcat open';   // open by default — the grid is a nice thing to see
