@@ -2,7 +2,11 @@ wrangler.jsonc
 .assetsignore
 .wrangler
 .git
+.agents
+.claude
+.codex
 node_modules
+tmp
 package.json
 package-lock.json
 ogp_gen.cjs
