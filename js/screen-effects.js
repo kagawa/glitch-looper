@@ -248,47 +248,45 @@ function drawGlint(x,y,s,col,alpha,shape){
 }
 
 // composite one channel of `tint` over `base` by the named blend mode, at full strength (the
-// caller lerps toward this result by whatever opacity/falloff applies — same pattern real paint
-// programs use to let any blend mode work at partial opacity)
-function blendChannel(mode,base,tint){
-  switch(mode){
-    case 1: return 255-((255-base)*(255-tint))/255;                                 // Screen
-    case 2: return base<128 ? (2*base*tint)/255 : 255-(2*(255-base)*(255-tint))/255; // Overlay
-    case 3: return Math.min(255, base+tint);                                        // Add
-    default: return tint;                                                           // Mix
-  }
-}
-// which border a pixel is nearest, expressed as a fraction 0..1 walking clockwise from the
-// top-left — lets a border-hugging colour be looked up the same way perimeterPoint used to place
-// LEDs, but now driving a continuous glow instead of discrete shapes
-function edgeFraction(x,y,w,h){
-  const total=2*(w+h), dl=x, dr=w-1-x, dt=y, db=h-1-y, m=Math.min(dl,dr,dt,db);
-  if (m===dt) return x/total;
-  if (m===dr) return (w+y)/total;
-  if (m===db) return (w+h+(w-x))/total;
-  return (2*w+h+(h-y))/total;
-}
 function applyEdgeGlow(w,h,phase){
-// ---- RGB Edge Glow: ARGB case-strip AMBIENT bounce — colour bleeds in from the border like
-//      indirect light reflecting off nearby surfaces, no LED shapes drawn directly. ----
+// ---- RGB Edge Glow: ARGB case-strip AMBIENT bounce. Colour bleeds inward from each border; all four
+//      borders contribute ADDITIVELY, so at a corner the two adjacent hues mix and brighten the way
+//      real overlapping light does (no hard diagonal seam), and the whole layer is blurred so it reads
+//      as a soft indirect glow rather than a crisp frame. Composited with a real canvas blend mode. ----
 const eg = state.edgeglow;
-if (eg.on && eg.amount>0){
-  const amt=P('edgeglow','amount'), tone=eg.tone|0, spd=eg.speed||0, mode=eg.blend|0;
-  const reach=4+eg.reach*Math.min(w,h)*0.45;
-  const shift=spd*phase;                                          // integer turns/loop → seamless
-  const id=ctx.getImageData(0,0,w,h), d=id.data;
-  for (let p=0,i=0;i<d.length;i+=4,p++){
-    const x=p%w, y=(p/w)|0;
-    const dist=Math.min(x,w-1-x,y,h-1-y);
-    if (dist>=reach) continue;
-    const fall=1-dist/reach, str=amt*fall*fall;                   // squared falloff → concentrated near the edge
-    const t=edgeFraction(x,y,w,h), col=hypeColor(tone, t+shift, 0.9, 64);
-    d[i]  += (blendChannel(mode,d[i],  col[0])-d[i])  *str;
-    d[i+1]+= (blendChannel(mode,d[i+1],col[1])-d[i+1])*str;
-    d[i+2]+= (blendChannel(mode,d[i+2],col[2])-d[i+2])*str;
+if (!(eg.on && eg.amount>0)) return;
+const amt=P('edgeglow','amount'), tone=eg.tone|0, spd=eg.speed||0, mode=eg.blend|0;
+const reach=Math.max(6, eg.reach*Math.min(w,h)*0.5);
+const shift=spd*phase, P4=2*(w+h), PAL=360;                       // integer turns/loop → seamless (shift wraps)
+const pal=new Array(PAL);                                         // per-frame hue ring → avoids an hsv() call per pixel
+for (let k=0;k<PAL;k++) pal[k]=hypeColor(tone, k/PAL+shift, 0.9, 64);
+const col=f=>pal[((Math.floor(f*PAL)%PAL)+PAL)%PAL];
+sc.width=w; sc.height=h;
+const glow=sctx.createImageData(w,h), g=glow.data;
+for (let y=0;y<h;y++){
+  const dt=y, db=h-1-y;
+  for (let x=0;x<w;x++){
+    const dl=x, dr=w-1-x;
+    let lr=0,lg=0,lb=0, ws=0;                                     // additive light from each border in range
+    if (dt<reach){ const q=(1-dt/reach)**2,       c=col(x/P4);           lr+=c[0]*q; lg+=c[1]*q; lb+=c[2]*q; ws+=q; }
+    if (dr<reach){ const q=(1-dr/reach)**2,       c=col((w+y)/P4);       lr+=c[0]*q; lg+=c[1]*q; lb+=c[2]*q; ws+=q; }
+    if (db<reach){ const q=(1-db/reach)**2,       c=col((w+h+(w-x))/P4); lr+=c[0]*q; lg+=c[1]*q; lb+=c[2]*q; ws+=q; }
+    if (dl<reach){ const q=(1-dl/reach)**2,       c=col((2*w+2*h-y)/P4); lr+=c[0]*q; lg+=c[1]*q; lb+=c[2]*q; ws+=q; }
+    if (ws<=0) continue;
+    const i=(y*w+x)*4;
+    g[i]=lr/ws; g[i+1]=lg/ws; g[i+2]=lb/ws;                       // hue = coverage-weighted blend → smooth across corners
+    g[i+3]=Math.min(1,ws)*255;                                   // brightness = additive coverage → corners a touch brighter
   }
-  ctx.putImageData(id,0,0);
 }
+sctx.putImageData(glow,0,0);
+const COMP=['source-over','screen','overlay','lighter'];         // Mix / Screen / Overlay / Add
+ctx.save();
+ctx.globalCompositeOperation=COMP[mode]||'screen';
+ctx.globalAlpha=amt;
+ctx.filter=`blur(${Math.max(1,reach*0.2).toFixed(1)}px)`;        // soft bokeh-like bleed, no hard frame edge
+ctx.drawImage(sc,0,0);
+ctx.filter='none';
+ctx.restore();
 }
 
 function applyBurst(w,h,phase){
