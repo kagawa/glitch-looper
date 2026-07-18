@@ -347,12 +347,12 @@ if (gf.on && img){
 //      of the picture, the signature RLE-desync smear. No browser codec involved, so it's fully
 //      live and Envelope-capable — real format corruption, computed like a sim effect.
 function rleEncode(idx, n){
-  const bytes=[], headerPos=[];
+  const bytes=[], headerPos=[], pixelPos=[];   // pixelPos[k] = the pixel each header's packet starts at
   let i=0;
   while (i<n){
     let runLen=1; while (i+runLen<n && idx[i+runLen]===idx[i] && runLen<128) runLen++;
     if (runLen>=2){
-      headerPos.push(bytes.length); bytes.push(0x80|(runLen-1)); bytes.push(idx[i]);
+      headerPos.push(bytes.length); pixelPos.push(i); bytes.push(0x80|(runLen-1)); bytes.push(idx[i]);
       i+=runLen;
     } else {
       let count=0; let j=i;
@@ -361,12 +361,12 @@ function rleEncode(idx, n){
         if (rl>=2) break;
         j++; count++;
       }
-      headerPos.push(bytes.length); bytes.push((count-1)&0x7F);
+      headerPos.push(bytes.length); pixelPos.push(i); bytes.push((count-1)&0x7F);
       for (let k=0;k<count;k++) bytes.push(idx[i+k]);
       i+=count;
     }
   }
-  return { bytes:new Uint8Array(bytes), headerPos };
+  return { bytes:new Uint8Array(bytes), headerPos, pixelPos };
 }
 function rleDecode(bytes, target, n, palLen){
   let bi=0, pos=0;
@@ -393,16 +393,26 @@ const pal = gifPal, palLen = pal.length, map = gifMapper, n=w*h;
 const im = ctx.getImageData(0,0,w,h), d = im.data;
 const idx = new Uint8Array(n);
 for (let p=0,i=0;p<n;p++,i+=4) idx[p]=map(d[i],d[i+1],d[i+2]);
-const { bytes, headerPos } = rleEncode(idx, n);
+const { bytes, headerPos, pixelPos } = rleEncode(idx, n);
 if (!headerPos.length) return;                       // flat single-colour image → nothing to corrupt
 const speed = Math.max(1, rl.speed|0), step = Math.floor(phase*speed);
-const maxHits = Math.max(3, Math.round(headerPos.length*0.4));
-const hits = 1 + Math.floor(amt*amt*maxHits);
-const cbytes = bytes.slice();
-for (let k=0;k<hits;k++){
-  const pos = headerPos[Math.floor(rand(step*13.7+k*3.1+0.5)*headerPos.length)%headerPos.length];
-  cbytes[pos] = Math.floor(rand(step*7.3+k*9.9+1.7)*256);
-}
+const HN = headerPos.length, cbytes = bytes.slice();
+const flip = pos => {   // flip the RLE/raw type bit so the packet's byte-length ALWAYS differs from the
+  const orig=bytes[pos]; // original — every hit reliably desyncs the cursor onward (not just recolours locally)
+  cbytes[pos] = ((orig ^ 0x80) & 0x80) | (Math.floor(rand(step*7.3+pos*0.037+1.7)*128) & 0x7F);
+};
+// binary-search the header whose packet starts nearest a given PIXEL fraction (not packet-list
+// fraction — packet density varies wildly between flat and busy regions, so indexing by pixel
+// position keeps Amount meaning "this fraction of the picture, by area" regardless of content).
+const headerAt = targetPixel => { let lo=0, hi=HN-1;
+  while (lo<hi){ const mid=(lo+hi)>>1; if (pixelPos[mid]<targetPixel) lo=mid+1; else hi=mid; } return headerPos[lo]; };
+// Amount picks WHERE the guaranteed desync starts — low Amount corrupts only a small tail of the
+// picture, high Amount starts near the top (most of the picture smears). Step-jittered spread keeps
+// it from being a single hard edge.
+const frac = Math.max(0.02, 1-amt) + (rand(step*3.7+0.4)-0.5)*0.06;
+flip(headerAt(Math.min(n-1, Math.max(0, Math.round(frac*n)))));
+const extra = 1 + Math.floor(amt*3);                  // a few extra scattered hits add per-step texture
+for (let k=0;k<extra;k++) flip(headerPos[Math.floor(rand(step*13.7+k*3.1+0.5)*HN)%HN]);
 const idx2 = idx.slice();
 rleDecode(cbytes, idx2, n, palLen);
 for (let p=0,i=0;p<n;p++,i+=4){ const c=pal[idx2[p]]; d[i]=c[0]; d[i+1]=c[1]; d[i+2]=c[2]; d[i+3]=255; }
