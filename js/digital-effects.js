@@ -360,9 +360,21 @@ if (so.on){
       const f=amt*0.5, D2=Math.round(D*1.7), D3=Math.round(D*2.3), D4=Math.round(D*3.1), st=Math.max(1,D4);
       for (let i=st;i<len;i++){ if((i&3)===3) continue;
         d[i]=d[i]+f*(0.6*(d[i-D]-128)+0.4*(d[i-D2]-128)+0.28*(d[i-D3]-128)+0.18*(d[i-D4]-128)); }
-    } else {                                       // Tremolo — amplitude LFO along the stream → rolling bands
+    } else if (mode===3){                          // Tremolo — amplitude LFO along the stream → rolling bands
       const k=6.283/Math.max(8,D), dep=amt;
       for (let i=0;i<len;i++){ if((i&3)===3) continue; d[i]=d[i]*(1+dep*Math.sin(i*k)); }
+    } else if (mode===4){                           // Ring Mod — multiply by a carrier sine → metallic interference / new colours
+      const k=6.283/Math.max(2,D>>1);
+      for (let i=0;i<len;i++){ if((i&3)===3) continue; const ring=128+(d[i]-128)*Math.sin(i*k); d[i]=d[i]+(ring-d[i])*amt; }
+    } else if (mode===5){                           // Overdrive — sine wavefold → oversaturated neon bands
+      const drive=1+amt*6;
+      for (let i=0;i<len;i++){ if((i&3)===3) continue; const fold=128+127*Math.sin((d[i]-128)/128*drive*1.5708); d[i]=d[i]+(fold-d[i])*amt; }
+    } else if (mode===6){                           // Stutter — repeat short byte runs → horizontal glitch tiles
+      const snap=d.slice(), rep=Math.max(16,(P('sonify','delay')*8|0))&~3, span=rep*3;   // ~2–200px tiles across the slider
+      for (let i=0;i<len;i++){ if((i&3)===3) continue; const b=Math.floor(i/span)*span, s2=b+((i-b)%rep); d[i]=d[i]+(snap[s2]-d[i])*amt; }
+    } else {                                        // Decimate (sample & hold) — hold every N pixels → chunky colour steps
+      const snap=d.slice(), hold=Math.max(1,Math.round(P('sonify','delay')*0.6));        // ~1–60px steps
+      for (let i=0;i<len;i++){ const ch=i&3; if(ch===3) continue; const held=Math.floor((i>>2)/hold)*hold; d[i]=d[i]+(snap[held*4+ch]-d[i])*amt; }
     }
     for (let i=3;i<len;i+=4) d[i]=255;              // restore opaque alpha
     ctx.putImageData(im,0,0);

@@ -118,7 +118,7 @@ const FX = [
     { k:'amount', label:'FX Amount', min:0, max:1, step:.01, def:.5, env:1 },
   ]},
   { id:'sonify', name:'Sonify', hint:'audio-style databend on the raw byte stream — echo / reverse / reverb / tremolo', on:false, open:false, params:[
-    { k:'mode',   label:'Effect', type:'select', def:0, options:[[0,'Echo'],[1,'Reverse'],[2,'Reverb'],[3,'Tremolo']] },
+    { k:'mode',   label:'Effect', type:'select', def:0, options:[[0,'Echo'],[1,'Reverse'],[2,'Reverb'],[3,'Tremolo'],[4,'Ring Mod'],[5,'Overdrive'],[6,'Stutter'],[7,'Decimate']] },
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
     { k:'delay',  label:'Delay / Rate', min:1, max:100, step:1, def:30, env:1 },
   ]},
@@ -142,8 +142,8 @@ const FX = [
     { k:'palette', label:'Palette', min:0, max:1, step:.01, def:.4 },
     { k:'frames',  label:'Frames', min:1, max:12, step:1, def:6 },
   ]},
-  { id:'audio', name:'Audio Databend', hint:'real — route the raw bytes through a WebAudio graph (echo / reverb / crush / filter)', on:false, open:false, params:[
-    { k:'mode',   label:'Effect', type:'select', def:0, options:[[0,'Echo'],[1,'Reverb'],[2,'Bit-crush'],[3,'Filter Sweep']] },
+  { id:'audio', name:'Audio Databend', hint:'real — route the raw bytes through a WebAudio graph (echo / reverb / crush / filter / distortion / compressor / chorus)', on:false, open:false, params:[
+    { k:'mode',   label:'Effect', type:'select', def:0, options:[[0,'Echo'],[1,'Reverb'],[2,'Bit-crush'],[3,'Low-pass Sweep'],[4,'High-pass'],[5,'Band-pass'],[6,'Notch'],[7,'Distortion'],[8,'Compressor'],[9,'Chorus']] },
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5 },
     { k:'frames', label:'Frames', min:1, max:8, step:1, def:4 },
   ]},

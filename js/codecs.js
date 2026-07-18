@@ -303,9 +303,27 @@ async function buildAudioFrames(){
       const ws=octx.createWaveShaper(); const steps=Math.max(2,Math.round(16-amt*14));   // 4-bit → 1-bit, visible across the slider
       const curve=new Float32Array(1024); for (let i=0;i<1024;i++){ const x=i/511.5-1; curve[i]=Math.round(x*steps)/steps; }
       ws.curve=curve; source.connect(ws); node=ws;
-    } else {                                                        // filter sweep — soften / edge the byte stream
-      const bq=octx.createBiquadFilter(); bq.type='lowpass'; bq.frequency.value=200+(1-amt)*8000+t*2500; bq.Q.value=1+amt*8;
+    } else if (mode>=3 && mode<=6){                                 // filter — soften / edge / band the byte stream
+      const bq=octx.createBiquadFilter();
+      bq.type = mode===3?'lowpass':mode===4?'highpass':mode===5?'bandpass':'notch';
+      if (mode===3){ bq.frequency.value=200+(1-amt)*8000+t*2500; bq.Q.value=1+amt*8; }        // low-pass sweep → smear
+      else if (mode===4){ bq.frequency.value=120+amt*6000+t*2000; bq.Q.value=1+amt*8; }        // high-pass → edges/emboss
+      else { bq.frequency.value=300+amt*5000+t*3000; bq.Q.value=2+amt*16; }                     // band-pass / notch → tinted band
       source.connect(bq); node=bq;
+    } else if (mode===7){                                           // distortion — real waveshaper fuzz
+      const ws=octx.createWaveShaper(), k=amt*100, deg=Math.PI/180, curve=new Float32Array(1024);
+      for (let i=0;i<1024;i++){ const x=i/511.5-1; curve[i]=(3+k)*x*20*deg/(Math.PI+k*Math.abs(x)); }
+      ws.curve=curve; ws.oversample='2x'; source.connect(ws); node=ws;
+    } else if (mode===8){                                           // compressor — pumping / tone flatten
+      const comp=octx.createDynamicsCompressor();
+      comp.threshold.value=-6-amt*44; comp.ratio.value=1+amt*19; comp.knee.value=6; comp.attack.value=0.003; comp.release.value=0.05+t*0.1;
+      source.connect(comp); node=comp;
+    } else {                                                        // chorus / flanger — LFO-modulated delay → wavy colour shimmer
+      const delay=octx.createDelay(0.05); delay.delayTime.value=0.004+amt*0.012;
+      const lfo=octx.createOscillator(); lfo.frequency.value=0.5+t*4+amt*3;
+      const lg=octx.createGain(); lg.gain.value=0.002+amt*0.01; lfo.connect(lg); lg.connect(delay.delayTime); lfo.start();
+      const wet=octx.createGain(); wet.gain.value=0.7; const dry=octx.createGain(); dry.gain.value=0.7; const mix=octx.createGain();
+      source.connect(dry); dry.connect(mix); source.connect(delay); delay.connect(wet); wet.connect(mix); node=mix;
     }
     node.connect(octx.destination); source.start();
     const rc = (await octx.startRendering()).getChannelData(0);
