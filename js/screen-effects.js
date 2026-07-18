@@ -151,6 +151,18 @@ function hypeColor(tone, frac, sat, count){
   if (m){ const c=count||m.length; return m[((Math.floor(frac*c+1e-6)%m.length)+m.length)%m.length]; }
   return HYPE_TONE[tone]||HYPE_TONE[0];
 }
+// like hypeColor but SMOOTH — for continuous fields (edge glow, colour sweep) where hard colour
+// blocks flicker as they rotate. Rainbow → smooth hue; multi-colour → linearly interpolated so the
+// pattern reads as one gentle gradient cycling through its colours once per unit of frac (much
+// slower/softer than the hard-stepped hypeColor); single tones stay flat.
+function hypeLerp(tone, frac, sat){
+  frac=((frac%1)+1)%1;
+  if (tone===2) return hsv(frac*360, sat, 1);
+  const m=HYPE_MULTI[tone];
+  if (m){ const L=m.length, f=frac*L, i=Math.floor(f)%L, j=(i+1)%L, u=f-Math.floor(f), a=m[i], b=m[j];
+    return [a[0]+(b[0]-a[0])*u, a[1]+(b[1]-a[1])*u, a[2]+(b[2]-a[2])*u]; }
+  return HYPE_TONE[tone]||HYPE_TONE[0];
+}
 
 function applyBokeh(w,h,phase){
 // ---- Bokeh Bloom: soft light discs grown from the picture's own highlights, breathing over the loop ----
@@ -258,8 +270,8 @@ if (!(eg.on && eg.amount>0)) return;
 const amt=P('edgeglow','amount'), tone=eg.tone|0, spd=eg.speed||0, mode=eg.blend|0;
 const reach=Math.max(6, eg.reach*Math.min(w,h)*0.5);
 const shift=spd*phase, P4=2*(w+h), PAL=360;                       // integer turns/loop → seamless (shift wraps)
-const pal=new Array(PAL);                                         // per-frame hue ring → avoids an hsv() call per pixel
-for (let k=0;k<PAL;k++) pal[k]=hypeColor(tone, k/PAL+shift, 0.9, 64);
+const pal=new Array(PAL);                                         // per-frame colour ring → avoids a colour calc per pixel
+for (let k=0;k<PAL;k++) pal[k]=hypeLerp(tone, k/PAL+shift, 0.9);  // smooth: multi-colour tones cycle once, gently, not 20× hard blocks
 const col=f=>pal[((Math.floor(f*PAL)%PAL)+PAL)%PAL];
 sc.width=w; sc.height=h;
 const glow=sctx.createImageData(w,h), g=glow.data;

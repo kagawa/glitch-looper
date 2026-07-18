@@ -207,20 +207,22 @@ const FX = [
     { k:'drift',  label:'Drift', min:0, max:1, step:.01, def:.4 },
   ]},
   // ---- hype / dopamine ----
-  { id:'gold', name:'Gold / Chrome', hint:'metallic tone-map with a shine sweep — 5000兆円 gold', on:false, open:false, params:[
+  { id:'gold', name:'Metallic', hint:'metallic tone-map with a shine sweep — gold / chrome / rose / bronze / rainbow', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.8, env:1 },
     { k:'shine',  label:'Shine', min:0, max:1, step:.01, def:.6, env:1 },
     { k:'speed',  label:'Shine Speed', min:1, max:6, step:1, def:1, show:s=> s.shine>0 },
     { k:'angle',  label:'Shine Angle', min:0, max:345, step:15, def:45, show:s=> s.shine>0 },
-    { k:'tone',   label:'Tone', type:'select', def:0, options:[[0,'Gold'],[1,'Silver'],[2,'Rainbow-gold'],[3,'Rose'],[4,'Bronze']] },
+    { k:'tone',   label:'Tone', type:'select', def:0, options:[[0,'Gold'],[1,'Silver / Chrome'],[2,'Rainbow'],[3,'Rose'],[4,'Bronze']] },
   ]},
-  { id:'rainbow', name:'Rainbow', hint:'full-spectrum overlay — a static gradient, or a travelling RGB-software colour-wave pulse', on:false, open:false, params:[
-    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.6, env:1, envd:1 },
-    { k:'style',  label:'Style', type:'select', def:0, options:[[0,'Full Gradient'],[1,'Travelling Wave']] },
-    { k:'bands',  label:'Bands', min:1, max:8, step:1, def:2, show:s=> s.style===1 },
-    { k:'speed',  label:'Cycle / Scroll Speed', min:1, max:6, step:1, def:1 },
-    { k:'angle',  label:'Angle', min:0, max:345, step:15, def:45 },
-    { k:'blend',  label:'Blend', type:'select', def:0, options:[[0,'Overlay'],[1,'Screen'],[2,'Hue (recolor)'],[3,'Soft']] },
+  { id:'rainbow', name:'Colour Sweep', hint:'colour overlay — static gradient, or a travelling colour-wave pulse; spectrum or a palette', on:false, open:false, params:[
+    { k:'amount',  label:'Amount', min:0, max:1, step:.01, def:.6, env:1, envd:1 },
+    { k:'style',   label:'Style', type:'select', def:0, options:[[0,'Full Gradient'],[1,'Travelling Wave']] },
+    { k:'palette', label:'Palette', type:'select', def:2, options:[[2,'Rainbow'],[8,'Fire'],[9,'Candy'],[10,'Festive']] },
+    { k:'bands',   label:'Bands', min:1, max:8, step:1, def:2, show:s=> s.style===1 },
+    { k:'width',   label:'Wave Width', min:0, max:1, step:.01, def:.5, show:s=> s.style===1 },
+    { k:'speed',   label:'Cycle / Scroll Speed', min:1, max:6, step:1, def:1 },
+    { k:'angle',   label:'Angle', min:0, max:345, step:15, def:45 },
+    { k:'blend',   label:'Blend', type:'select', def:0, options:[[0,'Overlay'],[1,'Screen'],[2,'Hue (recolor)'],[3,'Soft']] },
   ]},
   { id:'sparkle', name:'Sparkle', hint:'twinkling glitter — gold / white / rainbow stars', on:false, open:false, params:[
     { k:'amount',  label:'Amount', min:0, max:1, step:.01, def:.8, env:1 },
@@ -245,7 +247,7 @@ const FX = [
     { k:'cx',     label:'Hub X', min:0, max:1, step:.01, def:.5, show:s=> s.style===1 },
     { k:'cy',     label:'Hub Y', min:0, max:1, step:.01, def:.5, show:s=> s.style===1 },
   ]},
-  { id:'edgeglow', name:'RGB Edge Glow', hint:'ARGB case-strip ambient bounce — colour bleeds in from the border like indirect light, no visible LEDs drawn', on:false, open:false, params:[
+  { id:'edgeglow', name:'Edge Glow', hint:'ambient border bounce — colour bleeds in from the edges like indirect light, no source drawn', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.7, env:1, envd:1 },
     { k:'reach',  label:'Reach', min:0, max:1, step:.01, def:.35 },
     { k:'speed',  label:'Chase Speed (turns/loop)', min:-6, max:6, step:1, def:1 },

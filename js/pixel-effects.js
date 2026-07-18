@@ -164,7 +164,8 @@ function hsv(h,s,v){ h=((h%360)+360)%360/60; const c=v*s, x=c*(1-Math.abs(h%2-1)
   return [Math.round((r+m)*255),Math.round((g+m)*255),Math.round((b+m)*255)]; }
 
 function applyGold(w,h,phase){
-// ---- Gold / Chrome: map luma to a metallic gradient with a shine band sweeping over the loop ----
+// ---- Metallic: map luma to a metallic gradient (gold/chrome/rose/bronze/rainbow) with a shine band
+//      sweeping over the loop. (id stays 'gold' for preset/URL compatibility.) ----
 const gd = state.gold;
 if (gd.on && gd.amount>0){
   const a = P('gold','amount'), shine = gd.shine, tone = gd.tone|0;
@@ -199,25 +200,28 @@ if (gd.on && gd.amount>0){
 }
 
 function applyRainbow(w,h,phase){
-// ---- Rainbow: Full Gradient (hues cycling in place across a static gradient) or Travelling Wave
-//      (discrete glowing band(s) that genuinely move across the frame, fading to nothing between
-//      passes — the RGB-software colour-wave pulse look, e.g. Corsair iCUE). Both blend the same way. ----
+// ---- Colour Sweep: a colour field laid over the frame — Full Gradient (colours cycling in place
+//      across a static gradient) or Travelling Wave (glowing band(s) that genuinely move across the
+//      frame, fading to nothing between passes — the RGB-software colour-wave pulse look). Palette
+//      picks Rainbow (full spectrum) or a curated set (Fire / Candy / Festive). Both blend the same. ----
 const rb = state.rainbow;
 if (rb.on && rb.amount>0){
-  const a=P('rainbow','amount'), ang=(rb.angle|0)*Math.PI/180, style=rb.style|0;
+  const a=P('rainbow','amount'), ang=(rb.angle|0)*Math.PI/180, style=rb.style|0, tone=(rb.palette==null?2:rb.palette)|0;
   const BLEND=['overlay','screen','hue','soft-light'];
   if (style===1){
     const cs=Math.cos(ang), sn=Math.sin(ang), freq=Math.max(1,rb.bands|0), speed=rb.speed|0||1;
+    const width=rb.width==null?0.5:rb.width, kf=3.0-width*2.6;                // Wave Width: thin (kf 3.0) → wide (kf 0.4)
     const span=(Math.abs(cs)*w+Math.abs(sn)*h)||1, off0=Math.min(0,cs)*w+Math.min(0,sn)*h;
-    const scroll=phase*speed, hueBase=(phase*speed*97)%360;                  // integer turns/loop → seamless
+    const scroll=phase*speed;                                                // integer turns/loop → seamless
     sc.width=w; sc.height=h;
     const im=sctx.createImageData(w,h), d=im.data;
     for (let p=0,i=0;i<d.length;i+=4,p++){
       const x=p%w, y=(p/w)|0, proj=(x*cs+y*sn-off0)/span;
       const bandFrac=((proj*freq-scroll)%1+1)%1, dist=Math.abs(bandFrac-0.5)*2;
-      const bp=Math.max(0,1-dist*1.7); const bright=bp*bp;                   // squared falloff → a crisp travelling pulse
-      const [r,g,b]=hsv(hueBase+bandFrac*50, 1, 1);
-      d[i]=r; d[i+1]=g; d[i+2]=b; d[i+3]=Math.round(255*bright);
+      const bp=Math.max(0,1-dist*kf); const bright=bp*bp;                    // squared falloff → a crisp travelling pulse
+      if (bright<=0.002) continue;
+      const c=hypeLerp(tone, scroll+bandFrac*0.2, 1);                        // colour drifts an integer no. of cycles/loop → seamless
+      d[i]=c[0]; d[i+1]=c[1]; d[i+2]=c[2]; d[i+3]=Math.round(255*bright);
     }
     sctx.putImageData(im,0,0);
     ctx.save(); ctx.globalCompositeOperation=BLEND[rb.blend|0]||'overlay'; ctx.globalAlpha=a;
@@ -225,8 +229,8 @@ if (rb.on && rb.amount>0){
   } else {
     const cx=w/2, cy=h/2, L=(Math.abs(Math.cos(ang))*w+Math.abs(Math.sin(ang))*h)/2;
     const g=ctx.createLinearGradient(cx-Math.cos(ang)*L, cy-Math.sin(ang)*L, cx+Math.cos(ang)*L, cy+Math.sin(ang)*L);
-    const N=12, off=phase*(rb.speed|0||1);                                   // integer cycles/loop → seamless
-    for(let i=0;i<=N;i++) g.addColorStop(i/N, `hsl(${((i/N+off)%1)*360},100%,55%)`);
+    const N=24, off=phase*(rb.speed|0||1);                                   // integer cycles/loop → seamless
+    for(let i=0;i<=N;i++){ const c=hypeLerp(tone, i/N+off, 1); g.addColorStop(i/N, `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`); }
     ctx.save(); ctx.globalCompositeOperation=BLEND[rb.blend|0]||'overlay'; ctx.globalAlpha=a;
     ctx.fillStyle=g; ctx.fillRect(0,0,w,h); ctx.restore();
   }
