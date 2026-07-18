@@ -118,7 +118,7 @@ if (ps.on){
   if (amt>0){
     const im = ctx.getImageData(0,0,w,h), d=im.data;
     const lo = ps.thresh*255;
-    const maxLen = Math.max(4, Math.round((ps.dir===1?h:w)*(0.05+ps.len*0.95)));
+    const maxLen = Math.max(4, Math.round((ps.dir===3?Math.hypot(w,h):ps.dir===1?h:w)*(0.05+ps.len*0.95)));
     const lum = i => d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114;
     const key = ps.key|0, ivl = ps.ivl|0;
     const sortVal =
@@ -189,6 +189,26 @@ if (ps.on){
     };
     if (ps.dir===0||ps.dir===2){ for(let y=0;y<h;y++){ const r=y*w; sortLine(k=>(r+k)*4, w, y+1); } }
     if (ps.dir===1||ps.dir===2){ for(let x=0;x<w;x++){ sortLine(k=>(k*w+x)*4, h, 9973+x); } }
+    if (ps.dir===3){
+      // Angled: bucket every pixel by its coordinate perpendicular to the chosen angle — each bucket
+      // is one "line" at that angle, running the whole image. Sort each bucket by its coordinate
+      // ALONG the angle to get the pixels' true traversal order, then run the exact same run logic
+      // used for rows/columns on that order (idx() is just an array lookup instead of arithmetic).
+      const rad=(ps.angle||0)*Math.PI/180, ca=Math.cos(rad), sa=Math.sin(rad);
+      let vmin=Infinity, vmax=-Infinity;
+      for (const [cx,cy] of [[0,0],[w-1,0],[0,h-1],[w-1,h-1]]){ const v=-cx*sa+cy*ca; if(v<vmin)vmin=v; if(v>vmax)vmax=v; }
+      const nBuckets = Math.max(1, Math.round(vmax-vmin)+1), buckets = new Array(nBuckets);
+      for (let y=0;y<h;y++) for (let x=0;x<w;x++){
+        const bIdx = Math.round(-x*sa+y*ca-vmin), u = x*ca+y*sa;
+        (buckets[bIdx] || (buckets[bIdx]=[])).push([u,(y*w+x)*4]);
+      }
+      for (let b=0;b<nBuckets;b++){
+        const arr=buckets[b]; if(!arr||arr.length<2) continue;
+        arr.sort((p,q)=>p[0]-q[0]);
+        const pix=arr.map(e=>e[1]);
+        sortLine(k=>pix[k], pix.length, b+31.4);
+      }
+    }
     ctx.putImageData(im,0,0);
   }
 }

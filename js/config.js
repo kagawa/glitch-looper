@@ -90,7 +90,8 @@ const FX = [
     { k:'chance', label:'Sort Chance', min:0, max:1, step:.01, def:1 },
     // Threshold only feeds the two intervals that cut on the picture; Whole line has no run length
     { k:'thresh', label:'Threshold / Edge', min:0, max:1, step:.01, def:.5, show:s=> s.ivl===0 || s.ivl===2 },
-    { k:'dir',    label:'Direction', type:'select', def:0, options:[[0,'Rows →'],[1,'Columns ↓'],[2,'Both']] },
+    { k:'dir',    label:'Direction', type:'select', def:0, options:[[0,'Rows →'],[1,'Columns ↓'],[2,'Both'],[3,'Angled']] },
+    { k:'angle',  label:'Angle', min:0, max:179, step:1, def:45, show:s=> s.dir===3 },
     { k:'len',    label:'Max Length', min:0, max:1, step:.01, def:.6, show:s=> s.ivl!==4 },
   ]},
   { id:'databend', name:'Data Shear', hint:'raw-byte / stride error — diagonal shear + rainbow', on:false, open:false, params:[
