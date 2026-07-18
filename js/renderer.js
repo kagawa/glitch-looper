@@ -149,6 +149,8 @@ function drawFrame(phase){    // phase in [0,1)
 
   applyBmpRowMisread(w,h);
 
+  applyWrongFormat(w,h,phase);
+
   applyDegauss(w,h,phase);
 
   applyIndexedGif(w,h,phase);

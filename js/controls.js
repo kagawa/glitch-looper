@@ -158,7 +158,7 @@ const RAND_PROB = { png:.12, jpeg:.15, warp:.18, halftone:.12, feedback:.12, mel
                     mosh:.25, crt:.2, pixelate:.3, hud:.3, motion:.4,
                     ghost:.14, dotcrawl:.1, hum:.12, herring:.08, sync:.14, zoom:0, leak:.12, bloom:.14,
                     compress:.14, pixsort:.14, databend:.12, degauss:.06, gif:.12, dct:.12,
-                    sonify:.12, byteshift:.12, bitplane:.1, bmpmisread:.14, webp:.1, gifg:.1, audio:.08,
+                    sonify:.12, byteshift:.12, bitplane:.1, bmpmisread:.14, wrongfmt:.12, webp:.1, gifg:.1, audio:.08,
                     extrude:.12, time:.1, playback:.1, interlace:.1, stale:.1, synctear:.1, chroma:.12,   // these re-render the frame — keep them rare
                     // colour-mapping / stylise effects: keep them occasional, emboss rarest
                     duotone:.14, solarize:.14, posterize:.14, emboss:.04,

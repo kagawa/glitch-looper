@@ -245,6 +245,63 @@ function applyBmpRowMisread(w,h){
   ctx.putImageData(out,0,0);
 }
 
+function applyWrongFormat(w,h,phase){
+// ---- Wrong Format: reinterpret the frame as if decoded with the wrong pixel layout ----
+const wf = state.wrongfmt;
+if (!(wf.on)) return;
+const amt = P('wrongfmt','amount'); if (amt<=0) return;
+const mode = wf.mode|0, roam = wf.roam, np = w*h;
+const src = ctx.getImageData(0,0,w,h), s = src.data;
+const out = ctx.createImageData(w,h), d = out.data;
+const drift = Math.round(phase*w*Math.max(1,Math.round(roam*6)));   // integer px/loop → seamless
+
+if (mode===0){                                     // Planar (triple-ghost): Y / U / V stacked as three squished bands
+  for (let y=0;y<h;y++){
+    const b = (y*3/h)|0, ly = (y*3 - b*h)|0, sy = ly<0?0:ly>=h?h-1:ly;
+    const off = b===0 ? 0 : (b===1 ? drift : -drift);
+    for (let x=0;x<w;x++){
+      let sx=(x+off)%w; if(sx<0)sx+=w;
+      const si=(sy*w+sx)*4, r=s[si],g=s[si+1],bl=s[si+2], lum=0.299*r+0.587*g+0.114*bl;
+      let R,G,B;
+      if (b===0){ R=G=B=lum; }                       // Y plane → luma ghost
+      else if (b===1){ R=lum*0.4; G=lum*0.7+g*0.3; B=bl; }   // U plane → cool ghost
+      else { R=r; G=lum*0.5; B=lum*0.4; }            // V plane → warm ghost
+      const di=(y*w+x)*4;
+      d[di]  =s[di]  +(R-s[di]  )*amt;
+      d[di+1]=s[di+1]+(G-s[di+1])*amt;
+      d[di+2]=s[di+2]+(B-s[di+2])*amt; d[di+3]=255;
+    }
+  }
+} else if (mode===1){                               // Stride Shear: wrong row stride → diagonal wrap-tear
+  const stride = amt*w*0.9;
+  for (let y=0;y<h;y++){
+    const off = (Math.round(y*stride/h*8) + drift);
+    for (let x=0;x<w;x++){
+      let sx=(x+off)%w; if(sx<0)sx+=w;
+      const si=(y*w+sx)*4, di=(y*w+x)*4;
+      d[di]=s[si]; d[di+1]=s[si+1]; d[di+2]=s[si+2]; d[di+3]=255;
+    }
+  }
+} else if (mode===2){                               // Bit Depth (16→8): halved width + hi/lo byte shimmer
+  for (let y=0;y<h;y++) for (let x=0;x<w;x++){
+    const sx=(Math.round(x*(1+amt))+((drift)|0))%w, sxx=sx<0?sx+w:sx;
+    const si=(y*w+sxx)*4, di=(y*w+x)*4, lowByte=(x&1)?(1-amt*0.5):1;
+    d[di]  =s[si]  *lowByte; d[di+1]=s[si+1]*lowByte; d[di+2]=s[si+2]*lowByte; d[di+3]=255;
+  }
+} else {                                            // Channel Planar: RGBRGB read as RRR…GGG…BBB → per-channel ghost
+  const gShift=Math.round((np/3+drift)*amt), bShift=Math.round((2*np/3+drift)*amt);
+  for (let p=0;p<np;p++){
+    const di=p*4;
+    let gp=(p+gShift)%np; if(gp<0)gp+=np;
+    let bp=(p+bShift)%np; if(bp<0)bp+=np;
+    d[di]  =s[di];
+    d[di+1]=s[gp*4+1];
+    d[di+2]=s[bp*4+2]; d[di+3]=255;
+  }
+}
+ctx.putImageData(out,0,0);
+}
+
 function applyIndexedGif(w,h,phase){
 // ---- Indexed / GIF: quantise to a cached global palette + dither, then palette-glitch ----
 const gf = state.gif;
