@@ -341,6 +341,74 @@ if (gf.on && img){
 }
 }
 
+// ---- RLE Databend: genuine TGA-style RLE8 packet stream (flat, no per-row reset), corrupt the
+//      packet headers, decode the wreckage. A corrupted header desyncs the byte cursor, so every
+//      packet after it reads from the wrong offset — the colour runs bleed/shift across the rest
+//      of the picture, the signature RLE-desync smear. No browser codec involved, so it's fully
+//      live and Envelope-capable — real format corruption, computed like a sim effect.
+function rleEncode(idx, n){
+  const bytes=[], headerPos=[];
+  let i=0;
+  while (i<n){
+    let runLen=1; while (i+runLen<n && idx[i+runLen]===idx[i] && runLen<128) runLen++;
+    if (runLen>=2){
+      headerPos.push(bytes.length); bytes.push(0x80|(runLen-1)); bytes.push(idx[i]);
+      i+=runLen;
+    } else {
+      let count=0; let j=i;
+      while (j<n && count<128){
+        let rl=1; while (j+rl<n && idx[j+rl]===idx[j] && rl<128) rl++;
+        if (rl>=2) break;
+        j++; count++;
+      }
+      headerPos.push(bytes.length); bytes.push((count-1)&0x7F);
+      for (let k=0;k<count;k++) bytes.push(idx[i+k]);
+      i+=count;
+    }
+  }
+  return { bytes:new Uint8Array(bytes), headerPos };
+}
+function rleDecode(bytes, target, n, palLen){
+  let bi=0, pos=0;
+  while (bi<bytes.length && pos<n){
+    const hdr=bytes[bi++];
+    if (hdr & 0x80){
+      const count=(hdr&0x7F)+1;
+      if (bi>=bytes.length) break;
+      const val=bytes[bi++]%palLen, end=Math.min(n,pos+count);
+      target.fill(val,pos,end); pos=end;
+    } else {
+      const count=(hdr&0x7F)+1;
+      for (let k=0;k<count && pos<n;k++){ if (bi>=bytes.length) break; target[pos++]=bytes[bi++]%palLen; }
+    }
+  }
+}
+function applyRleDatabend(w,h,phase){
+const rl = state.rle;
+if (!(rl.on)) return;
+const amt = P('rle','amount'); if (amt<=0) return;
+const colors = Math.max(2, rl.colors|0);
+ensureGifPalette(colors);
+const pal = gifPal, palLen = pal.length, map = gifMapper, n=w*h;
+const im = ctx.getImageData(0,0,w,h), d = im.data;
+const idx = new Uint8Array(n);
+for (let p=0,i=0;p<n;p++,i+=4) idx[p]=map(d[i],d[i+1],d[i+2]);
+const { bytes, headerPos } = rleEncode(idx, n);
+if (!headerPos.length) return;                       // flat single-colour image → nothing to corrupt
+const speed = Math.max(1, rl.speed|0), step = Math.floor(phase*speed);
+const maxHits = Math.max(3, Math.round(headerPos.length*0.4));
+const hits = 1 + Math.floor(amt*amt*maxHits);
+const cbytes = bytes.slice();
+for (let k=0;k<hits;k++){
+  const pos = headerPos[Math.floor(rand(step*13.7+k*3.1+0.5)*headerPos.length)%headerPos.length];
+  cbytes[pos] = Math.floor(rand(step*7.3+k*9.9+1.7)*256);
+}
+const idx2 = idx.slice();
+rleDecode(cbytes, idx2, n, palLen);
+for (let p=0,i=0;p<n;p++,i+=4){ const c=pal[idx2[p]]; d[i]=c[0]; d[i+1]=c[1]; d[i+2]=c[2]; d[i+3]=255; }
+ctx.putImageData(im,0,0);
+}
+
 function applySonify(w,h){
 // ---- Sonify: treat the RGBA byte stream as audio — echo (IIR delay) + reverse blocks ----
 const so = state.sonify;

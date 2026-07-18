@@ -110,6 +110,11 @@ const FX = [
     { k:'mode',   label:'Layout', type:'select', def:0, options:[[0,'Planar (triple-ghost)'],[1,'Stride Shear'],[2,'Bit Depth (16→8)'],[3,'Channel Planar']] },
     { k:'roam',   label:'Roam', min:0, max:1, step:.01, def:0, env:1 },
   ]},
+  { id:'rle', name:'RLE Databend', hint:'real — genuine TGA-style RLE8 packet stream, corrupt the run headers → colour runs desync and smear', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1, envd:1 },
+    { k:'colors', label:'Colours', min:2, max:128, step:1, def:48 },
+    { k:'speed',  label:'Speed', min:1, max:12, step:1, def:4 },
+  ]},
   { id:'gif', name:'Indexed / GIF', hint:'256-colour palette · dither · scramble / colour-cycle / streaks', on:false, open:false, params:[
     { k:'colors', label:'Colours', min:2, max:64, step:1, def:16 },
     { k:'dither', label:'Dither', min:0, max:1, step:.01, def:.4 },
@@ -455,7 +460,7 @@ const FX = [
 // effect cards are shown grouped by sub-genre (order here = display order)
 const FX_GROUPS = [
   ['File Corruption',       ['jpeg','png','webp','gifg','audio','sonify','byteshift','bitplane']],   // real encoded-byte damage + raw reinterpret
-  ['Digital Glitch',        ['glitch','mosh','compress','dct','pixsort','databend','bmpmisread','wrongfmt','gif','pixelate']],
+  ['Digital Glitch',        ['glitch','mosh','compress','dct','pixsort','databend','bmpmisread','wrongfmt','rle','gif','pixelate']],
   ['Analog Signal',         ['vhs','sync','roll','noise','ghost','dotcrawl','hum','herring','degauss']],
   ['Film / Display',        ['film','crt','hud','halftone']],
   ['Light / Optics',        ['bloom','leak','sparkle','burst','prism','iris','starf','bokeh','foil']],

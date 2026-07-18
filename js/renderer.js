@@ -151,6 +151,8 @@ function drawFrame(phase){    // phase in [0,1)
 
   applyWrongFormat(w,h,phase);
 
+  applyRleDatabend(w,h,phase);
+
   applyDegauss(w,h,phase);
 
   applyIndexedGif(w,h,phase);
