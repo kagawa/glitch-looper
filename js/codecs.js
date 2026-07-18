@@ -292,6 +292,7 @@ async function buildAudioFrames(){
     // effect breathes/animates without a live audio graph. t rides the ramp for extra drift.
     const t = nFrames>1 ? f/(nFrames-1) : 1;
     const a = amt*(0.12 + 0.88*t);
+    const drift = nFrames>1 ? t : 0;   // positional drift only — stays at 0 (no shift) when there's a single frame
     let node = source;
     if (mode===0){                                                  // echo — delayed copies smear down the scan
       const delay=octx.createDelay(1); delay.delayTime.value = 0.002 + a*0.02 + t*0.008;
@@ -323,12 +324,12 @@ async function buildAudioFrames(){
       const fb=octx.createGain(); fb.gain.value=0.4+a*0.45; const mix=octx.createGain();   // capped <0.85 so it can't blow up
       source.connect(mix); source.connect(delay); delay.connect(fb); fb.connect(delay); delay.connect(mix); node=mix;
     } else if (mode===7){                                           // distortion — waveshaper fuzz + per-frame drift so it visibly moves
-      const pre=octx.createDelay(0.05); pre.delayTime.value=t*0.007;
+      const pre=octx.createDelay(0.05); pre.delayTime.value=drift*0.007;
       const ws=octx.createWaveShaper(), k=(20+a*140)*(0.5+t), deg=Math.PI/180, curve=new Float32Array(1024);
       for (let i=0;i<1024;i++){ const x=i/511.5-1; curve[i]=(3+k)*x*20*deg/(Math.PI+k*Math.abs(x)); }
       ws.curve=curve; ws.oversample='2x'; source.connect(pre); pre.connect(ws); node=ws;
     } else if (mode===8){                                           // compressor — pumping; makeup restores level (no grey) + per-frame drift
-      const pre=octx.createDelay(0.05); pre.delayTime.value=t*0.007;
+      const pre=octx.createDelay(0.05); pre.delayTime.value=drift*0.007;
       const comp=octx.createDynamicsCompressor();
       comp.threshold.value=-6-a*44+t*24; comp.ratio.value=2+a*18; comp.knee.value=6; comp.attack.value=0.003; comp.release.value=0.05;
       const makeup=octx.createGain(); makeup.gain.value=1+a*1.6;
