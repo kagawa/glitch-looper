@@ -318,19 +318,21 @@ async function buildAudioFrames(){
       const bq=octx.createBiquadFilter(); bq.type='bandpass'; bq.frequency.value=300+a*5000+t*4000; bq.Q.value=2+a*14;
       const wet=octx.createGain(); wet.gain.value=0.5+a; const dry=octx.createGain(); dry.gain.value=0.7; const mix=octx.createGain();
       source.connect(dry); dry.connect(mix); source.connect(bq); bq.connect(wet); wet.connect(mix); node=mix;
-    } else if (mode===6){                                           // notch — a resonant hole swept through → rippling gouge
-      const bq=octx.createBiquadFilter(); bq.type='notch'; bq.frequency.value=200+a*6000+t*5000; bq.Q.value=6+a*24;
-      const bq2=octx.createBiquadFilter(); bq2.type='notch'; bq2.frequency.value=800+a*9000+t*6000; bq2.Q.value=6+a*24;
-      source.connect(bq); bq.connect(bq2); node=bq2;
-    } else if (mode===7){                                           // distortion — real waveshaper fuzz (drive drifts per frame)
-      const ws=octx.createWaveShaper(), k=(20+a*100)*(0.5+t), deg=Math.PI/180, curve=new Float32Array(1024);
+    } else if (mode===6){                                           // comb — short delay + feedback → resonant colour ripples
+      const delay=octx.createDelay(0.05); delay.delayTime.value=0.0006+a*0.004+t*0.0012;
+      const fb=octx.createGain(); fb.gain.value=0.4+a*0.45; const mix=octx.createGain();   // capped <0.85 so it can't blow up
+      source.connect(mix); source.connect(delay); delay.connect(fb); fb.connect(delay); delay.connect(mix); node=mix;
+    } else if (mode===7){                                           // distortion — waveshaper fuzz + per-frame drift so it visibly moves
+      const pre=octx.createDelay(0.05); pre.delayTime.value=t*0.007;
+      const ws=octx.createWaveShaper(), k=(20+a*140)*(0.5+t), deg=Math.PI/180, curve=new Float32Array(1024);
       for (let i=0;i<1024;i++){ const x=i/511.5-1; curve[i]=(3+k)*x*20*deg/(Math.PI+k*Math.abs(x)); }
-      ws.curve=curve; ws.oversample='2x'; source.connect(ws); node=ws;
-    } else if (mode===8){                                           // compressor — pumping; makeup gain restores level (no grey)
+      ws.curve=curve; ws.oversample='2x'; source.connect(pre); pre.connect(ws); node=ws;
+    } else if (mode===8){                                           // compressor — pumping; makeup restores level (no grey) + per-frame drift
+      const pre=octx.createDelay(0.05); pre.delayTime.value=t*0.007;
       const comp=octx.createDynamicsCompressor();
       comp.threshold.value=-6-a*44+t*24; comp.ratio.value=2+a*18; comp.knee.value=6; comp.attack.value=0.003; comp.release.value=0.05;
       const makeup=octx.createGain(); makeup.gain.value=1+a*1.6;
-      source.connect(comp); comp.connect(makeup); node=makeup;
+      source.connect(pre); pre.connect(comp); comp.connect(makeup); node=makeup;
     } else {                                                        // chorus / flanger — LFO-modulated delay → wavy colour shimmer
       const delay=octx.createDelay(0.05); delay.delayTime.value=0.004+a*0.012;
       const lfo=octx.createOscillator(); lfo.frequency.value=0.5+t*4+a*3;

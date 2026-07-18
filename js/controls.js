@@ -346,4 +346,4 @@ function toggleZen(){
 }
 document.addEventListener('fullscreenchange', ()=>{ if (!document.fullscreenElement) document.body.classList.remove('zen'); });
 
-resetBtn.onclick = ()=>{ applyPreset('Clean'); if (presetSel) presetSel.value=''; };
+resetBtn.onclick = ()=>{ const mo={...state.motion}; applyPreset('Clean'); Object.assign(state.motion, mo); syncUI(); if (presetSel) presetSel.value=''; };   // reset clears effects but leaves the Envelope as-is
