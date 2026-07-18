@@ -28,19 +28,29 @@ if (n.on && (n.grain>0 || n.flicker>0)){
     const sz = 1 + Math.round((n.size||0)*11);       // grain cell size: 1px (fine) → chunky blocks
     const cw = Math.ceil(w/sz);                       // cells per row (a whole cell shares one noise value)
     const density = (type===2||type===3) ? P('noise','grain')*0.15 : 0;
-    // Smooth blends between block noise (each cell a flat value) and bilinearly-interpolated noise
-    // (each pixel a weighted average of the four neighbouring cells' values) — kills the square
-    // block edges that show up at large Grain Size without loading up on blur. Only meaningful for
-    // Luma/Chroma with cells >1px; specks stay crisp because "blurred specks" doesn't read as a look.
-    const smooth = (type<2 && sz>1) ? (n.smooth||0) : 0;
+    // Smooth softens the square cell edges that show up at large Grain Size — for Luma/Chroma it
+    // blends between block noise and a bilinearly-interpolated version (per-pixel weighted average
+    // of the four neighbouring cells' values), for Specks it turns each square-cell dot into a soft
+    // radial one that fades from the cell centre outward, so a big-Size speck reads as a round soft
+    // point instead of a hard block. Only meaningful when cells are >1px.
+    const smooth = sz>1 ? (n.smooth||0) : 0;
     const nzC = (cx,cy,off)=> rand((cy*cw+cx)*0.37 + seed + off);
     for (let p=0,i=0;i<d.length;i+=4,p++){
       const x=p%w, y=(p/w)|0;
-      if (type>=2){                                   // sparse specks — always block-based
+      if (type>=2){                                   // sparse specks
         const cid = (y/sz|0)*cw + (x/sz|0);
         if (rand(cid*0.37+seed*1.7)<density){
-          if (type===3){ const c=hsv(rand(cid*0.71+seed)*360,0.95,1); d[i]=c[0]; d[i+1]=c[1]; d[i+2]=c[2]; }  // vivid colour specks
-          else { const v=rand(cid*0.53+seed)>0.5?255:0; d[i]=v; d[i+1]=v; d[i+2]=v; }                          // salt & pepper
+          let sr, sg, sb;
+          if (type===3){ const c=hsv(rand(cid*0.71+seed)*360,0.95,1); sr=c[0]; sg=c[1]; sb=c[2]; }             // vivid colour specks
+          else { const v=rand(cid*0.53+seed)>0.5?255:0; sr=v; sg=v; sb=v; }                                   // salt & pepper
+          if (smooth>0){                              // radial falloff from the cell centre → soft round dot
+            const fxr=x/sz-((x/sz)|0)-0.5, fyr=y/sz-((y/sz)|0)-0.5;
+            const dr=Math.sqrt(fxr*fxr+fyr*fyr)*2;    // 0 at centre, √2 at corners
+            const fade=1 - (dr>1?1:dr)*smooth;        // lerps between hard block (smooth=0) and dot fully vanishing at corners (smooth=1)
+            d[i]+=(sr-d[i])*fade; d[i+1]+=(sg-d[i+1])*fade; d[i+2]+=(sb-d[i+2])*fade;
+          } else {
+            d[i]=sr; d[i+1]=sg; d[i+2]=sb;
+          }
         }
       } else if (smooth>0){                           // Luma / Chroma with bilinear blend
         const cxf=x/sz, cyf=y/sz, gx=cxf|0, gy=cyf|0, fx=cxf-gx, fy=cyf-gy;
