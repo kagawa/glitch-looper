@@ -43,10 +43,13 @@ if (n.on && (n.grain>0 || n.flicker>0)){
           let sr, sg, sb;
           if (type===3){ const c=hsv(rand(cid*0.71+seed)*360,0.95,1); sr=c[0]; sg=c[1]; sb=c[2]; }             // vivid colour specks
           else { const v=rand(cid*0.53+seed)>0.5?255:0; sr=v; sg=v; sb=v; }                                   // salt & pepper
-          if (smooth>0){                              // radial falloff from the cell centre → soft round dot
+          if (smooth>0){                              // soft translucent dot — a quadratic radial falloff
             const fxr=x/sz-((x/sz)|0)-0.5, fyr=y/sz-((y/sz)|0)-0.5;
             const dr=Math.sqrt(fxr*fxr+fyr*fyr)*2;    // 0 at centre, √2 at corners
-            const fade=1 - (dr>1?1:dr)*smooth;        // lerps between hard block (smooth=0) and dot fully vanishing at corners (smooth=1)
+            const t=dr>1?1:dr, shape=(1-t)*(1-t);     // quadratic fade → gentler than linear, more like a blurred point
+            // Smooth also drops the centre opacity (1 → 0.4), so the point is genuinely see-through,
+            // not just a shaped hard fill; the underlying picture reads through the speck.
+            const fade=shape*(1 - smooth*0.6);
             d[i]+=(sr-d[i])*fade; d[i+1]+=(sg-d[i+1])*fade; d[i+2]+=(sb-d[i+2])*fade;
           } else {
             d[i]=sr; d[i+1]=sg; d[i+2]=sb;
