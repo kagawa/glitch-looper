@@ -28,17 +28,34 @@ if (n.on && (n.grain>0 || n.flicker>0)){
     const sz = 1 + Math.round((n.size||0)*11);       // grain cell size: 1px (fine) → chunky blocks
     const cw = Math.ceil(w/sz);                       // cells per row (a whole cell shares one noise value)
     const density = (type===2||type===3) ? P('noise','grain')*0.15 : 0;
+    // Smooth blends between block noise (each cell a flat value) and bilinearly-interpolated noise
+    // (each pixel a weighted average of the four neighbouring cells' values) — kills the square
+    // block edges that show up at large Grain Size without loading up on blur. Only meaningful for
+    // Luma/Chroma with cells >1px; specks stay crisp because "blurred specks" doesn't read as a look.
+    const smooth = (type<2 && sz>1) ? (n.smooth||0) : 0;
+    const nzC = (cx,cy,off)=> rand((cy*cw+cx)*0.37 + seed + off);
     for (let p=0,i=0;i<d.length;i+=4,p++){
-      const cid = ((p/w|0)/sz|0)*cw + ((p%w)/sz|0);   // cell index → coarse when sz>1, per-pixel when sz==1
-      if (type>=2){                                   // sparse specks
+      const x=p%w, y=(p/w)|0;
+      if (type>=2){                                   // sparse specks — always block-based
+        const cid = (y/sz|0)*cw + (x/sz|0);
         if (rand(cid*0.37+seed*1.7)<density){
           if (type===3){ const c=hsv(rand(cid*0.71+seed)*360,0.95,1); d[i]=c[0]; d[i+1]=c[1]; d[i+2]=c[2]; }  // vivid colour specks
           else { const v=rand(cid*0.53+seed)>0.5?255:0; d[i]=v; d[i+1]=v; d[i+2]=v; }                          // salt & pepper
         }
-      } else if (type===1){                           // chroma: independent per channel → RGB static
-        d[i]+=(rand(cid*0.37+seed)-0.5)*amp; d[i+1]+=(rand(cid*0.37+seed+11.3)-0.5)*amp; d[i+2]+=(rand(cid*0.37+seed+27.7)-0.5)*amp;
-      } else {                                        // luma: same value on every channel (mono grain)
-        const nz=(rand(cid*0.37+seed)-0.5)*amp; d[i]+=nz; d[i+1]+=nz; d[i+2]+=nz;
+      } else if (smooth>0){                           // Luma / Chroma with bilinear blend
+        const cxf=x/sz, cyf=y/sz, gx=cxf|0, gy=cyf|0, fx=cxf-gx, fy=cyf-gy;
+        const bl=(o)=>{ const v00=nzC(gx,gy,o), v10=nzC(gx+1,gy,o), v01=nzC(gx,gy+1,o), v11=nzC(gx+1,gy+1,o);
+          const sV=v00*(1-fx)*(1-fy)+v10*fx*(1-fy)+v01*(1-fx)*fy+v11*fx*fy;
+          return (v00+(sV-v00)*smooth - 0.5)*amp; };  // lerp block↔smooth by Smooth, then centre & scale
+        if (type===0){ const nz=bl(0); d[i]+=nz; d[i+1]+=nz; d[i+2]+=nz; }
+        else { d[i]+=bl(0); d[i+1]+=bl(11.3); d[i+2]+=bl(27.7); }
+      } else {                                        // Luma / Chroma — original block path (unchanged, fast)
+        const cid = (y/sz|0)*cw + (x/sz|0);
+        if (type===1){
+          d[i]+=(rand(cid*0.37+seed)-0.5)*amp; d[i+1]+=(rand(cid*0.37+seed+11.3)-0.5)*amp; d[i+2]+=(rand(cid*0.37+seed+27.7)-0.5)*amp;
+        } else {
+          const nz=(rand(cid*0.37+seed)-0.5)*amp; d[i]+=nz; d[i+1]+=nz; d[i+2]+=nz;
+        }
       }
     }
     ctx.putImageData(g,0,0);
