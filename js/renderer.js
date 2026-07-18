@@ -197,7 +197,8 @@ function drawFrame(phase){    // phase in [0,1)
 
   applyLightLeak(w,h,phase);       // a lens overlay — deliberately covers the whole frame, past the mask
 
-  // ---- HUD / text overlay (drawn last so it stays crisp) ----
+  // ---- text overlays (drawn last so they stay crisp) ----
+  if (state.decotext.on) drawDecoText(w,h,phase);
   if (state.hud.on) drawHUD(w,h,phase);
 
   applyCrtBezel(w,h,cr);
