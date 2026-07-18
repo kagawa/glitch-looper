@@ -69,6 +69,7 @@ const FX = [
   ]},
   { id:'compress', name:'Compression', hint:'heavy-JPEG look — blocky DCT · chroma bleed · banding', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.6, env:1 },
+    { k:'sub',    label:'Chroma Subsample', type:'select', def:0, options:[[0,'4:4:4 (off)'],[1,'4:2:2 (half H)'],[2,'4:2:0 (quarter)']] },
     { k:'chroma', label:'Chroma Bleed', min:0, max:1, step:.01, def:.5 },
     { k:'ring',   label:'Ringing', min:0, max:1, step:.01, def:0, env:1 },
     { k:'soft',   label:'Softness (detail loss)', min:0, max:1, step:.01, def:0, env:1 },

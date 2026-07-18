@@ -66,9 +66,25 @@ if (cp.on){
   }
   const amt = P('compress','amount');
   if (amt>0){
-    const chb = cp.chroma, ring = P('compress','ring');
+    const chb = cp.chroma, ring = P('compress','ring'), sub = cp.sub|0;
     const qstep = 2 + amt*30;                       // luma quantisation → banding
     const im = ctx.getImageData(0,0,w,h), d = im.data;
+    // Real chroma subsampling happens BEFORE block quantisation in an actual encoder: colour is
+    // averaged over a small fixed grid (4:2:2 = 2×1, 4:2:0 = 2×2) independent of the DCT block size,
+    // which is what gives real footage its fine, regular colour-blockiness — distinct from Chroma
+    // Bleed's coarser drift toward the whole (much larger) quantisation block's average.
+    let Cb2=null, Cr2=null;
+    if (sub>0){
+      const cw=2, ch=sub===2?2:1;
+      Cb2=new Float32Array(w*h); Cr2=new Float32Array(w*h);
+      for (let cy=0; cy<h; cy+=ch) for (let cx=0; cx<w; cx+=cw){
+        const ye=Math.min(cy+ch,h), xe=Math.min(cx+cw,w);
+        let n=0,sCb=0,sCr=0;
+        for (let y=cy;y<ye;y++) for(let x=cx;x<xe;x++){ const i=(y*w+x)*4, r=d[i],g=d[i+1],b=d[i+2], Y=0.299*r+0.587*g+0.114*b; sCb+=b-Y; sCr+=r-Y; n++; }
+        const mCb=sCb/n, mCr=sCr/n;
+        for (let y=cy;y<ye;y++) for(let x=cx;x<xe;x++){ const p=y*w+x; Cb2[p]=mCb; Cr2[p]=mCr; }
+      }
+    }
     for (let by=0; by<h; by+=B){
       const ye=Math.min(by+B,h);
       for (let bx=0; bx<w; bx+=B){
@@ -76,7 +92,8 @@ if (cp.on){
         let n=0,sY=0,sY2=0,sCb=0,sCr=0;              // block means (DC term + chroma) + luma spread
         for (let y=by;y<ye;y++) for(let x=bx;x<xe;x++){
           const i=(y*w+x)*4, r=d[i],g=d[i+1],b=d[i+2], Y=0.299*r+0.587*g+0.114*b;
-          sY+=Y; sY2+=Y*Y; sCb+=b-Y; sCr+=r-Y; n++;
+          const p=y*w+x, cb=sub>0?Cb2[p]:(b-Y), cr=sub>0?Cr2[p]:(r-Y);
+          sY+=Y; sY2+=Y*Y; sCb+=cb; sCr+=cr; n++;
         }
         const mY=sY/n, mCb=sCb/n, mCr=sCr/n;
         // Ringing (mosquito noise): a coarsely quantised high-frequency coefficient spreads its
@@ -91,7 +108,8 @@ if (cp.on){
         }
         for (let y=by;y<ye;y++) for(let x=bx;x<xe;x++){
           const i=(y*w+x)*4, r=d[i],g=d[i+1],b=d[i+2];
-          let Y=0.299*r+0.587*g+0.114*b, Cb=b-Y, Cr=r-Y;
+          let Y=0.299*r+0.587*g+0.114*b; const p=y*w+x;
+          let Cb=sub>0?Cb2[p]:(b-Y), Cr=sub>0?Cr2[p]:(r-Y);
           Y += (mY-Y)*amt*0.7;                        // kill high-freq luma toward block mean
           Y = Math.round(Y/qstep)*qstep;              // quantise → banding
           if (amp>0.5)                                // lay the mangled basis back over the block
