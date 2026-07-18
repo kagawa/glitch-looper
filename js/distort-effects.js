@@ -250,6 +250,13 @@ if (kd.on && (kd.amount==null || kd.amount>0)){
 
 const EXTRUDE_TINT_RGB=[null,[0,0,0],[255,255,255],[246,197,64],[224,36,58]];   // Original / Black / White / Gold / Red
 const EXTRUDE_TINT_TONE={5:2, 6:8, 7:9, 8:10};                                  // Rainbow / Fire / Candy / Festive → hypeLerp tones
+function extrudeBlend(mode, base, side){
+  if (mode===1) return 255-((255-base)*(255-side))/255;                         // Screen
+  if (mode===2) return base*side/255;                                            // Multiply
+  if (mode===3){ const s=base+side; return s>255?255:s; }                       // Add
+  if (mode===4) return base<128 ? (2*base*side)/255 : 255-(2*(255-base)*(255-side))/255;  // Overlay
+  return side;                                                                   // Replace (original behaviour)
+}
 function applyExtrude(w,h){
 // ---- Extrude: pick a band of the picture (tone / colour / edges) and push it out — pseudo-3D.
 //      Select By decides what makes it into the "face" that gets pushed: Lightness / Saturation /
@@ -372,15 +379,33 @@ if (mode===1){
   }
 }
 // 2. Paint. Face pixels stay untouched; the side (dm>0) is source-pixel × shade, then optionally
-//    lerped toward Tint's colour by Tint Amount. Palette tints cycle along t=depth/D → coloured
-//    stripes down the side.
+//    lerped toward Tint's colour by Tint Amount. Shade multiplies the tint colour too, so flat
+//    tints (Black/White/Gold/Red) still fade with depth instead of being a solid colour cutout;
+//    palette tints (Rainbow/Fire/Candy/Festive) cycle colour along t=depth/D → coloured stripes
+//    down the side, and shade darkens them further as they recede.
+//    The final side colour is written to the canvas via Side Blend (Replace/Screen/Multiply/Add/
+//    Overlay) at Side Opacity, so the extruded body can be a solid replacement (the original
+//    behaviour), a screened-on colour highlight, an add-blend glow, etc.
+const bmode = ex.bmode|0, opacity = ex.opacity==null?1:ex.opacity;
 for (let i=0;i<w*h;i++){
   if (dm[i]<=0) continue;                            // 0 is the face, -1 was never reached
   const t=dm[i]/D, f=1 - shade*t;
   const o=i*4, s2=from[i]*4;
   let r=src[s2]*f, g=src[s2+1]*f, b=src[s2+2]*f;
-  if (tintCol && tmix>0){ const tc=tintCol(t); r+=(tc[0]-r)*tmix; g+=(tc[1]-g)*tmix; b+=(tc[2]-b)*tmix; }
-  d[o]=r; d[o+1]=g; d[o+2]=b;
+  if (tintCol && tmix>0){ const tc=tintCol(t);
+    const tr=tc[0]*f, tg=tc[1]*f, tb=tc[2]*f;        // tint also fades with depth (keeps the shade gradient the user set)
+    r+=(tr-r)*tmix; g+=(tg-g)*tmix; b+=(tb-b)*tmix;
+  }
+  if (bmode===0 && opacity>=0.999){                  // fast path: original behaviour byte-for-byte
+    d[o]=r; d[o+1]=g; d[o+2]=b;
+  } else {
+    const br=extrudeBlend(bmode, d[o],   r);
+    const bg=extrudeBlend(bmode, d[o+1], g);
+    const bb=extrudeBlend(bmode, d[o+2], b);
+    d[o]  =d[o]  +(br-d[o])  *opacity;
+    d[o+1]=d[o+1]+(bg-d[o+1])*opacity;
+    d[o+2]=d[o+2]+(bb-d[o+2])*opacity;
+  }
 }
 ctx.putImageData(im,0,0);
 }

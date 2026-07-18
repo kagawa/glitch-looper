@@ -384,9 +384,11 @@ const FX = [
     { k:'cy',     label:'Radial Y', min:0, max:1, step:.01, def:.5, show:s=> s.mode===1 },
     { k:'invert', label:'Radial Direction', type:'select', def:0, options:[[0,'Outward'],[1,'Inward']], show:s=> s.mode===1 },
     { k:'dist',   label:'Distance', min:0, max:1, step:.01, def:.3, env:1, envd:1 },
-    { k:'shade',  label:'Shade (side falloff)', min:-1, max:1, step:.01, def:.65 },
+    { k:'shade',  label:'Shade (depth falloff)', min:-1, max:1, step:.01, def:.65 },
     { k:'tint',   label:'Tint', type:'select', def:0, options:[[0,'Original'],[1,'Black'],[2,'White'],[3,'Gold'],[4,'Red'],[5,'Rainbow'],[6,'Fire'],[7,'Candy'],[8,'Festive']] },
     { k:'tmix',   label:'Tint Amount', min:0, max:1, step:.01, def:.7, show:s=> s.tint!==0 },
+    { k:'bmode',  label:'Side Blend', type:'select', def:0, options:[[0,'Replace'],[1,'Screen'],[2,'Multiply'],[3,'Add'],[4,'Overlay']] },
+    { k:'opacity',label:'Side Opacity', min:0, max:1, step:.01, def:1 },
   ]},
   { id:'melt', name:'Melt', hint:'pixel drip (breathes over the loop) — Drip or vertical Wrap', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.4, env:1 },
