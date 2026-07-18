@@ -38,21 +38,41 @@ if (n.on && (n.grain>0 || n.flicker>0)){
     for (let p=0,i=0;i<d.length;i+=4,p++){
       const x=p%w, y=(p/w)|0;
       if (type>=2){                                   // sparse specks
-        const cid = (y/sz|0)*cw + (x/sz|0);
-        if (rand(cid*0.37+seed*1.7)<density){
-          let sr, sg, sb;
-          if (type===3){ const c=hsv(rand(cid*0.71+seed)*360,0.95,1); sr=c[0]; sg=c[1]; sb=c[2]; }             // vivid colour specks
-          else { const v=rand(cid*0.53+seed)>0.5?255:0; sr=v; sg=v; sb=v; }                                   // salt & pepper
-          if (smooth>0){                              // soft translucent dot — a quadratic radial falloff
-            const fxr=x/sz-((x/sz)|0)-0.5, fyr=y/sz-((y/sz)|0)-0.5;
-            const dr=Math.sqrt(fxr*fxr+fyr*fyr)*2;    // 0 at centre, √2 at corners
-            const t=dr>1?1:dr, shape=(1-t)*(1-t);     // quadratic fade → gentler than linear, more like a blurred point
-            // Smooth also drops the centre opacity (1 → 0.4), so the point is genuinely see-through,
-            // not just a shaped hard fill; the underlying picture reads through the speck.
-            const fade=shape*(1 - smooth*0.6);
-            d[i]+=(sr-d[i])*fade; d[i+1]+=(sg-d[i+1])*fade; d[i+2]+=(sb-d[i+2])*fade;
-          } else {
-            d[i]=sr; d[i+1]=sg; d[i+2]=sb;
+        if (smooth>0){
+          // Smooth mode: a speck's dot GROWS past its own cell (radius scales with Smooth) instead
+          // of being clipped inside it — the cell-spacing stays the same as size, but each dot
+          // spreads out and neighbouring dots can overlap. Sample cells within reach; each speck
+          // cell contributes a quadratic-falloff halo weighted by distance from its centre.
+          const cxf=x/sz, cyf=y/sz, gx=cxf|0, gy=cyf|0;
+          const radius=0.5 + smooth*1.5;              // cell-units: 0.5 (own cell edge, smooth=0.001) → 2.0 (2 cells wide, smooth=1)
+          const R=Math.ceil(radius);                  // search box in cells
+          let rr=0, gg=0, bb=0, wtot=0;
+          for (let ny=gy-R; ny<=gy+R; ny++){
+            if (ny<0||ny>=Math.ceil(h/sz)) continue;
+            for (let nx=gx-R; nx<=gx+R; nx++){
+              if (nx<0||nx>=cw) continue;
+              const cid=ny*cw+nx;
+              if (rand(cid*0.37+seed*1.7) >= density) continue;
+              const dxc=cxf-(nx+0.5), dyc=cyf-(ny+0.5), dd=Math.sqrt(dxc*dxc+dyc*dyc)/radius;
+              if (dd>=1) continue;
+              const shape=(1-dd)*(1-dd);              // quadratic falloff → gentler edges
+              let sr,sg,sb;
+              if (type===3){ const c=hsv(rand(cid*0.71+seed)*360,0.95,1); sr=c[0]; sg=c[1]; sb=c[2]; }
+              else { const v=rand(cid*0.53+seed)>0.5?255:0; sr=v; sg=v; sb=v; }
+              rr+=sr*shape; gg+=sg*shape; bb+=sb*shape; wtot+=shape;
+            }
+          }
+          if (wtot>0){
+            const inv=1/wtot, avgR=rr*inv, avgG=gg*inv, avgB=bb*inv;
+            // Total coverage caps at 1; centre opacity drops with Smooth so the point is see-through
+            const fade=Math.min(1,wtot)*(1 - smooth*0.4);
+            d[i]+=(avgR-d[i])*fade; d[i+1]+=(avgG-d[i+1])*fade; d[i+2]+=(avgB-d[i+2])*fade;
+          }
+        } else {                                      // block path (unchanged, fast)
+          const cid = (y/sz|0)*cw + (x/sz|0);
+          if (rand(cid*0.37+seed*1.7)<density){
+            if (type===3){ const c=hsv(rand(cid*0.71+seed)*360,0.95,1); d[i]=c[0]; d[i+1]=c[1]; d[i+2]=c[2]; }
+            else { const v=rand(cid*0.53+seed)>0.5?255:0; d[i]=v; d[i+1]=v; d[i+2]=v; }
           }
         }
       } else if (smooth>0){                           // Luma / Chroma with bilinear blend
