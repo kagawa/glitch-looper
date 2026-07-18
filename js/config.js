@@ -76,6 +76,7 @@ const FX = [
   ]},
   { id:'dct', name:'DCT Glitch', hint:'real 8×8 DCT — flatten / quantise / DC-shift / scramble coefficients (live)', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
+    { k:'mix',    label:'Mix', min:0, max:1, step:.01, def:.7, env:1 },
     { k:'mode',   label:'Mode', type:'select', def:0, options:[[0,'Flatten (blocky)'],[1,'Quantise (banding)'],[2,'DC Shift (block jumps)'],[3,'Scramble AC (ringing)']] },
     { k:'block',  label:'Block', type:'select', def:8, options:[[8,'8 px'],[16,'16 px']] },
     { k:'chroma', label:'Colour', min:0, max:1, step:.01, def:.5 },
@@ -135,6 +136,11 @@ const FX = [
     { k:'data',    label:'Data (LZW)', min:0, max:1, step:.01, def:.5 },
     { k:'palette', label:'Palette', min:0, max:1, step:.01, def:.4 },
     { k:'frames',  label:'Frames', min:1, max:12, step:1, def:6 },
+  ]},
+  { id:'audio', name:'Audio Databend', hint:'real — route the raw bytes through a WebAudio graph (echo / reverb / crush / filter)', on:false, open:false, params:[
+    { k:'mode',   label:'Effect', type:'select', def:0, options:[[0,'Echo'],[1,'Reverb'],[2,'Bit-crush'],[3,'Filter Sweep']] },
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5 },
+    { k:'frames', label:'Frames', min:1, max:8, step:1, def:4 },
   ]},
   { id:'degauss', name:'Degauss', hint:'degaussing CRT — the picture ripples and the colour goes impure', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.6, env:1 },
@@ -443,7 +449,7 @@ const FX = [
 
 // effect cards are shown grouped by sub-genre (order here = display order)
 const FX_GROUPS = [
-  ['File Corruption',       ['jpeg','png','webp','gifg','sonify','byteshift','bitplane']],       // real encoded-byte damage + raw reinterpret
+  ['File Corruption',       ['jpeg','png','webp','gifg','audio','sonify','byteshift','bitplane']],   // real encoded-byte damage + raw reinterpret
   ['Digital Glitch',        ['glitch','mosh','compress','dct','pixsort','databend','bmpmisread','gif','pixelate']],
   ['Analog Signal',         ['vhs','sync','roll','noise','ghost','dotcrawl','hum','herring','degauss']],
   ['Film / Display',        ['film','crt','hud','halftone']],

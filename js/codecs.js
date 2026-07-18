@@ -268,3 +268,58 @@ function schedulePng(){
   pngReady=false; clearTimeout(pngTimer);
   pngTimer=setTimeout(()=> buildPngFrames().catch(()=>{}), 120);
 }
+
+// ---- real audio databend ----
+// Treat the raw RGB bytes as an audio signal, run them through a genuine WebAudio graph (echo /
+// reverb / bit-crush / filter) rendered offline, and read the processed samples back as pixels.
+// Authentic sonification — the corruption is shaped by real DSP, not a hand-coded approximation.
+async function buildAudioFrames(){
+  if (!img || typeof OfflineAudioContext==='undefined'){ audioReady=false; return; }
+  const au = state.audio, w = canvas.width, h = canvas.height, myToken = ++audioToken;
+  asrc.width=w; asrc.height=h; actx.clearRect(0,0,w,h); actx.drawImage(img,0,0,w,h);
+  const sd = actx.getImageData(0,0,w,h).data, px = w*h, N = px*3;    // RGB samples (leave alpha opaque)
+  const mode = au.mode|0, amt = au.amount, nFrames = Math.max(1, Math.round(au.frames)), SR = 44100;
+  const out = [];
+  for (let f=0; f<nFrames; f++){
+    const octx = new OfflineAudioContext(1, N, SR);
+    const inBuf = octx.createBuffer(1, N, SR), ch = inBuf.getChannelData(0);
+    for (let p=0,i=0,s=0;p<px;p++,i+=4){ ch[s++]=sd[i]/127.5-1; ch[s++]=sd[i+1]/127.5-1; ch[s++]=sd[i+2]/127.5-1; }
+    const source = octx.createBufferSource(); source.buffer = inBuf;
+    const t = nFrames>1 ? f/nFrames : 0;                            // per-frame drift → the pool animates
+    let node = source;
+    if (mode===0){                                                  // echo — delayed copies smear down the scan
+      const delay=octx.createDelay(1); delay.delayTime.value = 0.002 + amt*0.02 + t*0.008;
+      const fb=octx.createGain(); fb.gain.value = amt*0.6; const mix=octx.createGain();
+      source.connect(mix); source.connect(delay); delay.connect(fb); fb.connect(delay); delay.connect(mix); node=mix;
+    } else if (mode===1){                                           // reverb — diffuse smear (noise impulse)
+      const conv=octx.createConvolver(); const L=Math.max(1,Math.floor(SR*(0.04+amt*0.18)));
+      const ir=octx.createBuffer(1,L,SR), ird=ir.getChannelData(0);
+      for (let i=0;i<L;i++) ird[i]=(Math.random()*2-1)*Math.pow(1-i/L,2); conv.buffer=ir;
+      const wet=octx.createGain(); wet.gain.value=amt; const dry=octx.createGain(); dry.gain.value=1-amt*0.4; const mix=octx.createGain();
+      source.connect(dry); dry.connect(mix); source.connect(conv); conv.connect(wet); wet.connect(mix); node=mix;
+    } else if (mode===2){                                           // bit-crush — quantise samples (posterise)
+      const ws=octx.createWaveShaper(); const steps=Math.max(2,Math.round(64*(1-amt)+2));
+      const curve=new Float32Array(1024); for (let i=0;i<1024;i++){ const x=i/511.5-1; curve[i]=Math.round(x*steps)/steps; }
+      ws.curve=curve; source.connect(ws); node=ws;
+    } else {                                                        // filter sweep — soften / edge the byte stream
+      const bq=octx.createBiquadFilter(); bq.type='lowpass'; bq.frequency.value=200+(1-amt)*8000+t*2500; bq.Q.value=1+amt*8;
+      source.connect(bq); node=bq;
+    }
+    node.connect(octx.destination); source.start();
+    const rc = (await octx.startRendering()).getChannelData(0);
+    const od = new ImageData(w,h), o = od.data;
+    for (let p=0,i=0,s=0;p<px;p++,i+=4){
+      o[i]  =Math.max(0,Math.min(255,(rc[s++]+1)*127.5));
+      o[i+1]=Math.max(0,Math.min(255,(rc[s++]+1)*127.5));
+      o[i+2]=Math.max(0,Math.min(255,(rc[s++]+1)*127.5));
+      o[i+3]=255;
+    }
+    try { out.push(await createImageBitmap(od)); } catch(e){}
+  }
+  if (myToken!==audioToken) return;
+  if (out.length){ audioFrames=out; audioReady=true; } else audioReady=false;
+}
+function scheduleAudio(){
+  audioReady=false; clearTimeout(audioTimer);
+  audioTimer=setTimeout(()=> buildAudioFrames().catch(()=>{ audioReady=false; }), 140);
+}

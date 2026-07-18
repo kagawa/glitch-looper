@@ -28,6 +28,11 @@ let pngFrames = [], pngReady = false, pngTimer = null, pngToken = 0;
 const psrc = document.createElement('canvas');
 const pctx = psrc.getContext('2d', { willReadFrequently:true });
 
+// real audio databend: route the raw RGB bytes through a WebAudio graph and read the samples back
+let audioFrames = [], audioReady = false, audioTimer = null, audioToken = 0;
+const asrc = document.createElement('canvas');
+const actx = asrc.getContext('2d', { willReadFrequently:true });
+
 // ---------- build UI ----------
 const controls = document.getElementById('controls');   // wrapper: queries/delegation span both inner panels
 const fxPanel = document.getElementById('fxPanel');      // per-frame image effects
@@ -111,6 +116,7 @@ function buildUI(){
       if (r.dataset.fx==='png')  schedulePng();
       if (r.dataset.fx==='webp') scheduleWebp();
       if (r.dataset.fx==='gifg') scheduleGifg();
+      if (r.dataset.fx==='audio') scheduleAudio();
       updateRows();     // a show() can key off a slider too, not just a select
     });
   });
@@ -121,6 +127,7 @@ function buildUI(){
       if (c.dataset.fx==='png'  && c.checked) schedulePng();
       if (c.dataset.fx==='webp' && c.checked) scheduleWebp();
       if (c.dataset.fx==='gifg' && c.checked) scheduleGifg();
+      if (c.dataset.fx==='audio' && c.checked) scheduleAudio();
       updateCatCounts();
       if (document.querySelector('.seqcat.open')) buildSeqGrid();   // rows follow which effects are on
     });
@@ -138,6 +145,7 @@ function buildUI(){
     s.addEventListener('change', ()=>{
       state[s.dataset.fx][s.dataset.k] = parseInt(s.value, 10);
       if (s.dataset.fx==='jpeg') scheduleJpeg();   // e.g. the Target select re-corrupts a different segment
+      if (s.dataset.fx==='audio') scheduleAudio();
       if (s.dataset.fx==='png') schedulePng();
       if (s.dataset.fx==='mask' && s.dataset.k==='source') state.mask.mode=(state.mask.source|0)===6?1:0;
       if (s.dataset.fx==='hud' && s.dataset.k==='layout'){ applyHudPreset(state.hud.layout|0); syncUI(); }
@@ -282,6 +290,7 @@ function rebuildCodecs(){
   if (state.png.on)  schedulePng();  else pngReady  = false;
   if (state.webp.on) scheduleWebp(); else webpReady = false;
   if (state.gifg.on) scheduleGifg(); else gifgReady = false;
+  if (state.audio.on) scheduleAudio(); else audioReady = false;
 }
 // envelope multiplier for destructive effects — makes the glitch "breathe" over the loop
 function motionMul(phase){

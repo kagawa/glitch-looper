@@ -25,6 +25,8 @@ else if (state.webp.on && webpReady && webpFrames.length)
   base = webpFrames[Math.floor(phase*webpFrames.length) % webpFrames.length];
 else if (state.gifg.on && gifgReady && gifgFrames.length)
   base = gifgFrames[Math.floor(phase*gifgFrames.length) % gifgFrames.length];
+else if (state.audio.on && audioReady && audioFrames.length)
+  base = audioFrames[Math.floor(phase*audioFrames.length) % audioFrames.length];
 tctx.clearRect(0,0,w,h);
 tctx.filter = fp.length ? fp.join(' ') : 'none';
 tctx.drawImage(base, 0, 0, w, h);

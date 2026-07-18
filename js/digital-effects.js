@@ -13,14 +13,14 @@ function applyDctGlitch(w,h){
 const dg = state.dct;
 if (dg.on && dg.amount>0){
   const amt=P('dct','amount'), N=(dg.block|0)||8, mode=dg.mode|0, chroma=dg.chroma, NN=N*N, M=dctMat(N);
-  const id=ctx.getImageData(0,0,w,h), d=id.data, np=w*h;
+  const id=ctx.getImageData(0,0,w,h), d=id.data, np=w*h, orig=d.slice(), mix=P('dct','mix');
   const Y=new Float32Array(np), Cb=new Float32Array(np), Cr=new Float32Array(np);
   for (let p=0,i=0;i<d.length;i+=4,p++){ const r=d[i],g=d[i+1],b=d[i+2];
     Y[p]=0.299*r+0.587*g+0.114*b; Cb[p]=128-0.168736*r-0.331264*g+0.5*b; Cr[p]=128+0.5*r-0.418688*g-0.081312*b; }
   const blk=new Float32Array(NN), tmp=new Float32Array(NN), co=new Float32Array(NN);
   const proc=(plane,strength)=>{
     if (strength<=0) return;
-    const s=amt*strength, q=1+s*36, keep=Math.max(1,Math.round(N*2*(1-s)));
+    const s=amt*strength, q=1+s*36, keep=Math.max(2,Math.round(N*1.7*(1-s)));   // keep low freqs so it never flattens to grey
     for (let by=0;by<h;by+=N) for (let bx=0;bx<w;bx+=N){
       const bw=Math.min(N,w-bx), bh=Math.min(N,h-by);
       for (let y=0;y<N;y++){ const sy=by+Math.min(y,bh-1)*w; for (let x=0;x<N;x++) blk[y*N+x]=plane[sy+bx+Math.min(x,bw-1)]-128; }
@@ -40,7 +40,8 @@ if (dg.on && dg.amount>0){
   };
   proc(Y,1); proc(Cb,chroma); proc(Cr,chroma);
   for (let p=0,i=0;i<d.length;i+=4,p++){ const y=Y[p], cb=Cb[p]-128, cr=Cr[p]-128;
-    d[i]=y+1.402*cr; d[i+1]=y-0.344136*cb-0.714136*cr; d[i+2]=y+1.772*cb; }
+    const R=y+1.402*cr, G=y-0.344136*cb-0.714136*cr, B=y+1.772*cb;    // glitched, then blend over the original by Mix
+    d[i]=orig[i]+(R-orig[i])*mix; d[i+1]=orig[i+1]+(G-orig[i+1])*mix; d[i+2]=orig[i+2]+(B-orig[i+2])*mix; }
   ctx.putImageData(id,0,0);
 }
 }

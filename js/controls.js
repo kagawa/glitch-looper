@@ -28,6 +28,7 @@ function commitImage(src, sw, sh){
   if (state.png.on)  schedulePng();
   if (state.webp.on) scheduleWebp();
   if (state.gifg.on) scheduleGifg();
+  if (state.audio.on) scheduleAudio();
   return { w, h };
 }
 function loadImage(file){
@@ -157,7 +158,7 @@ const RAND_PROB = { png:.12, jpeg:.15, warp:.18, halftone:.12, feedback:.12, mel
                     mosh:.25, crt:.2, pixelate:.3, hud:.3, motion:.4,
                     ghost:.14, dotcrawl:.1, hum:.12, herring:.08, sync:.14, zoom:0, leak:.12, bloom:.14,
                     compress:.14, pixsort:.14, databend:.12, degauss:.06, gif:.12, dct:.12,
-                    sonify:.12, byteshift:.12, bitplane:.1, bmpmisread:.14, webp:.1, gifg:.1,
+                    sonify:.12, byteshift:.12, bitplane:.1, bmpmisread:.14, webp:.1, gifg:.1, audio:.08,
                     extrude:.12, time:.1, playback:.1, interlace:.1, stale:.1, synctear:.1, chroma:.12,   // these re-render the frame — keep them rare
                     // colour-mapping / stylise effects: keep them occasional, emboss rarest
                     duotone:.14, solarize:.14, posterize:.14, emboss:.04,
@@ -173,7 +174,7 @@ const RAND_LEVELS = {
   wild:  {prob:1.4, str:1,   seq:.22, seqHeavy:.48, min:3, max:8} };
 applyLevelRange(randLevelVal);   // start the sliders on the current strength's range (declared above)
 // destructive effects that read well flickering in and out — bump their pattern chance
-const RAND_SEQ_HEAVY = new Set(['jpeg','png','webp','gifg','mosh','databend','bmpmisread','sonify',
+const RAND_SEQ_HEAVY = new Set(['jpeg','png','webp','gifg','audio','mosh','databend','bmpmisread','sonify',
                                 'byteshift','bitplane','glitch','sync','pixsort','stale','synctear']);
 // a random Sequencer pattern (8 steps). ~75% pick one of a handful of clean rhythms (o=on, x=off),
 // each usable inverted too; ~25% a free random subset. Always keeps 1..7 steps on.
@@ -305,7 +306,7 @@ let driftAmt = 0.5;     // drift wander range as a fraction of each param's span
 function driftTick(){
   FX.forEach(f=>{
     if (state[f.id]._locked) return;
-    if (!state[f.id].on || f.id==='jpeg' || f.id==='png') return;   // skip the heavy real-glitch pools
+    if (!state[f.id].on || f.id==='jpeg' || f.id==='png' || f.id==='webp' || f.id==='gifg' || f.id==='audio') return;   // skip the heavy real-glitch pools
     if (f.id==='zoom' || f.id==='motion' || f.id==='mask') return;  // Zoom / Envelope / Mask shouldn't wander
     f.params.forEach(p=>{
       if (p.type==='select') return;
