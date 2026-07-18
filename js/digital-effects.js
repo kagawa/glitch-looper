@@ -23,7 +23,7 @@ if (dg.on && dg.amount>0){
     const s=amt*strength, q=1+s*36, keep=Math.max(2,Math.round(N*1.7*(1-s)));   // keep low freqs so it never flattens to grey
     for (let by=0;by<h;by+=N) for (let bx=0;bx<w;bx+=N){
       const bw=Math.min(N,w-bx), bh=Math.min(N,h-by);
-      for (let y=0;y<N;y++){ const sy=by+Math.min(y,bh-1)*w; for (let x=0;x<N;x++) blk[y*N+x]=plane[sy+bx+Math.min(x,bw-1)]-128; }
+      for (let y=0;y<N;y++){ const sy=(by+Math.min(y,bh-1))*w; for (let x=0;x<N;x++) blk[y*N+x]=plane[sy+bx+Math.min(x,bw-1)]-128; }
       // forward: rowT[y][v]=Σx blk[y][x]M[v][x] ; co[u][v]=Σy M[u][y]rowT[y][v]
       for (let y=0;y<N;y++) for (let v=0;v<N;v++){ let a=0; for (let x=0;x<N;x++) a+=blk[y*N+x]*M[v*N+x]; tmp[y*N+v]=a; }
       for (let u=0;u<N;u++) for (let v=0;v<N;v++){ let a=0; for (let y=0;y<N;y++) a+=M[u*N+y]*tmp[y*N+v]; co[u*N+v]=a; }

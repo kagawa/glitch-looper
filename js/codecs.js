@@ -283,7 +283,9 @@ async function buildAudioFrames(){
   for (let f=0; f<nFrames; f++){
     const octx = new OfflineAudioContext(1, N, SR);
     const inBuf = octx.createBuffer(1, N, SR), ch = inBuf.getChannelData(0);
-    for (let p=0,i=0,s=0;p<px;p++,i+=4){ ch[s++]=sd[i]/127.5-1; ch[s++]=sd[i+1]/127.5-1; ch[s++]=sd[i+2]/127.5-1; }
+    // planar layout — all R, then all G, then all B — so a filter/echo smears within a channel
+    // (horizontal streaks) and keeps colour, instead of blending R/G/B into grey.
+    for (let p=0,i=0;p<px;p++,i+=4){ ch[p]=sd[i]/127.5-1; ch[px+p]=sd[i+1]/127.5-1; ch[2*px+p]=sd[i+2]/127.5-1; }
     const source = octx.createBufferSource(); source.buffer = inBuf;
     const t = nFrames>1 ? f/nFrames : 0;                            // per-frame drift → the pool animates
     let node = source;
@@ -298,7 +300,7 @@ async function buildAudioFrames(){
       const wet=octx.createGain(); wet.gain.value=amt; const dry=octx.createGain(); dry.gain.value=1-amt*0.4; const mix=octx.createGain();
       source.connect(dry); dry.connect(mix); source.connect(conv); conv.connect(wet); wet.connect(mix); node=mix;
     } else if (mode===2){                                           // bit-crush — quantise samples (posterise)
-      const ws=octx.createWaveShaper(); const steps=Math.max(2,Math.round(64*(1-amt)+2));
+      const ws=octx.createWaveShaper(); const steps=Math.max(2,Math.round(16-amt*14));   // 4-bit → 1-bit, visible across the slider
       const curve=new Float32Array(1024); for (let i=0;i<1024;i++){ const x=i/511.5-1; curve[i]=Math.round(x*steps)/steps; }
       ws.curve=curve; source.connect(ws); node=ws;
     } else {                                                        // filter sweep — soften / edge the byte stream
@@ -308,10 +310,10 @@ async function buildAudioFrames(){
     node.connect(octx.destination); source.start();
     const rc = (await octx.startRendering()).getChannelData(0);
     const od = new ImageData(w,h), o = od.data;
-    for (let p=0,i=0,s=0;p<px;p++,i+=4){
-      o[i]  =Math.max(0,Math.min(255,(rc[s++]+1)*127.5));
-      o[i+1]=Math.max(0,Math.min(255,(rc[s++]+1)*127.5));
-      o[i+2]=Math.max(0,Math.min(255,(rc[s++]+1)*127.5));
+    for (let p=0,i=0;p<px;p++,i+=4){
+      o[i]  =Math.max(0,Math.min(255,(rc[p]+1)*127.5));
+      o[i+1]=Math.max(0,Math.min(255,(rc[px+p]+1)*127.5));
+      o[i+2]=Math.max(0,Math.min(255,(rc[2*px+p]+1)*127.5));
       o[i+3]=255;
     }
     try { out.push(await createImageBitmap(od)); } catch(e){}
