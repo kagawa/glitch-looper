@@ -248,43 +248,6 @@ if (kd.on && (kd.amount==null || kd.amount>0)){
 }
 }
 
-function drawFanBlade(angle,half,R,col,alpha){
-  if (alpha<=0.01) return;
-  sctx.globalAlpha=alpha;
-  sctx.fillStyle=`rgb(${col[0]},${col[1]},${col[2]})`;
-  sctx.beginPath(); sctx.moveTo(0,0);
-  sctx.lineTo(Math.cos(angle-half)*R, Math.sin(angle-half)*R);
-  sctx.lineTo(Math.cos(angle+half)*R, Math.sin(angle+half)*R);
-  sctx.closePath(); sctx.fill();
-}
-function applyFanBlur(w,h,phase){
-// ---- ARGB Fan Blur: a spinning translucent fan, streaked RGB blades — the ARGB case-fan look.
-//      Not a real optical blur of the picture; a decorative overlay (same lineage as Burst Lines),
-//      each blade smeared into a trailing streak of fading copies to fake motion blur. ----
-const fb = state.fanblur;
-if (fb.on && fb.amount>0){
-  const amt=P('fanblur','amount'), blades=Math.max(2,fb.blades|0), tone=fb.tone|0;
-  const R=Math.min(w,h)*(0.12+fb.size*0.38), streak=fb.streak, spin=fb.spin||0;
-  const cx=fb.cx*w, cy=fb.cy*h, TWO=Math.PI*2;
-  const rot=spin*phase*TWO;                                        // integer turns/loop → seamless
-  const K=1+Math.round(streak*9), dir=spin<0?-1:1;
-  const half=(Math.PI/blades)*0.38, step=(Math.PI/blades)*0.55*(0.3+streak);
-  sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h);
-  sctx.save(); sctx.translate(cx,cy);
-  for (let i=0;i<blades;i++){
-    const baseAng=i*(TWO/blades)+rot;
-    const col=hypeColor(tone, i/blades, 0.85, blades);
-    for (let k=0;k<K;k++){
-      const ang=baseAng-dir*k*step, alpha=(1-k/K)*(K>1?0.55:0.9);
-      drawFanBlade(ang, half, R, col, alpha);
-    }
-  }
-  sctx.restore();
-  ctx.save(); ctx.globalCompositeOperation='screen'; ctx.globalAlpha=amt;
-  ctx.drawImage(sc,0,0); ctx.restore();
-}
-}
-
 function applyExtrude(w,h){
 // ---- Extrude: pick a band of the picture by tone or colour and push it out — pseudo-3D ----
 //      The shading is what sells it. Drag a region along a direction with its own colour and you

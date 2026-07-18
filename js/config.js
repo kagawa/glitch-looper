@@ -214,18 +214,13 @@ const FX = [
     { k:'angle',  label:'Shine Angle', min:0, max:345, step:15, def:45, show:s=> s.shine>0 },
     { k:'tone',   label:'Tone', type:'select', def:0, options:[[0,'Gold'],[1,'Silver'],[2,'Rainbow-gold'],[3,'Rose'],[4,'Bronze']] },
   ]},
-  { id:'rainbow', name:'Rainbow', hint:'full-spectrum overlay, hues cycling over the loop', on:false, open:false, params:[
-    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.6, env:1 },
-    { k:'speed',  label:'Cycle Speed', min:1, max:6, step:1, def:1 },
+  { id:'rainbow', name:'Rainbow', hint:'full-spectrum overlay — a static gradient, or a travelling RGB-software colour-wave pulse', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.6, env:1, envd:1 },
+    { k:'style',  label:'Style', type:'select', def:0, options:[[0,'Full Gradient'],[1,'Travelling Wave']] },
+    { k:'bands',  label:'Bands', min:1, max:8, step:1, def:2, show:s=> s.style===1 },
+    { k:'speed',  label:'Cycle / Scroll Speed', min:1, max:6, step:1, def:1 },
     { k:'angle',  label:'Angle', min:0, max:345, step:15, def:45 },
     { k:'blend',  label:'Blend', type:'select', def:0, options:[[0,'Overlay'],[1,'Screen'],[2,'Hue (recolor)'],[3,'Soft']] },
-  ]},
-  { id:'rgbwave', name:'RGB Wave Sweep', hint:'discrete glowing colour band(s) travelling across the frame, hue drifting as they go — RGB-software colour-wave pulse', on:false, open:false, params:[
-    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.7, env:1, envd:1 },
-    { k:'freq',   label:'Bands', min:1, max:8, step:1, def:2 },
-    { k:'speed',  label:'Scroll Speed (turns/loop)', min:1, max:6, step:1, def:1 },
-    { k:'angle',  label:'Angle', min:0, max:345, step:15, def:45 },
-    { k:'sat',    label:'Saturation', min:0, max:1, step:.01, def:1 },
   ]},
   { id:'sparkle', name:'Sparkle', hint:'twinkling glitter — gold / white / rainbow stars', on:false, open:false, params:[
     { k:'amount',  label:'Amount', min:0, max:1, step:.01, def:.8, env:1 },
@@ -235,29 +230,27 @@ const FX = [
     { k:'shape',   label:'Shape', type:'select', def:0, options:[[0,'Star (4pt)'],[1,'Star (6pt)'],[2,'Sparkle (8pt)'],[3,'Dot'],[4,'Diamond'],[5,'Hexagon'],[6,'Star (5pt)'],[7,'Heart']] },
     { k:'tone',    label:'Tone', type:'select', def:0, options:[[0,'Gold'],[1,'White'],[2,'Rainbow'],[3,'Ice'],[4,'Pink'],[5,'Emerald'],[6,'Violet'],[8,'Fire'],[9,'Candy'],[10,'Festive'],[11,'Black (light bg)']] },
   ]},
-  { id:'burst', name:'Burst Lines', hint:'radial 集中線 — spinning speed-lines, pachinko hype', on:false, open:false, params:[
+  { id:'burst', name:'Burst Lines', hint:'radial 集中線, or a soft spinning ARGB fan — pick a Style', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.6, env:1 },
-    { k:'lines',  label:'Lines', min:0, max:1, step:.01, def:.5 },
+    { k:'style',  label:'Style', type:'select', def:0, options:[[0,'Speed Lines (集中線)'],[1,'Fan Blades (ARGB)']] },
+    { k:'lines',  label:'Lines', min:0, max:1, step:.01, def:.5, show:s=> s.style!==1 },
+    { k:'blades', label:'Blades', min:2, max:9, step:1, def:5, show:s=> s.style===1 },
+    { k:'streak', label:'Streak', min:0, max:1, step:.01, def:.6, show:s=> s.style===1 },
+    { k:'size',   label:'Size', min:0, max:1, step:.01, def:.5, show:s=> s.style===1 },
     { k:'jitter', label:'Width Jitter', min:0, max:1, step:.01, def:.6 },
-    { k:'reach',  label:'Reach (to centre)', min:0, max:1, step:.01, def:.7 },
+    { k:'reach',  label:'Reach (to centre)', min:0, max:1, step:.01, def:.7, show:s=> s.style!==1 },
     { k:'spin',   label:'Spin (turns/loop)', min:-1, max:1, step:.05, def:.15 },
     { k:'tone',   label:'Tone', type:'select', def:0, options:[[0,'Gold'],[1,'White'],[2,'Rainbow'],[3,'Ice'],[4,'Pink'],[5,'Emerald'],[6,'Violet'],[7,'Ink (dark)'],[8,'Fire'],[9,'Candy'],[10,'Festive'],[11,'Black']] },
     { k:'blend',  label:'Blend', type:'select', def:0, options:[[0,'Screen'],[1,'Add'],[2,'Overlay'],[3,'Solid'],[4,'Multiply (dark)']] },
+    { k:'cx',     label:'Hub X', min:0, max:1, step:.01, def:.5, show:s=> s.style===1 },
+    { k:'cy',     label:'Hub Y', min:0, max:1, step:.01, def:.5, show:s=> s.style===1 },
   ]},
-  { id:'edgeglow', name:'RGB Edge Glow', hint:'ARGB case-strip look — glowing LEDs chasing around the frame border', on:false, open:false, params:[
-    { k:'amount',  label:'Amount', min:0, max:1, step:.01, def:.7, env:1, envd:1 },
-    { k:'density', label:'LED Density', min:0, max:1, step:.01, def:.5 },
-    { k:'size',    label:'Glow Size', min:0, max:1, step:.01, def:.5 },
-    { k:'inset',   label:'Inset', min:0, max:1, step:.01, def:.02 },
-    { k:'speed',   label:'Chase Speed (turns/loop)', min:-6, max:6, step:1, def:1 },
-    { k:'tone',    label:'Tone', type:'select', def:2, options:[[0,'Gold'],[1,'White'],[2,'Rainbow'],[3,'Ice'],[4,'Pink'],[5,'Emerald'],[6,'Violet'],[8,'Fire'],[9,'Candy'],[10,'Festive']] },
-  ]},
-  { id:'circuit', name:'PCB Circuit Glow', hint:'glowing motherboard trace pattern overlaid on the frame — cyberpunk gaming-rig look', on:false, open:false, params:[
-    { k:'amount',  label:'Amount', min:0, max:1, step:.01, def:.6, env:1, envd:1 },
-    { k:'density', label:'Trace Density', min:0, max:1, step:.01, def:.5 },
-    { k:'glow',    label:'Glow', min:0, max:1, step:.01, def:.6 },
-    { k:'pulse',   label:'Pulse Speed (turns/loop)', min:0, max:6, step:1, def:1 },
-    { k:'tone',    label:'Tone', type:'select', def:0, options:[[0,'Cyan'],[1,'Magenta'],[2,'Green'],[3,'Rainbow']] },
+  { id:'edgeglow', name:'RGB Edge Glow', hint:'ARGB case-strip ambient bounce — colour bleeds in from the border like indirect light, no visible LEDs drawn', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.7, env:1, envd:1 },
+    { k:'reach',  label:'Reach', min:0, max:1, step:.01, def:.35 },
+    { k:'speed',  label:'Chase Speed (turns/loop)', min:-6, max:6, step:1, def:1 },
+    { k:'tone',   label:'Tone', type:'select', def:2, options:[[0,'Gold'],[1,'White'],[2,'Rainbow'],[3,'Ice'],[4,'Pink'],[5,'Emerald'],[6,'Violet'],[8,'Fire'],[9,'Candy'],[10,'Festive']] },
+    { k:'blend',  label:'Blend', type:'select', def:1, options:[[0,'Mix'],[1,'Screen'],[2,'Overlay'],[3,'Add']] },
   ]},
   // ---- Dream / Optics ----
   { id:'kaleido', name:'Kaleidoscope', hint:'mirror or rotate the frame into symmetric wedges', on:false, open:false, params:[
@@ -268,16 +261,6 @@ const FX = [
     { k:'angle',  label:'Source Angle', min:0, max:345, step:15, def:0 },
     { k:'spread', label:'Fan Spread', min:0, max:1, step:.01, def:.35 },
     { k:'zoom',   label:'Zoom Out', min:0, max:1, step:.01, def:.3 },
-    { k:'cx',     label:'Hub X', min:0, max:1, step:.01, def:.5 },
-    { k:'cy',     label:'Hub Y', min:0, max:1, step:.01, def:.5 },
-  ]},
-  { id:'fanblur', name:'ARGB Fan Blur', hint:'a spinning translucent fan with streaked RGB blades — ARGB case-fan look', on:false, open:false, params:[
-    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.6, env:1, envd:1 },
-    { k:'blades', label:'Blades', min:2, max:9, step:1, def:5 },
-    { k:'size',   label:'Size', min:0, max:1, step:.01, def:.5 },
-    { k:'streak', label:'Streak', min:0, max:1, step:.01, def:.6 },
-    { k:'spin',   label:'Spin (turns/loop)', min:-6, max:6, step:1, def:2 },
-    { k:'tone',   label:'Tone', type:'select', def:2, options:[[0,'Gold'],[1,'White'],[2,'Rainbow'],[3,'Ice'],[4,'Pink'],[5,'Emerald'],[6,'Violet'],[8,'Fire'],[9,'Candy'],[10,'Festive']] },
     { k:'cx',     label:'Hub X', min:0, max:1, step:.01, def:.5 },
     { k:'cy',     label:'Hub Y', min:0, max:1, step:.01, def:.5 },
   ]},
@@ -498,9 +481,9 @@ const FX_GROUPS = [
   ['Digital Glitch',        ['glitch','mosh','compress','dct','pixsort','databend','bmpmisread','wrongfmt','rle','gif','pixelate']],
   ['Analog Signal',         ['vhs','sync','roll','noise','ghost','dotcrawl','hum','herring','degauss']],
   ['Film / Display',        ['film','crt','hud','halftone']],
-  ['Light / Optics',        ['bloom','leak','sparkle','burst','prism','iris','starf','bokeh','foil','edgeglow','circuit']],
-  ['Distortion / Geometry', ['warp','melt','extrude','feedback','kaleido','liquid','fanblur']],
-  ['Colour / Material',     ['color','duotone','solarize','posterize','emboss','gold','rainbow','rgbwave','paper']],
+  ['Light / Optics',        ['bloom','leak','sparkle','burst','prism','iris','starf','bokeh','foil','edgeglow']],
+  ['Distortion / Geometry', ['warp','melt','extrude','feedback','kaleido','liquid']],
+  ['Colour / Material',     ['color','duotone','solarize','posterize','emboss','gold','rainbow','paper']],
   ['Video',                 ['time','playback','stale','synctear','interlace','chroma']],        // acts on the footage, not any one frame
   ['Global',                ['zoom','mask','motion']],                                           // whole-frame settings → lives in its own panel
 ];

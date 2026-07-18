@@ -199,43 +199,37 @@ if (gd.on && gd.amount>0){
 }
 
 function applyRainbow(w,h,phase){
-// ---- Rainbow: a full-spectrum gradient whose hues cycle over the loop, blended on top ----
+// ---- Rainbow: Full Gradient (hues cycling in place across a static gradient) or Travelling Wave
+//      (discrete glowing band(s) that genuinely move across the frame, fading to nothing between
+//      passes — the RGB-software colour-wave pulse look, e.g. Corsair iCUE). Both blend the same way. ----
 const rb = state.rainbow;
 if (rb.on && rb.amount>0){
-  const a=P('rainbow','amount'), ang=(rb.angle|0)*Math.PI/180;
-  const cx=w/2, cy=h/2, L=(Math.abs(Math.cos(ang))*w+Math.abs(Math.sin(ang))*h)/2;
-  const g=ctx.createLinearGradient(cx-Math.cos(ang)*L, cy-Math.sin(ang)*L, cx+Math.cos(ang)*L, cy+Math.sin(ang)*L);
-  const N=12, off=phase*(rb.speed|0||1);                                     // integer cycles/loop → seamless
-  for(let i=0;i<=N;i++) g.addColorStop(i/N, `hsl(${((i/N+off)%1)*360},100%,55%)`);
+  const a=P('rainbow','amount'), ang=(rb.angle|0)*Math.PI/180, style=rb.style|0;
   const BLEND=['overlay','screen','hue','soft-light'];
-  ctx.save(); ctx.globalCompositeOperation=BLEND[rb.blend|0]||'overlay'; ctx.globalAlpha=a;
-  ctx.fillStyle=g; ctx.fillRect(0,0,w,h); ctx.restore();
-}
-}
-
-function applyRgbWave(w,h,phase){
-// ---- RGB Wave Sweep: discrete glowing colour band(s) travelling across the frame, fading to
-//      nothing between them and drifting hue as they go — the RGB-software "colour wave" pulse
-//      look (Corsair iCUE etc). Unlike Rainbow (a full-bleed gradient tinting the whole image at
-//      once), most of the frame stays clear between passes; only the travelling band lights up. ----
-const rw = state.rgbwave;
-if (rw.on && rw.amount>0){
-  const amt=P('rgbwave','amount'), ang=(rw.angle|0)*Math.PI/180, cs=Math.cos(ang), sn=Math.sin(ang);
-  const freq=Math.max(1,rw.freq|0), speed=rw.speed|0||1, sat=rw.sat;
-  const span=(Math.abs(cs)*w+Math.abs(sn)*h)||1, off0=Math.min(0,cs)*w+Math.min(0,sn)*h;
-  const scroll=phase*speed, hueBase=(phase*speed*97)%360;                    // integer turns/loop → seamless
-  const id=ctx.getImageData(0,0,w,h), d=id.data;
-  for (let p=0,i=0;i<d.length;i+=4,p++){
-    const x=p%w, y=(p/w)|0, proj=(x*cs+y*sn-off0)/span;
-    const bandFrac=((proj*freq-scroll)%1+1)%1;
-    const dist=Math.abs(bandFrac-0.5)*2;                                     // 0 at band centre, 1 between bands
-    const bright=Math.max(0,1-dist*1.7);
-    if (bright<=0.002) continue;
-    const [r,g,b]=hsv(hueBase+bandFrac*50, sat, 1);
-    const str=amt*bright*bright;                                            // squared falloff → a crisp travelling pulse, not a soft wash
-    d[i]+=(r-d[i])*str; d[i+1]+=(g-d[i+1])*str; d[i+2]+=(b-d[i+2])*str;
+  if (style===1){
+    const cs=Math.cos(ang), sn=Math.sin(ang), freq=Math.max(1,rb.bands|0), speed=rb.speed|0||1;
+    const span=(Math.abs(cs)*w+Math.abs(sn)*h)||1, off0=Math.min(0,cs)*w+Math.min(0,sn)*h;
+    const scroll=phase*speed, hueBase=(phase*speed*97)%360;                  // integer turns/loop → seamless
+    sc.width=w; sc.height=h;
+    const im=sctx.createImageData(w,h), d=im.data;
+    for (let p=0,i=0;i<d.length;i+=4,p++){
+      const x=p%w, y=(p/w)|0, proj=(x*cs+y*sn-off0)/span;
+      const bandFrac=((proj*freq-scroll)%1+1)%1, dist=Math.abs(bandFrac-0.5)*2;
+      const bp=Math.max(0,1-dist*1.7); const bright=bp*bp;                   // squared falloff → a crisp travelling pulse
+      const [r,g,b]=hsv(hueBase+bandFrac*50, 1, 1);
+      d[i]=r; d[i+1]=g; d[i+2]=b; d[i+3]=Math.round(255*bright);
+    }
+    sctx.putImageData(im,0,0);
+    ctx.save(); ctx.globalCompositeOperation=BLEND[rb.blend|0]||'overlay'; ctx.globalAlpha=a;
+    ctx.drawImage(sc,0,0); ctx.restore();
+  } else {
+    const cx=w/2, cy=h/2, L=(Math.abs(Math.cos(ang))*w+Math.abs(Math.sin(ang))*h)/2;
+    const g=ctx.createLinearGradient(cx-Math.cos(ang)*L, cy-Math.sin(ang)*L, cx+Math.cos(ang)*L, cy+Math.sin(ang)*L);
+    const N=12, off=phase*(rb.speed|0||1);                                   // integer cycles/loop → seamless
+    for(let i=0;i<=N;i++) g.addColorStop(i/N, `hsl(${((i/N+off)%1)*360},100%,55%)`);
+    ctx.save(); ctx.globalCompositeOperation=BLEND[rb.blend|0]||'overlay'; ctx.globalAlpha=a;
+    ctx.fillStyle=g; ctx.fillRect(0,0,w,h); ctx.restore();
   }
-  ctx.putImageData(id,0,0);
 }
 }
 

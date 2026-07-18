@@ -205,60 +205,6 @@ function drawBokeh(x,y,s,col,alpha,shape){
   ctx.fill();
 }
 
-// PCB trace geometry is cached (rebuilt only when the canvas size or density changes) — cheap to
-// redraw every frame, expensive to re-walk the maze every frame for no visual gain.
-let circuitCache=null, circuitKey='';
-function buildCircuitTraces(w,h,density){
-  const cell=Math.max(8, Math.round(Math.min(w,h)/24));
-  const cols=Math.max(1,Math.floor(w/cell)), rows=Math.max(1,Math.floor(h/cell));
-  const walkers=Math.round(6+density*26), maxSteps=Math.round(4+density*10);
-  const segs=[], nodes=[];
-  for (let wi=0; wi<walkers; wi++){
-    let gx=Math.floor(rand(wi*3.1+1)*cols), gy=Math.floor(rand(wi*7.7+2)*rows);
-    let dir=Math.floor(rand(wi*5.3+3)*4);                        // 0=right,1=down,2=left,3=up
-    nodes.push([gx*cell+cell/2, gy*cell+cell/2]);
-    for (let s=0; s<maxSteps; s++){
-      if (rand(wi*11.3+s*2.9)<0.35) dir=(dir+(rand(wi*4.4+s)<0.5?1:3))%4;   // occasional turn (mostly straight → PCB look)
-      const dx=[1,0,-1,0][dir], dy=[0,1,0,-1][dir], ngx=gx+dx, ngy=gy+dy;
-      if (ngx<0||ngx>=cols||ngy<0||ngy>=rows) break;
-      segs.push([gx*cell+cell/2, gy*cell+cell/2, ngx*cell+cell/2, ngy*cell+cell/2]);
-      gx=ngx; gy=ngy;
-      if (rand(wi*13.1+s*3.7)<0.25) nodes.push([gx*cell+cell/2, gy*cell+cell/2]);   // occasional via/node
-    }
-  }
-  return { segs, nodes };
-}
-const CIRCUIT_TONES=[[70,230,255],[255,80,220],[110,255,140]];   // Cyan / Magenta / Green
-function applyCircuit(w,h,phase){
-// ---- PCB Circuit Glow: a glowing motherboard-trace maze overlaid on the frame, current pulsing
-//      through it — cyberpunk gaming-rig look. The maze itself is cached; only brightness/hue animate. ----
-const cc = state.circuit;
-if (cc.on && cc.amount>0){
-  const amt=P('circuit','amount'), density=cc.density, glow=cc.glow, tone=cc.tone|0, pulseSpd=cc.pulse|0;
-  const key=`${w}x${h}x${Math.round(density*20)}`;
-  if (key!==circuitKey){ circuitCache=buildCircuitTraces(w,h,density); circuitKey=key; }
-  const { segs, nodes } = circuitCache;
-  const pulse=0.55+0.45*Math.sin(phase*Math.PI*2*Math.max(1,pulseSpd));
-  const colorAt = i => tone===3 ? hsv((i*23+phase*pulseSpd*360)%360,0.9,1) : CIRCUIT_TONES[tone]||CIRCUIT_TONES[0];
-  sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h);
-  sctx.lineCap='round'; sctx.lineWidth=1.4;
-  for (let i=0;i<segs.length;i++){
-    const [x0,y0,x1,y1]=segs[i], col=colorAt(i);
-    sctx.strokeStyle=`rgb(${col[0]},${col[1]},${col[2]})`;
-    sctx.beginPath(); sctx.moveTo(x0,y0); sctx.lineTo(x1,y1); sctx.stroke();
-  }
-  for (let i=0;i<nodes.length;i++){
-    const [x,y]=nodes[i], col=colorAt(i*7);
-    const rg=sctx.createRadialGradient(x,y,0,x,y,5);
-    rg.addColorStop(0,`rgba(${col[0]},${col[1]},${col[2]},0.9)`); rg.addColorStop(1,`rgba(${col[0]},${col[1]},${col[2]},0)`);
-    sctx.fillStyle=rg; sctx.beginPath(); sctx.arc(x,y,5,0,7); sctx.fill();
-  }
-  ctx.save(); ctx.globalCompositeOperation='screen'; ctx.globalAlpha=amt*pulse;
-  ctx.filter = glow>0 ? `blur(${(glow*3).toFixed(1)}px)` : 'none';
-  ctx.drawImage(sc,0,0); ctx.filter='none'; ctx.restore();
-}
-}
-
 function applySparkle(w,h,phase){
 // ---- Sparkle: seeded twinkling glints, screened on top — each twinkles an integer number of times
 //      over the loop so it lands back where it started (seamless), positions fixed by the seed ----
@@ -301,75 +247,132 @@ function drawGlint(x,y,s,col,alpha,shape){
   else { for(let k=0;k<4;k++) ray(k*Math.PI/2, L); }                                                     // 4-point (default)
 }
 
-// walk a point t∈[0,1) clockwise around the rectangle [x0,y0]–[x1,y1]'s perimeter
-function perimeterPoint(t,x0,y0,x1,y1){
-  const dw=x1-x0, dh=y1-y0, total=Math.max(1e-6,2*(dw+dh));
-  let d=((t%1)+1)%1*total;
-  if (d<dw) return [x0+d,y0];
-  d-=dw; if (d<dh) return [x1,y0+d];
-  d-=dh; if (d<dw) return [x1-d,y1];
-  d-=dw; return [x0,y1-d];
+// composite one channel of `tint` over `base` by the named blend mode, at full strength (the
+// caller lerps toward this result by whatever opacity/falloff applies — same pattern real paint
+// programs use to let any blend mode work at partial opacity)
+function blendChannel(mode,base,tint){
+  switch(mode){
+    case 1: return 255-((255-base)*(255-tint))/255;                                 // Screen
+    case 2: return base<128 ? (2*base*tint)/255 : 255-(2*(255-base)*(255-tint))/255; // Overlay
+    case 3: return Math.min(255, base+tint);                                        // Add
+    default: return tint;                                                           // Mix
+  }
+}
+// which border a pixel is nearest, expressed as a fraction 0..1 walking clockwise from the
+// top-left — lets a border-hugging colour be looked up the same way perimeterPoint used to place
+// LEDs, but now driving a continuous glow instead of discrete shapes
+function edgeFraction(x,y,w,h){
+  const total=2*(w+h), dl=x, dr=w-1-x, dt=y, db=h-1-y, m=Math.min(dl,dr,dt,db);
+  if (m===dt) return x/total;
+  if (m===dr) return (w+y)/total;
+  if (m===db) return (w+h+(w-x))/total;
+  return (2*w+h+(h-y))/total;
 }
 function applyEdgeGlow(w,h,phase){
-// ---- RGB Edge Glow: an ARGB case-strip look — glowing LEDs at fixed positions around the frame
-//      border, their colours cycling through the loop so a rainbow band appears to chase around. ----
+// ---- RGB Edge Glow: ARGB case-strip AMBIENT bounce — colour bleeds in from the border like
+//      indirect light reflecting off nearby surfaces, no LED shapes drawn directly. ----
 const eg = state.edgeglow;
 if (eg.on && eg.amount>0){
-  const amt=P('edgeglow','amount'), tone=eg.tone|0, spd=eg.speed||0;
-  const N=Math.round(10+eg.density*70), size=4+eg.size*22, inset=eg.inset*Math.min(w,h)*0.5;
-  const x0=inset, y0=inset, x1=Math.max(x0+1,w-inset), y1=Math.max(y0+1,h-inset);
+  const amt=P('edgeglow','amount'), tone=eg.tone|0, spd=eg.speed||0, mode=eg.blend|0;
+  const reach=4+eg.reach*Math.min(w,h)*0.45;
   const shift=spd*phase;                                          // integer turns/loop → seamless
-  ctx.save(); ctx.globalCompositeOperation = HYPE_DARK.has(tone) ? 'multiply' : 'screen';
-  for (let i=0;i<N;i++){
-    const t=i/N, [x,y]=perimeterPoint(t,x0,y0,x1,y1);
-    const col=hypeColor(tone, t+shift, 0.9, N);
-    drawBokeh(x,y,size,col,amt,0);
+  const id=ctx.getImageData(0,0,w,h), d=id.data;
+  for (let p=0,i=0;i<d.length;i+=4,p++){
+    const x=p%w, y=(p/w)|0;
+    const dist=Math.min(x,w-1-x,y,h-1-y);
+    if (dist>=reach) continue;
+    const fall=1-dist/reach, str=amt*fall*fall;                   // squared falloff → concentrated near the edge
+    const t=edgeFraction(x,y,w,h), col=hypeColor(tone, t+shift, 0.9, 64);
+    d[i]  += (blendChannel(mode,d[i],  col[0])-d[i])  *str;
+    d[i+1]+= (blendChannel(mode,d[i+1],col[1])-d[i+1])*str;
+    d[i+2]+= (blendChannel(mode,d[i+2],col[2])-d[i+2])*str;
   }
-  ctx.restore();
+  ctx.putImageData(id,0,0);
 }
 }
 
 function applyBurst(w,h,phase){
-// ---- Burst / 集中線: radial speed-lines from the centre, faded in from a clear middle, screened on top.
-//      Spinning it slowly and seamlessly needs rotational symmetry, so a spinning burst uses uniform
-//      wedges (N-fold symmetric) and rotates by a whole number of line-spacings; a static burst (spin 0)
-//      keeps the irregular, jittered widths for a hand-drawn manga look. ----
+// ---- Burst / 集中線: two Styles sharing one wedge-drawing lineage.
+//      Speed Lines — radial lines from the centre, faded in from a clear middle, for the classic
+//      manga/pachinko look. Spinning it slowly and seamlessly needs rotational symmetry, so a
+//      spinning burst uses uniform wedges (N-fold symmetric) and rotates by a whole number of
+//      line-spacings; a static burst (spin 0) keeps the irregular, jittered widths for a
+//      hand-drawn feel.
+//      Fan Blades — fewer, wider blades faded from the hub outward with a trailing streak, an
+//      ARGB case-fan look. Each blade is drawn as an indirect glow (a gradient, bright near the
+//      hub fading to nothing at the tip) rather than a flat-filled shape, so no hard "light
+//      source" edge is ever drawn — it reads as bounced light, not a lit object. ----
 const bs = state.burst;
 if (bs.on && bs.amount>0){
-  const a=P('burst','amount'), cx=w/2, cy=h/2, R=Math.hypot(w,h)/2*1.1, TWO=Math.PI*2;
-  const N=Math.round(12+bs.lines*44), tone=bs.tone|0;
-  const spinT=bs.spin==null?0:bs.spin, spinning=Math.abs(spinT)>1e-6;
-  let k=Math.round(spinT*N); if (spinning && k===0) k=spinT>0?1:-1;          // snap to a line-spacing step
-  const rot=spinning ? k*(TWO/N)*phase : 0;                                  // multiple of 2π/N → seamless
-  sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h);
-  sctx.save(); sctx.translate(cx,cy); sctx.rotate(rot);
+  const a=P('burst','amount'), tone=bs.tone|0, style=bs.style|0, TWO=Math.PI*2;
   const jit = bs.jitter==null?0.6:bs.jitter;
-  for (let i=0;i<N;i++){
-    const ang=i*(TWO/N);
-    const frac=spinning ? (i/N)+rot/TWO : i/N;                              // colour/width by world position when spinning
-    // Width variation: per-wedge random when static; a smooth angle-periodic noise when spinning, so the
-    // widths ride the wedges through the loop and still match at the seam (integer harmonics = periodic).
-    const nz = spinning ? burstNoise(frac) : rand(i*7.3);
-    const half=(Math.PI/N)*0.55*(1 + jit*(nz*2-1)*0.9);
-    const col=hypeColor(tone, frac, 0.9, N);
-    sctx.fillStyle=`rgb(${col[0]},${col[1]},${col[2]})`;
-    sctx.beginPath(); sctx.moveTo(0,0);
-    sctx.lineTo(Math.cos(ang-half)*R, Math.sin(ang-half)*R);
-    sctx.lineTo(Math.cos(ang+half)*R, Math.sin(ang+half)*R);
-    sctx.closePath(); sctx.fill();
+  sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h);
+  if (style===1){
+    const cx=(bs.cx==null?0.5:bs.cx)*w, cy=(bs.cy==null?0.5:bs.cy)*h;
+    const N=Math.max(2,bs.blades|0);
+    const spinT=bs.spin==null?0:bs.spin, spinning=Math.abs(spinT)>1e-6;
+    let k=Math.round(spinT*N); if (spinning && k===0) k=spinT>0?1:-1;
+    const rot=spinning ? k*(TWO/N)*phase : 0;                                // multiple of 2π/N → seamless
+    const R=Math.hypot(w,h)*(0.08+(bs.size==null?0.5:bs.size)*0.6);          // covers well past the corners at max Size
+    const streak=bs.streak==null?0.6:bs.streak, K=1+Math.round(streak*8);
+    const dir=(k<0)?-1:1, half=(Math.PI/N)*0.34*(1+jit*0.35), step=(Math.PI/N)*0.5*(0.25+streak);
+    sctx.save(); sctx.translate(cx,cy);
+    for (let i=0;i<N;i++){
+      const baseAng=i*(TWO/N)+rot, frac=spinning ? (i/N)+rot/TWO : i/N;
+      const col=hypeColor(tone, frac, 0.9, N);
+      for (let kk=0;kk<K;kk++){
+        const ang=baseAng-dir*kk*step, alpha=(1-kk/K)*(K>1?0.5:0.85);
+        if (alpha<=0.01) continue;
+        const tipx=Math.cos(ang)*R, tipy=Math.sin(ang)*R;
+        const rg=sctx.createLinearGradient(0,0,tipx,tipy);                   // bright at the hub, gone by the tip — bounced light, not a drawn blade
+        rg.addColorStop(0, `rgba(${col[0]},${col[1]},${col[2]},${(0.85*alpha).toFixed(3)})`);
+        rg.addColorStop(1, `rgba(${col[0]},${col[1]},${col[2]},0)`);
+        sctx.fillStyle=rg;
+        sctx.beginPath(); sctx.moveTo(0,0);
+        sctx.lineTo(Math.cos(ang-half)*R, Math.sin(ang-half)*R);
+        sctx.lineTo(Math.cos(ang+half)*R, Math.sin(ang+half)*R);
+        sctx.closePath(); sctx.fill();
+      }
+    }
+    sctx.restore();
+  } else {
+    const cx=w/2, cy=h/2, R=Math.hypot(w,h)/2*1.1;
+    const N=Math.round(12+bs.lines*44);
+    const spinT=bs.spin==null?0:bs.spin, spinning=Math.abs(spinT)>1e-6;
+    let k=Math.round(spinT*N); if (spinning && k===0) k=spinT>0?1:-1;        // snap to a line-spacing step
+    const rot=spinning ? k*(TWO/N)*phase : 0;                                // multiple of 2π/N → seamless
+    sctx.save(); sctx.translate(cx,cy); sctx.rotate(rot);
+    for (let i=0;i<N;i++){
+      const ang=i*(TWO/N);
+      const frac=spinning ? (i/N)+rot/TWO : i/N;                            // colour/width by world position when spinning
+      // Width variation: per-wedge random when static; a smooth angle-periodic noise when spinning, so the
+      // widths ride the wedges through the loop and still match at the seam (integer harmonics = periodic).
+      const nz = spinning ? burstNoise(frac) : rand(i*7.3);
+      const half=(Math.PI/N)*0.55*(1 + jit*(nz*2-1)*0.9);
+      const col=hypeColor(tone, frac, 0.9, N);
+      sctx.fillStyle=`rgb(${col[0]},${col[1]},${col[2]})`;
+      sctx.beginPath(); sctx.moveTo(0,0);
+      sctx.lineTo(Math.cos(ang-half)*R, Math.sin(ang-half)*R);
+      sctx.lineTo(Math.cos(ang+half)*R, Math.sin(ang+half)*R);
+      sctx.closePath(); sctx.fill();
+    }
+    sctx.restore();
+    // Reach controls how far in from the rim the lines run: low = a thin ring near the edge (clear
+    // middle), high = all the way to the centre. Lines always fade to nothing at the very centre.
+    const reach = bs.reach==null?0.7:bs.reach, s0=Math.min(0.9,0.5*(1-reach)), s1=Math.min(0.98,s0+0.45);
+    const rg=sctx.createRadialGradient(cx,cy,0, cx,cy,R);
+    rg.addColorStop(0,'rgba(0,0,0,0)');
+    if (s0>0.001) rg.addColorStop(s0,'rgba(0,0,0,0)');
+    rg.addColorStop(s1,'rgba(0,0,0,.85)'); rg.addColorStop(1,'rgba(0,0,0,1)');
+    sctx.globalCompositeOperation='destination-in'; sctx.fillStyle=rg; sctx.fillRect(0,0,w,h); sctx.globalCompositeOperation='source-over';
   }
-  sctx.restore();
-  // Reach controls how far in from the rim the lines run: low = a thin ring near the edge (clear
-  // middle), high = all the way to the centre. Lines always fade to nothing at the very centre.
-  const reach = bs.reach==null?0.7:bs.reach, s0=Math.min(0.9,0.5*(1-reach)), s1=Math.min(0.98,s0+0.45);
-  const rg=sctx.createRadialGradient(cx,cy,0, cx,cy,R);
-  rg.addColorStop(0,'rgba(0,0,0,0)');
-  if (s0>0.001) rg.addColorStop(s0,'rgba(0,0,0,0)');
-  rg.addColorStop(s1,'rgba(0,0,0,.85)'); rg.addColorStop(1,'rgba(0,0,0,1)');
-  sctx.globalCompositeOperation='destination-in'; sctx.fillStyle=rg; sctx.fillRect(0,0,w,h); sctx.globalCompositeOperation='source-over';
   const BLEND=['screen','lighter','overlay','source-over','multiply'];
   const pulse=0.8+0.2*Math.sin(phase*Math.PI*2);
-  ctx.save(); ctx.globalCompositeOperation=BLEND[bs.blend|0]||'screen'; ctx.globalAlpha=a*pulse; ctx.drawImage(sc,0,0); ctx.restore();
+  ctx.save(); ctx.globalCompositeOperation=BLEND[bs.blend|0]||'screen'; ctx.globalAlpha=a*pulse;
+  if (style===1) ctx.filter=`blur(${(3+(bs.size==null?0.5:bs.size)*5).toFixed(1)}px)`;   // extra softness → reads as indirect bounce, not a crisp cutout
+  ctx.drawImage(sc,0,0);
+  if (style===1) ctx.filter='none';
+  ctx.restore();
 }
 }
 

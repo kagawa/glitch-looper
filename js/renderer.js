@@ -105,8 +105,6 @@ function drawFrame(phase){    // phase in [0,1)
 
   applyKaleido(w,h,phase);
 
-  applyFanBlur(w,h,phase);
-
   applyLiquid(w,h,phase);
 
   applyMelt(w,h,phase);
@@ -126,8 +124,6 @@ function drawFrame(phase){    // phase in [0,1)
   applyGold(w,h,phase);
 
   applyRainbow(w,h,phase);
-
-  applyRgbWave(w,h,phase);
 
   applyPaper(w,h);
 
@@ -187,8 +183,6 @@ function drawFrame(phase){    // phase in [0,1)
 
   applyBokeh(w,h,phase);
 
-  applyCircuit(w,h,phase);
-
   const cr = applyCrtTube(w,h);
 
   applyBurst(w,h,phase);
@@ -197,7 +191,7 @@ function drawFrame(phase){    // phase in [0,1)
 
   applyEdgeGlow(w,h,phase);
 
-  applyRegionMask(w,h,phase);      // confines everything above, Burst/Sparkle/Circuit/Edge Glow included
+  applyRegionMask(w,h,phase);      // confines everything above, Burst/Sparkle/Edge Glow included
 
   applyFinalZoom(w,h);
 
