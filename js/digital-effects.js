@@ -584,7 +584,7 @@ function applyMosh(w,h,fseed,em=1){
       const sx = Math.floor(rand(seed*9.3+k)*(w-bw));
       const sy = Math.floor(rand(seed*1.7+k)*(h-bh));
       const [fvx,fvy] = sampleFlow(seed, (sx+bw/2)/w, (sy+bh/2)/h, GX, GY);
-      const dxo = Math.round(fvx*w*intensity), dyo = Math.round(fvy*h*intensity*0.4);   // flow drags mostly sideways, some vertical drift
+      const dxo = Math.round(fvx*w*intensity), dyo = Math.round(fvy*h*intensity*0.4*m.vert);   // flow drags sideways; Vertical Drift opts into vertical movement too (0 = purely horizontal, the original look)
       const reps = Math.round(1 + rand(seed*7.3+k)*(maxReps-1));
       for (let p=1;p<=reps;p++){
         const offx = dxo*p, offy = dyo*p;

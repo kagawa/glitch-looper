@@ -50,6 +50,7 @@ const FX = [
     { k:'intensity', label:'Intensity',   min:0, max:1, step:.01, def:.5, env:1, envd:1 },
     { k:'blocks',    label:'Blocks', min:0, max:1, step:.01, def:.5 },
     { k:'bloom',     label:'Bloom (max repeat)', min:1, max:4, step:1, def:1 },
+    { k:'vert',      label:'Vertical Drift', min:0, max:1, step:.01, def:0 },
     { k:'sort',      label:'Pixel Sort', min:0, max:1, step:.01, def:.3 },
     { k:'chaos',     label:'Jitter', min:0, max:1, step:.01, def:.6 },
     { k:'rate',      label:'Change Rate', min:1, max:30, step:1, def:10 },
