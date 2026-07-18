@@ -46,7 +46,7 @@ const FX = [
     { k:'sepia',   label:'Sepia', min:0, max:1, step:.01, def:.5 },
     { k:'burn',    label:'Burn/Flicker', min:0, max:1, step:.01, def:.3, env:1 },
   ]},
-  { id:'mosh', name:'Datamosh', hint:'mimics gif-corruption look (not real data corruption)', on:false, open:false, params:[
+  { id:'mosh', name:'Datamosh', hint:'block smear dragged along a shared flow field (optical-flow stand-in) + pixel sort + channel jitter — mimics P-frame corruption, not real data corruption', on:false, open:false, params:[
     { k:'intensity', label:'Intensity',   min:0, max:1, step:.01, def:.5, env:1, envd:1 },
     { k:'blocks',    label:'Blocks', min:0, max:1, step:.01, def:.5 },
     { k:'bloom',     label:'Bloom (max repeat)', min:1, max:4, step:1, def:1 },

@@ -503,6 +503,23 @@ if (bpl.on){
 }
 }
 // ---------- datamosh: block smear + pixel sort + channel corruption ----------
+// A coarse grid of random motion vectors, bilinear-interpolated — a lightweight optical-flow
+// stand-in. Real datamosh drags content along motion vectors estimated from neighbouring frames,
+// so nearby blocks move together in a coherent sweep rather than jumping to unrelated offsets;
+// this gives block displacement that same coherent, melting/peeling character.
+function flowVec(seed,gx,gy){
+  const a = rand(seed*31.7+gx*13.1+gy*29.3+3)*Math.PI*2, mag = rand(seed*17.3+gx*7.7+gy*11.3+50);
+  return [Math.cos(a)*mag, Math.sin(a)*mag];
+}
+function sampleFlow(seed,u,v,GX,GY){
+  const fx=u*(GX-1), fy=v*(GY-1), gx0=Math.floor(fx), gy0=Math.floor(fy), tx=fx-gx0, ty=fy-gy0;
+  const gx1=Math.min(GX-1,gx0+1), gy1=Math.min(GY-1,gy0+1);
+  const v00=flowVec(seed,gx0,gy0), v10=flowVec(seed,gx1,gy0), v01=flowVec(seed,gx0,gy1), v11=flowVec(seed,gx1,gy1);
+  return [
+    v00[0]*(1-tx)*(1-ty)+v10[0]*tx*(1-ty)+v01[0]*(1-tx)*ty+v11[0]*tx*ty,
+    v00[1]*(1-tx)*(1-ty)+v10[1]*tx*(1-ty)+v01[1]*(1-tx)*ty+v11[1]*tx*ty,
+  ];
+}
 // seed varies per frame; higher chaos = seed jumps more => different breakage each frame
 function applyMosh(w,h,fseed,em=1){
   const m = state.mosh;
@@ -512,29 +529,34 @@ function applyMosh(w,h,fseed,em=1){
   const d = id.data;
   const src = new Uint8ClampedArray(d);        // snapshot to read from
 
-  // 1) block displacement (datamosh smear)
+  // 1) block displacement (datamosh smear), dragged along a shared flow field
   //    Bloom mimics P-frame duplication: the same motion vector is applied over and over, so the
   //    block content is dragged another step each time and leaves a copy behind at every stop —
   //    the stretched, trailing look of a real datamosh. It is a ceiling, not a fixed count: each
   //    block draws its own repeat count from 1..Bloom, so the trails come out uneven. 1 = every
-  //    block applied once (a plain displacement).
+  //    block applied once (a plain displacement). Chaos also sets the flow grid's turbulence: calm
+  //    = a few broad coherent sweeps, chaotic = many small swirling ones.
   if (m.blocks>0){
     const n = Math.floor(1 + m.blocks*10*intensity);
     const maxReps = Math.max(1, m.bloom|0);
+    const GX = 3+Math.round(m.chaos*5), GY = 2+Math.round(m.chaos*3);
     for (let k=0;k<n;k++){
       const bw = Math.max(4, Math.floor((0.08+0.35*rand(seed*3.1+k))*w));
       const bh = Math.max(2, Math.floor((0.02+0.14*rand(seed*5.7+k))*h));
       const sx = Math.floor(rand(seed*9.3+k)*(w-bw));
       const sy = Math.floor(rand(seed*1.7+k)*(h-bh));
-      const dxo = Math.floor((rand(seed*2.2+k)-0.5)*w*intensity);
+      const [fvx,fvy] = sampleFlow(seed, (sx+bw/2)/w, (sy+bh/2)/h, GX, GY);
+      const dxo = Math.round(fvx*w*intensity), dyo = Math.round(fvy*h*intensity*0.4);   // flow drags mostly sideways, some vertical drift
       const reps = Math.round(1 + rand(seed*7.3+k)*(maxReps-1));
       for (let p=1;p<=reps;p++){
-        const off = dxo*p;
+        const offx = dxo*p, offy = dyo*p;
         for (let y=0;y<bh;y++){
+          const ty = sy+y+offy;
+          if (ty<0||ty>=h) continue;
           for (let x=0;x<bw;x++){
-            const tx = sx+x+off;
+            const tx = sx+x+offx;
             if (tx<0||tx>=w) continue;
-            const si=((sy+y)*w+sx+x)*4, ti=((sy+y)*w+tx)*4;
+            const si=((sy+y)*w+sx+x)*4, ti=(ty*w+tx)*4;
             d[ti]=src[si]; d[ti+1]=src[si+1]; d[ti+2]=src[si+2];
           }
         }
