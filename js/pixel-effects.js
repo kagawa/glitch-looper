@@ -104,6 +104,7 @@ if (ht.on){
   const inkmap=ht.invert|0;
   const invert=(inkmap===1||inkmap===3), threshold=(inkmap===2||inkmap===3), mono=(inkmap===4);
   const dark=bgP.dark;
+  const fixedDots=(ht.dotmode|0)===1 && dark;
   const cos=Math.cos(angle), sin=Math.sin(angle);
   const cxC=w/2, cyC=h/2;
   // A rotated grid needs enough reach along both lattice axes to cover the canvas diagonal.
@@ -153,6 +154,7 @@ if (ht.on){
     return {r:r/n, g:g/n, b:b/n};
   };
   const litRad = (r,g,b,maxR) => {
+    if (fixedDots) return maxR*0.72;
     const lum=(r*0.3+g*0.59+b*0.11)/255;
     // dark bg → bright pixels big; light bg → dark pixels big; Invert flips that. The XOR-ish
     // (dark===invert) form is the shortest way to express those four combinations.
