@@ -245,6 +245,8 @@ const FX = [
   ]},
   { id:'pixelate', name:'Pixelate', hint:'mosaic / retro blocks (Envelope can pulse block size)', on:false, open:false, params:[
     { k:'size', label:'Block Size', min:1, max:48, step:1, def:8, env:1 },
+    { k:'shape', label:'Shape', type:'select', def:0, options:[[0,'Square'],[1,'Circle'],[2,'Triangle'],[3,'Hexagon'],[4,'Packed Round']] },
+    { k:'angle', label:'Grid Angle', min:-45, max:45, step:1, def:0 },
     { k:'mix',  label:'Mix', min:0, max:1, step:.01, def:1, env:1 },
     { k:'fade',  label:'Fade', type:'select', def:0,
       options:[[0,'Even'],[1,'Right'],[2,'Left'],[3,'Bottom'],[4,'Top'],[5,'Bright areas'],[6,'Dark areas']] },
