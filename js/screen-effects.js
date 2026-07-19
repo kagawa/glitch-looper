@@ -313,7 +313,7 @@ function applyEdgeGlow(w,h,phase){
 //      as a soft indirect glow rather than a crisp frame. Composited with a real canvas blend mode. ----
 const eg = state.edgeglow;
 if (!(eg.on && eg.amount>0)) return;
-const amt=P('edgeglow','amount'), tone=eg.tone|0, spd=eg.speed||0, mode=eg.blend|0, jitter=+eg.jitter||0;
+const amt=P('edgeglow','amount'), tone=eg.tone|0, spd=eg.speed||0, mode=eg.blend|0, jitter=+eg.jitter||0, segs=Math.max(2,eg.segments|0||8);
 const reach=Math.max(6, eg.reach*Math.min(w,h)*0.5);
 const shift=spd*phase, P4=2*(w+h), PAL=360;                       // integer turns/loop → seamless (shift wraps)
 const pal=new Array(PAL);                                         // per-frame colour ring → avoids a colour calc per pixel
@@ -326,8 +326,12 @@ for (let y=0;y<h;y++){
   for (let x=0;x<w;x++){
     const dl=x, dr=w-1-x;
     let lr=0,lg=0,lb=0, ws=0;                                     // additive light from each border in range
-    const vTop=reach*(1+jitter*.22*Math.sin(x*.071+y*.013+phase*6.283)), vRight=reach*(1+jitter*.22*Math.sin(y*.067+x*.017+phase*6.283+1.7));
-    const vBottom=reach*(1+jitter*.22*Math.sin(x*.059-y*.019+phase*6.283+3.1)), vLeft=reach*(1+jitter*.22*Math.sin(y*.083-x*.011+phase*6.283+4.6));
+    const topSeg=Math.floor(x/(w/segs)), rightSeg=Math.floor(y/(h/segs)), bottomSeg=Math.floor((w-1-x)/(w/segs)), leftSeg=Math.floor((h-1-y)/(h/segs));
+    const segNoise=(n,off)=>rand(n*17.31+off*41.7+9.2)*2-1;
+    const vTop=reach*(1+jitter*(.32*Math.sin(x*.071+y*.013+phase*6.283)+.38*segNoise(topSeg,0)));
+    const vRight=reach*(1+jitter*(.32*Math.sin(y*.067+x*.017+phase*6.283+1.7)+.38*segNoise(rightSeg,1)));
+    const vBottom=reach*(1+jitter*(.32*Math.sin(x*.059-y*.019+phase*6.283+3.1)+.38*segNoise(bottomSeg,2)));
+    const vLeft=reach*(1+jitter*(.32*Math.sin(y*.083-x*.011+phase*6.283+4.6)+.38*segNoise(leftSeg,3)));
     if (dt<vTop){ const q=(1-dt/vTop)**2,       c=col(x/P4);           lr+=c[0]*q; lg+=c[1]*q; lb+=c[2]*q; ws+=q; }
     if (dr<vRight){ const q=(1-dr/vRight)**2,       c=col((w+y)/P4);       lr+=c[0]*q; lg+=c[1]*q; lb+=c[2]*q; ws+=q; }
     if (db<vBottom){ const q=(1-db/vBottom)**2,       c=col((w+h+(w-x))/P4); lr+=c[0]*q; lg+=c[1]*q; lb+=c[2]*q; ws+=q; }

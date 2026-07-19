@@ -329,6 +329,7 @@ const FX = [
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.7, env:1, envd:1 },
     { k:'reach',  label:'Reach', min:0, max:1, step:.01, def:.35 },
     { k:'jitter', label:'Reach Variation', min:0, max:1, step:.01, def:0 },
+    { k:'segments', label:'Variation Segments', min:2, max:24, step:1, def:8, show:s=> s.jitter>0 },
     { k:'speed',  label:'Chase Speed (turns/loop)', min:-6, max:6, step:1, def:1 },
     { k:'tone',   label:'Tone', type:'select', def:2, options:[[0,'Gold'],[1,'White'],[2,'Rainbow'],[3,'Ice'],[4,'Pink'],[5,'Emerald'],[6,'Violet'],[8,'Fire'],[9,'Candy'],[10,'Festive']] },
     { k:'blend',  label:'Blend', type:'select', def:1, options:[[0,'Mix'],[1,'Screen'],[2,'Overlay'],[3,'Add']] },
