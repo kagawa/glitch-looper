@@ -405,7 +405,7 @@ const FX = [
   ]},
   { id:'halftone', name:'Halftone', hint:'dot-matrix / newsprint dots', on:false, open:false, params:[
     { k:'cell', label:'Cell Size', min:3, max:20, step:1, def:6 },
-    { k:'shape', label:'Shape', type:'select', def:0, options:[[0,'Circle'],[1,'Square'],[2,'Triangle'],[3,'Hexagon'],[4,'Line'],[5,'CMYK Screen']] },
+    { k:'shape', label:'Shape', type:'select', def:0, options:[[0,'Circle'],[1,'Square'],[2,'Triangle'],[3,'Hexagon'],[4,'Line'],[5,'CMYK Screen'],[6,'Packed Round']] },
     { k:'angle', label:'Grid Angle', min:-45, max:45, step:1, def:0 },
     { k:'bg',   label:'Background', type:'select', def:0, options:[[0,'Dark (LED)'],[1,'Light (print)'],[2,'None'],[3,'White LED'],[4,'Amber CRT'],[5,'Green Phosphor'],[6,'Blueprint'],[7,'Sepia'],[8,'Neon'],[9,'Riso']] },
     { k:'dotmode', label:'LED Pattern', type:'select', def:0, options:[[0,'Variable size'],[1,'Fixed size']] },
