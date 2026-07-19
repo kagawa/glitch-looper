@@ -313,7 +313,7 @@ function applyEdgeGlow(w,h,phase){
 //      as a soft indirect glow rather than a crisp frame. Composited with a real canvas blend mode. ----
 const eg = state.edgeglow;
 if (!(eg.on && eg.amount>0)) return;
-const amt=P('edgeglow','amount'), tone=eg.tone|0, spd=eg.speed||0, mode=eg.blend|0;
+const amt=P('edgeglow','amount'), tone=eg.tone|0, spd=eg.speed||0, mode=eg.blend|0, jitter=+eg.jitter||0;
 const reach=Math.max(6, eg.reach*Math.min(w,h)*0.5);
 const shift=spd*phase, P4=2*(w+h), PAL=360;                       // integer turns/loop → seamless (shift wraps)
 const pal=new Array(PAL);                                         // per-frame colour ring → avoids a colour calc per pixel
@@ -326,10 +326,12 @@ for (let y=0;y<h;y++){
   for (let x=0;x<w;x++){
     const dl=x, dr=w-1-x;
     let lr=0,lg=0,lb=0, ws=0;                                     // additive light from each border in range
-    if (dt<reach){ const q=(1-dt/reach)**2,       c=col(x/P4);           lr+=c[0]*q; lg+=c[1]*q; lb+=c[2]*q; ws+=q; }
-    if (dr<reach){ const q=(1-dr/reach)**2,       c=col((w+y)/P4);       lr+=c[0]*q; lg+=c[1]*q; lb+=c[2]*q; ws+=q; }
-    if (db<reach){ const q=(1-db/reach)**2,       c=col((w+h+(w-x))/P4); lr+=c[0]*q; lg+=c[1]*q; lb+=c[2]*q; ws+=q; }
-    if (dl<reach){ const q=(1-dl/reach)**2,       c=col((2*w+2*h-y)/P4); lr+=c[0]*q; lg+=c[1]*q; lb+=c[2]*q; ws+=q; }
+    const vTop=reach*(1+jitter*.22*Math.sin(x*.071+y*.013+phase*6.283)), vRight=reach*(1+jitter*.22*Math.sin(y*.067+x*.017+phase*6.283+1.7));
+    const vBottom=reach*(1+jitter*.22*Math.sin(x*.059-y*.019+phase*6.283+3.1)), vLeft=reach*(1+jitter*.22*Math.sin(y*.083-x*.011+phase*6.283+4.6));
+    if (dt<vTop){ const q=(1-dt/vTop)**2,       c=col(x/P4);           lr+=c[0]*q; lg+=c[1]*q; lb+=c[2]*q; ws+=q; }
+    if (dr<vRight){ const q=(1-dr/vRight)**2,       c=col((w+y)/P4);       lr+=c[0]*q; lg+=c[1]*q; lb+=c[2]*q; ws+=q; }
+    if (db<vBottom){ const q=(1-db/vBottom)**2,       c=col((w+h+(w-x))/P4); lr+=c[0]*q; lg+=c[1]*q; lb+=c[2]*q; ws+=q; }
+    if (dl<vLeft){ const q=(1-dl/vLeft)**2,       c=col((2*w+2*h-y)/P4); lr+=c[0]*q; lg+=c[1]*q; lb+=c[2]*q; ws+=q; }
     if (ws<=0) continue;
     const i=(y*w+x)*4;
     g[i]=lr/ws; g[i+1]=lg/ws; g[i+2]=lb/ws;                       // hue = coverage-weighted blend → smooth across corners

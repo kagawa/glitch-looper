@@ -530,7 +530,7 @@ if (rb.on && rb.amount>0){
     // Foil: fine diffraction bands modulated by picture luminance + a moving sheen across.
     // Reads on brighter areas (as a real hologram sticker only shows against light), so a dark
     // frame stays dark. Bands = band count, Sheen = strength of the sweeping specular highlight.
-    const cs=Math.cos(ang), sn=Math.sin(ang), dens=Math.max(1,rb.bands|0), speed=rb.speed|0||1;
+    const cs=Math.cos(ang), sn=Math.sin(ang), dens=Math.max(1,rb.bands|0), speed=rb.speed|0||1, tileN=Math.round(2+(+rb.tiles||0)*18);
     const span=(Math.abs(cs)*w+Math.abs(sn)*h)||1, off0=Math.min(0,cs)*w+Math.min(0,sn)*h;
     const sweep=((phase*speed)%1+1)%1;                                       // integer turns/loop → seamless
     const sheen=(+rb.sheen||0);
@@ -538,7 +538,9 @@ if (rb.on && rb.amount>0){
     for (let y=0;y<h;y++) for (let x=0;x<w;x++){
       const i=(y*w+x)*4, lum=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255;
       const proj=(x*cs+y*sn-off0)/span;
-      const c=hypeLerp(tone, proj*dens + phase*speed, 0.9);                  // palette-aware bands, hue cycles
+      const tx=Math.floor(x/w*tileN), ty=Math.floor(y/h*tileN), tcx=(tx+.5)/tileN-.5, tcy=(ty+.5)/tileN-.5;
+      const tilePhase=tileN>2 ? Math.hypot(tcx,tcy)*.9 + Math.atan2(tcy,tcx)/(Math.PI*2) : 0;
+      const c=hypeLerp(tone, proj*dens + phase*speed + tilePhase, 0.9);    // tile-local foil phase
       const band=0.5+0.5*Math.sin(proj*dens*Math.PI*4);                      // fine ripple within each band
       const shDist=Math.abs(((proj-sweep+1.5)%1)-0.5)*2, sh=Math.max(0,1-shDist*4)*sheen;
       const wc=Math.min(1, a*(0.3+0.7*lum)*(0.4+0.6*band) + a*sh*lum);
@@ -583,7 +585,7 @@ function applyStarFilter(w,h,phase){
 // ---- Star Filter: isolate highlights, streak them along a few ray directions, screen back on ----
 const st = state.starf;
 if (st.on && st.amount>0){
-  const amt=P('starf','amount'), thr=st.thresh, len=P('starf','length')*Math.max(w,h)*0.3;
+  const amt=P('starf','amount'), thr=st.thresh, len=P('starf','length')*Math.max(w,h)*0.3, colour=st.colour|0;
   if (len<1) return;
   const RAYS=[4,6,8,2][st.rays|0]||4, base=(st.angle|0)*Math.PI/180;
   // local-highlight pass: keep each pixel by how much brighter it is than its blurred surroundings,
@@ -597,7 +599,13 @@ if (st.on && st.amount>0){
   for (let i=0;i<og.length;i+=4){
     const lo=(og[i]*0.299+og[i+1]*0.587+og[i+2]*0.114)/255;
     const lb=(bl[i]*0.299+bl[i+1]*0.587+bl[i+2]*0.114)/255;
-    const g=Math.min(1, Math.max(0, lo-lb-thr*0.12)*gain);
+    let match=1;
+    if (colour>0){
+      const mx=Math.max(og[i],og[i+1],og[i+2]), mn=Math.min(og[i],og[i+1],og[i+2]), sat=mx?((mx-mn)/mx):0;
+      if (colour===8) match=sat<.18 ? 1 : 0;
+      else { const h=(Math.atan2(Math.sqrt(3)*(og[i+1]-og[i+2]),2*og[i]-og[i+1]-og[i+2])/ (Math.PI*2)+1)%1; const target=[0,.08,.17,.33,.5,.67,.83][colour-1]||0; let d=Math.abs(h-target); d=Math.min(d,1-d); match=Math.max(0,1-d/.11)*Math.min(1,sat*2); }
+    }
+    const g=Math.min(1, Math.max(0, lo-lb-thr*0.12)*gain)*match;
     b[i]=og[i]*g; b[i+1]=og[i+1]*g; b[i+2]=og[i+2]*g; b[i+3]=255;
   }
   sctx.putImageData(bp,0,0);

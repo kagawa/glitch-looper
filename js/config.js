@@ -293,6 +293,7 @@ const FX = [
     { k:'bands',   label:'Bands', min:1, max:12, step:1, def:2, show:s=> (s.style|0)!==0 },
     { k:'width',   label:'Wave Width', min:0, max:1, step:.01, def:.5, show:s=> (s.style|0)===1 },
     { k:'sheen',   label:'Sheen', min:0, max:1, step:.01, def:.5, show:s=> (s.style|0)===2 },
+    { k:'tiles',   label:'Tile Split', min:0, max:1, step:.01, def:0, show:s=> (s.style|0)===2 },
     { k:'speed',   label:'Cycle / Scroll Speed', min:1, max:6, step:1, def:1 },
     { k:'angle',   label:'Angle', min:0, max:345, step:15, def:45 },
     { k:'blend',   label:'Blend', type:'select', def:0, options:[[0,'Overlay'],[1,'Screen'],[2,'Hue (recolor)'],[3,'Soft']] },
@@ -327,6 +328,7 @@ const FX = [
   { id:'edgeglow', name:'Edge Glow', hint:'ambient border bounce — colour bleeds in from the edges like indirect light, no source drawn', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.7, env:1, envd:1 },
     { k:'reach',  label:'Reach', min:0, max:1, step:.01, def:.35 },
+    { k:'jitter', label:'Reach Variation', min:0, max:1, step:.01, def:0 },
     { k:'speed',  label:'Chase Speed (turns/loop)', min:-6, max:6, step:1, def:1 },
     { k:'tone',   label:'Tone', type:'select', def:2, options:[[0,'Gold'],[1,'White'],[2,'Rainbow'],[3,'Ice'],[4,'Pink'],[5,'Emerald'],[6,'Violet'],[8,'Fire'],[9,'Candy'],[10,'Festive']] },
     { k:'blend',  label:'Blend', type:'select', def:1, options:[[0,'Mix'],[1,'Screen'],[2,'Overlay'],[3,'Add']] },
@@ -355,6 +357,7 @@ const FX = [
     { k:'length', label:'Length', min:0, max:1, step:.01, def:.5, env:1 },
     { k:'rays',   label:'Rays', type:'select', def:0, options:[[0,'4-point'],[1,'6-point'],[2,'8-point'],[3,'Anamorphic']] },
     { k:'angle',  label:'Angle', min:0, max:345, step:15, def:45 },
+    { k:'colour', label:'Light Colour', type:'select', def:0, options:[[0,'Any'],[1,'Red'],[2,'Orange'],[3,'Yellow'],[4,'Green'],[5,'Cyan'],[6,'Blue'],[7,'Violet'],[8,'White']] },
   ]},
   { id:'iris', name:'Iridescent Film', hint:'oil-slick / soap-bubble rainbow on edges & tones', on:false, open:false, params:[
     { k:'amount',    label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
