@@ -359,7 +359,7 @@ function applyAura(w,h,phase){
 const au = state.aura;
 if (!(au.on && au.amount>0)) return;
 const amt=P('aura','amount'), tone=au.tone|0, blend=au.blend|0, mode=au.mode|0;
-const src=au.source|0, R0=Math.min(w,h)*(+au.radius||0.3);
+const src=au.source|0, anchorRadiusBoost=src<=9?2.5:1, R0=Math.min(w,h)*(+au.radius||0.3)*anchorRadiusBoost;
 const core=+au.core||0, soft=+au.soft||0, rings=mode===1?Math.max(1,au.rings|0):au.rings|0, rays=mode===2?Math.max(4,au.rays|0):au.rays|0;
 const flow=au.flow|0, spinT=+au.spin||0, pulse=+au.pulse||0;
 const streak=+au.streak||0;
@@ -446,9 +446,8 @@ for (let si=0;si<sources.length;si++){
   }
   // rays — soft triangular wedges (like Burst), coloured by world angle so a spin is seamless
   if (rays>0){
-    const rayLen = Rp*1.15, halfW = (TWO/rays)*0.16;
+    const rayLen = Rp*1.15, spacing=TWO/rays, halfW = Math.min(spacing*0.16, 0.11);
     for (let i=0;i<rays;i++){
-      const spacing=TWO/rays;
       const a = i*spacing + (rand(si*47.3+i*11.9+2.2)-.5)*spacing*.24 + rot;
       const frac = spinning ? (i/rays) + rot/TWO : (i/rays);
       const c = tone===7 && s.col ? s.col : hypeLerp(tone, frac, 0.95);
@@ -476,13 +475,19 @@ for (let si=0;si<sources.length;si++){
 
 // composite the whole layer under a light blur — enough to keep it reading as bounced light
 // without erasing the ring/ray structure (much lighter than before; Softness is the only knob).
-const blurPx = 1 + soft * 10;
+const blurPx = 2 + soft * 22;
 const BLEND=['overlay','screen','lighter','soft-light'];
 ctx.save();
 ctx.globalCompositeOperation = HYPE_DARK.has(tone) ? 'multiply' : (BLEND[blend]||'screen');
 ctx.filter=`blur(${blurPx.toFixed(1)}px)`;
 ctx.drawImage(sc, 0, 0);
 ctx.filter='none';
+if (soft>0.65){
+  ctx.globalAlpha=amt*(soft-.65)*0.35;
+  ctx.filter=`blur(${(blurPx*1.8).toFixed(1)}px)`;
+  ctx.drawImage(sc,0,0);
+  ctx.filter='none';
+}
 ctx.restore();
 }
 
