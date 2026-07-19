@@ -187,6 +187,33 @@ if (ht.on){
         paint(x, y, litRad(s.r,s.g,s.b,hr), s.r, s.g, s.b, 3, angle);
       }
     }
+  } else if (shape===4){
+    // Line screen: each row of the lattice is one parallel line whose thickness follows the
+    // brightness at every cell along it (the other classic halftone screen, alongside dots).
+    // Adjacent bars in the same row butt against each other so a smoothly-varying brightness
+    // reads as one continuous line; Grid Angle rotates the whole screen.
+    const nHalf = Math.ceil(halfDiag/cell) + 1;
+    const halfW = cell*0.5;                             // along the line — full cell so bars meet
+    const ax = cos*halfW, ay = sin*halfW;               // along-line half-extent (fixed)
+    for (let iy=-nHalf; iy<=nHalf; iy++){
+      for (let ix=-nHalf; ix<=nHalf; ix++){
+        const u=(ix+0.5)*cell, v=(iy+0.5)*cell;
+        const x=cxC + u*cos - v*sin, y=cyC + u*sin + v*cos;
+        if (x<-cell||x>w+cell||y<-cell||y>h+cell) continue;
+        const s=sampleAvg(x, y, cell*0.5);
+        const half = litRad(s.r,s.g,s.b, cell*0.5);      // across-line half-thickness
+        if (half<0.35) continue;
+        const bx = -sin*half, by = cos*half;              // across-line direction (variable)
+        sctx.fillStyle = (dark||whiteLed) ? `rgb(${s.r|0},${s.g|0},${s.b|0})` : '#111';
+        sctx.beginPath();
+        sctx.moveTo(x-ax-bx, y-ay-by);
+        sctx.lineTo(x+ax-bx, y+ay-by);
+        sctx.lineTo(x+ax+bx, y+ay+by);
+        sctx.lineTo(x-ax+bx, y-ay+by);
+        sctx.closePath();
+        sctx.fill();
+      }
+    }
   }
 
   ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.drawImage(sc,0,0); ctx.restore();
