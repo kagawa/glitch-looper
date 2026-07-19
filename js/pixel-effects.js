@@ -62,26 +62,53 @@ if (px2.on && px2.size>1){
 }
 
 function applyHalftone(w,h){
-// ---- halftone: rotatable dot/shape matrix (LED, newsprint, transparent, or white LED) ----
-// Grid Angle rotates the LATTICE, not the canvas — sample and dot share the same rotated
-// position so the picture stays put while the dot grid tilts. Triangles and hexagons are
-// placed at their true tessellation centroids so neighbours share edges rather than
-// overlapping inside square cells.
+// ---- halftone: rotatable dot/shape/line matrix with LED, print, CRT-phosphor, blueprint and
+//      sepia presets. Grid Angle rotates the LATTICE, not the canvas — sample and dot share the
+//      same rotated position so the picture stays put while the dot grid tilts. Triangles and
+//      hexagons sit at their true tessellation centroids so neighbours share edges.
 const ht = state.halftone;
 if (ht.on){
   ctx.setTransform(1,0,0,1,0,0);
-  const cell=Math.max(3,Math.round(ht.cell)), bg=ht.bg|0, dark=bg===0, whiteLed=bg===3;
+  const cell=Math.max(3,Math.round(ht.cell));
   // ^ round: param drift (D) can hand us a fractional cell → fractional pixel indices → NaN → black frame
   const before=ctx.getImageData(0,0,w,h), src=before.data;
   sc.width=w; sc.height=h; sctx.setTransform(1,0,0,1,0,0);
   sctx.globalCompositeOperation='source-over'; sctx.globalAlpha=1; sctx.filter='none';
   sctx.clearRect(0,0,w,h);
-  if (bg!==2){ sctx.fillStyle = (dark ? '#0a0a0a' : whiteLed ? '#fff' : '#f0ede6'); sctx.fillRect(0,0,w,h); }
-  const shape=ht.shape|0, angle=(+ht.angle||0)*Math.PI/180, inv=ht.invert|0;
+  // Background presets: {fill, ink, dark}. ink=null → dot uses the pixel's own colour; dark=true
+  // → bright pixels get big dots (LED-style). Fixed-ink presets keep single-hue phosphor / print
+  // ink regardless of the source colour, so Amber CRT / Green Phosphor / Blueprint / Sepia
+  // stay in character.
+  const BG_PRESETS = [
+    { fill:'#0a0a0a', ink:null,          dark:true  }, // 0 Dark (LED)
+    { fill:'#f0ede6', ink:[17,17,17],    dark:false }, // 1 Light (print)
+    { fill:null,      ink:null,          dark:true  }, // 2 None
+    { fill:'#ffffff', ink:null,          dark:true  }, // 3 White LED
+    { fill:'#160a00', ink:[255,176,0],   dark:true  }, // 4 Amber CRT
+    { fill:'#001505', ink:[80,255,110],  dark:true  }, // 5 Green Phosphor
+    { fill:'#0b2f5e', ink:[235,235,255], dark:true  }, // 6 Blueprint
+    { fill:'#f4e8d0', ink:[61,40,17],    dark:false }, // 7 Sepia
+  ];
+  const bgP = BG_PRESETS[ht.bg|0] || BG_PRESETS[0];
+  if (bgP.fill){ sctx.fillStyle=bgP.fill; sctx.fillRect(0,0,w,h); }
+  const shape=ht.shape|0, angle=(+ht.angle||0)*Math.PI/180;
+  // Ink Mapping (the field is still named `invert` for state-compat with earlier presets):
+  // 0 Normal · 1 Invert · 2 Threshold · 3 Threshold Invert · 4 Mono.
+  //   Invert flips which end of the tone range gets big dots.
+  //   Threshold cuts sizes to on/off — the pure b&w halftone with no size ramp.
+  //   Mono forces the dot to a neutral ink opposite of the bg's brightness, ignoring both the
+  //   pixel colour AND any fixed-ink phosphor, so a mono photocopy sits on any background.
+  const inkmap=ht.invert|0;
+  const invert=(inkmap===1||inkmap===3), threshold=(inkmap===2||inkmap===3), mono=(inkmap===4);
+  const dark=bgP.dark;
   const cos=Math.cos(angle), sin=Math.sin(angle);
   const cxC=w/2, cyC=h/2;
   // A rotated grid needs enough reach along both lattice axes to cover the canvas diagonal.
   const halfDiag = Math.hypot(w, h)/2 + cell*2;
+
+  const monoInk = dark ? 'rgb(238,238,238)' : 'rgb(34,34,34)';
+  const fixedInk = bgP.ink ? `rgb(${bgP.ink[0]},${bgP.ink[1]},${bgP.ink[2]})` : null;
+  const inkFor = (r,g,b) => mono ? monoInk : (fixedInk || `rgb(${r|0},${g|0},${b|0})`);
 
   const sampleAvg = (px, py, rr) => {
     const x0 = Math.max(0, Math.floor(px - rr));
@@ -99,12 +126,16 @@ if (ht.on){
     return {r:r/n, g:g/n, b:b/n};
   };
   const litRad = (r,g,b,maxR) => {
-    const lum=(r*0.3+g*0.59+b*0.11)/255, lit=inv?1-lum:lum;
-    return (dark||whiteLed ? Math.sqrt(lit) : Math.sqrt(1-lit)) * maxR;
+    const lum=(r*0.3+g*0.59+b*0.11)/255;
+    // dark bg → bright pixels big; light bg → dark pixels big; Invert flips that. The XOR-ish
+    // (dark===invert) form is the shortest way to express those four combinations.
+    let dotness = (dark===invert) ? 1-lum : lum;
+    if (threshold) dotness = dotness >= 0.5 ? 1 : 0;
+    return Math.sqrt(dotness) * maxR;
   };
   const paint = (px,py,rad,r,g,b,kind,rot=0) => {
     if (rad<0.35) return;
-    sctx.fillStyle = (dark||whiteLed) ? `rgb(${r|0},${g|0},${b|0})` : '#111';
+    sctx.fillStyle = inkFor(r,g,b);
     sctx.beginPath();
     if (kind===1){
       // Square rotates with the grid so tilted grids read as a rotated dot matrix, not a
@@ -204,7 +235,7 @@ if (ht.on){
         const half = litRad(s.r,s.g,s.b, cell*0.5);      // across-line half-thickness
         if (half<0.35) continue;
         const bx = -sin*half, by = cos*half;              // across-line direction (variable)
-        sctx.fillStyle = (dark||whiteLed) ? `rgb(${s.r|0},${s.g|0},${s.b|0})` : '#111';
+        sctx.fillStyle = inkFor(s.r, s.g, s.b);
         sctx.beginPath();
         sctx.moveTo(x-ax-bx, y-ay-by);
         sctx.lineTo(x+ax-bx, y+ay-by);
