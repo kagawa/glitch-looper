@@ -75,19 +75,22 @@ if (ht.on){
   sc.width=w; sc.height=h; sctx.setTransform(1,0,0,1,0,0);
   sctx.globalCompositeOperation='source-over'; sctx.globalAlpha=1; sctx.filter='none';
   sctx.clearRect(0,0,w,h);
-  // Background presets: {fill, ink, dark}. ink=null → dot uses the pixel's own colour; dark=true
-  // → bright pixels get big dots (LED-style). Fixed-ink presets keep single-hue phosphor / print
-  // ink regardless of the source colour, so Amber CRT / Green Phosphor / Blueprint / Sepia
-  // stay in character.
+  // Background presets: {fill, ink, dark, light, kind}. ink=null → dot uses the pixel's own
+  // colour; dark=true → bright pixels get big dots (LED-style size mapping — orthogonal to bg
+  // lightness). light=true → the bg fill itself is bright, so CMYK Screen picks the
+  // multiply-CMY print mode over the additive-RGB screen mode. `kind` opts into a custom ink
+  // transform in inkFor (neon → saturation boost; riso → warm/cool duotone spot colours).
   const BG_PRESETS = [
-    { fill:'#0a0a0a', ink:null,          dark:true  }, // 0 Dark (LED)
-    { fill:'#f0ede6', ink:[17,17,17],    dark:false }, // 1 Light (print)
-    { fill:null,      ink:null,          dark:true  }, // 2 None
-    { fill:'#ffffff', ink:null,          dark:true  }, // 3 White LED
-    { fill:'#160a00', ink:[255,176,0],   dark:true  }, // 4 Amber CRT
-    { fill:'#001505', ink:[80,255,110],  dark:true  }, // 5 Green Phosphor
-    { fill:'#0b2f5e', ink:[235,235,255], dark:true  }, // 6 Blueprint
-    { fill:'#f4e8d0', ink:[61,40,17],    dark:false }, // 7 Sepia
+    { fill:'#0a0a0a', ink:null,          dark:true,  light:false, kind:'pixel' }, // 0 Dark (LED)
+    { fill:'#f0ede6', ink:[17,17,17],    dark:false, light:true,  kind:'fixed' }, // 1 Light (print)
+    { fill:null,      ink:null,          dark:true,  light:false, kind:'pixel' }, // 2 None
+    { fill:'#ffffff', ink:null,          dark:true,  light:true,  kind:'pixel' }, // 3 White LED
+    { fill:'#160a00', ink:[255,176,0],   dark:true,  light:false, kind:'fixed' }, // 4 Amber CRT
+    { fill:'#001505', ink:[80,255,110],  dark:true,  light:false, kind:'fixed' }, // 5 Green Phosphor
+    { fill:'#0b2f5e', ink:[235,235,255], dark:true,  light:false, kind:'fixed' }, // 6 Blueprint
+    { fill:'#f4e8d0', ink:[61,40,17],    dark:false, light:true,  kind:'fixed' }, // 7 Sepia
+    { fill:'#06000f', ink:null,          dark:true,  light:false, kind:'neon'  }, // 8 Neon
+    { fill:'#f5f1e5', ink:null,          dark:false, light:true,  kind:'riso'  }, // 9 Riso
   ];
   const bgP = BG_PRESETS[ht.bg|0] || BG_PRESETS[0];
   if (bgP.fill){ sctx.fillStyle=bgP.fill; sctx.fillRect(0,0,w,h); }
@@ -107,8 +110,32 @@ if (ht.on){
   const halfDiag = Math.hypot(w, h)/2 + cell*2;
 
   const monoInk = dark ? 'rgb(238,238,238)' : 'rgb(34,34,34)';
+  const monoInkRgb = dark ? [238,238,238] : [34,34,34];
   const fixedInk = bgP.ink ? `rgb(${bgP.ink[0]},${bgP.ink[1]},${bgP.ink[2]})` : null;
-  const inkFor = (r,g,b) => mono ? monoInk : (fixedInk || `rgb(${r|0},${g|0},${b|0})`);
+  const kind = bgP.kind || 'pixel';
+  // Neon: push HSV saturation toward 1 so mid-saturated pixels read as vivid arcade / rave dots.
+  // Preserve the max channel so hue and brightness stay put; only the min channel is pulled down.
+  const neonInk = (r,g,b) => {
+    const mx = Math.max(r,g,b), mn = Math.min(r,g,b);
+    if (mx===0) return 'rgb(0,0,0)';
+    const s = (mx - mn) / mx;
+    const s2 = Math.min(1, s*1.9 + 0.12);      // boost + a small floor so pale pixels still pop
+    const denom = Math.max(1, mx - mn);
+    const scale = (mx - mx*(1 - s2)) / denom;
+    const nr = mx - (mx - r) * scale;
+    const ng = mx - (mx - g) * scale;
+    const nb = mx - (mx - b) * scale;
+    return `rgb(${nr|0},${ng|0},${nb|0})`;
+  };
+  // Riso: two flat spot inks picked by pixel warmth — warm pixels print in fluoro pink, cool
+  // pixels in teal, both on off-white paper (the duotone riso print look).
+  const risoInk = (r,g,b) => (r > b) ? 'rgb(255,68,130)' : 'rgb(48,190,210)';
+  const inkFor = (r,g,b) => {
+    if (mono) return monoInk;
+    if (kind==='neon') return neonInk(r,g,b);
+    if (kind==='riso') return risoInk(r,g,b);
+    return fixedInk || `rgb(${r|0},${g|0},${b|0})`;
+  };
 
   const sampleAvg = (px, py, rr) => {
     const x0 = Math.max(0, Math.floor(px - rr));
@@ -245,6 +272,51 @@ if (ht.on){
         sctx.fill();
       }
     }
+  } else if (shape===5){
+    // CMYK / RGB Screen: three sub-dots per cell for a real three-channel colour separation.
+    // On a light bg the ink is C/M/Y with 'multiply' — proper CMYK print colour where overlaps
+    // build toward black. On a dark bg it flips to R/G/B with 'lighter' — additive phosphor,
+    // the LCD/LED subpixel look. Ink Mapping's Invert flips per-channel strength, Threshold
+    // hard-clips each channel to on/off, Mono forces the sub-dots to a single neutral ink so
+    // the 3-per-cell pattern still reads as grayscale.
+    const nHalf = Math.ceil(halfDiag/cell) + 1;
+    const subR = cell * 0.34;
+    const off = cell * 0.22;
+    // Triangular arrangement of the 3 sub-positions inside each cell.
+    const positions = [
+      [-off*Math.cos(Math.PI/6),  off*Math.sin(Math.PI/6)],  // bottom-left
+      [ off*Math.cos(Math.PI/6),  off*Math.sin(Math.PI/6)],  // bottom-right
+      [0, -off],                                             // top
+    ];
+    const isPrint = !!bgP.light;
+    const inks = isPrint ? [[0,255,255],[255,0,255],[255,255,0]] : [[255,60,60],[60,255,60],[60,120,255]];
+    const prevBlend = sctx.globalCompositeOperation;
+    sctx.globalCompositeOperation = isPrint ? 'multiply' : 'lighter';
+    for (let iy=-nHalf; iy<=nHalf; iy++){
+      for (let ix=-nHalf; ix<=nHalf; ix++){
+        const u=(ix+0.5)*cell, v=(iy+0.5)*cell;
+        const x=cxC + u*cos - v*sin, y=cyC + u*sin + v*cos;
+        if (x<-cell||x>w+cell||y<-cell||y>h+cell) continue;
+        const s=sampleAvg(x, y, cell*0.5);
+        // Print → dot represents ink absorbed (255-channel); screen → dot represents light emitted.
+        const chans = isPrint ? [255-s.r, 255-s.g, 255-s.b] : [s.r, s.g, s.b];
+        for (let k=0; k<3; k++){
+          let strength = chans[k] / 255;
+          if (invert) strength = 1 - strength;
+          if (threshold) strength = strength >= 0.5 ? 1 : 0;
+          const rad = Math.sqrt(strength) * subR;
+          if (rad < 0.35) continue;
+          const [pu, pv] = positions[k];
+          const dx = pu*cos - pv*sin, dy = pu*sin + pv*cos;
+          const ink = mono ? monoInkRgb : inks[k];
+          sctx.fillStyle = `rgb(${ink[0]},${ink[1]},${ink[2]})`;
+          sctx.beginPath();
+          sctx.arc(x+dx, y+dy, rad, 0, Math.PI*2);
+          sctx.fill();
+        }
+      }
+    }
+    sctx.globalCompositeOperation = prevBlend;
   }
 
   ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.drawImage(sc,0,0); ctx.restore();

@@ -405,9 +405,9 @@ const FX = [
   ]},
   { id:'halftone', name:'Halftone', hint:'dot-matrix / newsprint dots', on:false, open:false, params:[
     { k:'cell', label:'Cell Size', min:3, max:20, step:1, def:6 },
-    { k:'shape', label:'Shape', type:'select', def:0, options:[[0,'Circle'],[1,'Square'],[2,'Triangle'],[3,'Hexagon'],[4,'Line']] },
+    { k:'shape', label:'Shape', type:'select', def:0, options:[[0,'Circle'],[1,'Square'],[2,'Triangle'],[3,'Hexagon'],[4,'Line'],[5,'CMYK Screen']] },
     { k:'angle', label:'Grid Angle', min:-45, max:45, step:1, def:0 },
-    { k:'bg',   label:'Background', type:'select', def:0, options:[[0,'Dark (LED)'],[1,'Light (print)'],[2,'None'],[3,'White LED'],[4,'Amber CRT'],[5,'Green Phosphor'],[6,'Blueprint'],[7,'Sepia']] },
+    { k:'bg',   label:'Background', type:'select', def:0, options:[[0,'Dark (LED)'],[1,'Light (print)'],[2,'None'],[3,'White LED'],[4,'Amber CRT'],[5,'Green Phosphor'],[6,'Blueprint'],[7,'Sepia'],[8,'Neon'],[9,'Riso']] },
     { k:'invert', label:'Ink Mapping', type:'select', def:0, options:[[0,'Normal'],[1,'Invert'],[2,'Threshold'],[3,'Threshold Invert'],[4,'Mono']] },
     { k:'mix',  label:'Mix', min:0, max:1, step:.01, def:1, env:1 },
     { k:'fade',  label:'Fade', type:'select', def:0,
