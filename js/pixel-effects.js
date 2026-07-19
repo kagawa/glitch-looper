@@ -75,6 +75,9 @@ if (px2.on && px2.size>1){
       } else if(shape===3){
         const hr=s/Math.sqrt(3), dx=hr*Math.sqrt(3), dy=hr*1.5, rows=Math.ceil(half/dy)+2, cols=Math.ceil(half/dx)+2;
         for(let row=-rows;row<=rows;row++) for(let col=-cols;col<=cols;col++) place(col*dx+(row&1)*dx*.5,row*dy,3);
+      } else if(shape===5){
+        const r=s*.5, dx=Math.sqrt(3)*r, dy=1.5*r, rows=Math.ceil(half/dy)+2, cols=Math.ceil(half/dx)+2;
+        for(let row=-rows;row<=rows;row++) for(let col=-cols;col<=cols;col++) place(col*dx+(row&1)*dx*.5,row*dy,1);
       } else {
         const n=Math.ceil(half/s)+2;
         for(let iy=-n;iy<=n;iy++) for(let ix=-n;ix<=n;ix++){
@@ -287,6 +290,16 @@ if (ht.on){
         const s=sampleAvg(x, y, hr*0.6);
         paint(x, y, litRad(s.r,s.g,s.b,hr), s.r, s.g, s.b, 3, angle);
       }
+    }
+  } else if (shape===7){
+    // Packed Circle: circles on a staggered hexagonal close-packing lattice.
+    const r=cell*.5, dx=Math.sqrt(3)*r, dy=1.5*r;
+    const halfRow=Math.ceil(halfDiag/dy)+1, halfCol=Math.ceil(halfDiag/dx)+1;
+    for(let row=-halfRow;row<=halfRow;row++) for(let col=-halfCol;col<=halfCol;col++){
+      const u=col*dx+(row&1)*dx*.5,v=row*dy;
+      const x=cxC+u*cos-v*sin,y=cyC+u*sin+v*cos;
+      if(x<-cell||x>w+cell||y<-cell||y>h+cell) continue;
+      const s=sampleAvg(x,y,r*.6); paint(x,y,litRad(s.r,s.g,s.b,r),s.r,s.g,s.b,0,angle);
     }
   } else if (shape===4){
     // Line screen: each row of the lattice is one parallel line whose thickness follows the
