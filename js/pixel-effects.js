@@ -56,27 +56,27 @@ if (px2.on && px2.size>1){
       sctx.setTransform(1,0,0,1,0,0); sctx.globalCompositeOperation='source-over'; sctx.clearRect(0,0,w,h);
       const c=Math.cos(angle), sn=Math.sin(angle), cx0=w/2, cy0=h/2;
       const sample=(x,y)=>{ const ix=Math.max(0,Math.min(w-1,Math.round(x))),iy=Math.max(0,Math.min(h-1,Math.round(y))),i=(iy*w+ix)*4; return [src[i],src[i+1],src[i+2]]; };
-      const draw=(x,y,col,kind)=>{ sctx.fillStyle=`rgb(${col[0]},${col[1]},${col[2]})`; const r=(kind===2||kind===3)?s/Math.sqrt(3):s*.5; sctx.beginPath();
+      const draw=(x,y,col,kind,rot=angle)=>{ sctx.fillStyle=`rgb(${col[0]},${col[1]},${col[2]})`; const r=(kind===2||kind===3)?s/Math.sqrt(3):s*.5; sctx.beginPath();
         if(kind===0){ const q=Math.cos(angle)*r, t=Math.sin(angle)*r, u=-t, v=q; sctx.moveTo(x-q-u,y-t-v); sctx.lineTo(x+q-u,y+t-v); sctx.lineTo(x+q+u,y+t+v); sctx.lineTo(x-q+u,y-t+v); sctx.closePath(); }
         else if(kind===1) sctx.arc(x,y,r,0,Math.PI*2);
-        else if(kind===2){ for(let k=0;k<3;k++){const a=angle-Math.PI/2+k*Math.PI*2/3,qx=x+Math.cos(a)*r,qy=y+Math.sin(a)*r;k?sctx.lineTo(qx,qy):sctx.moveTo(qx,qy);}sctx.closePath(); }
-        else if(kind===3){ for(let k=0;k<6;k++){const a=angle-Math.PI/2+k*Math.PI/3,qx=x+Math.cos(a)*r,qy=y+Math.sin(a)*r;k?sctx.lineTo(qx,qy):sctx.moveTo(qx,qy);}sctx.closePath(); }
+        else if(kind===2){ for(let k=0;k<3;k++){const a=rot-Math.PI/2+k*Math.PI*2/3,qx=x+Math.cos(a)*r,qy=y+Math.sin(a)*r;k?sctx.lineTo(qx,qy):sctx.moveTo(qx,qy);}sctx.closePath(); }
+        else if(kind===3){ for(let k=0;k<6;k++){const a=rot-Math.PI/2+k*Math.PI/3,qx=x+Math.cos(a)*r,qy=y+Math.sin(a)*r;k?sctx.lineTo(qx,qy):sctx.moveTo(qx,qy);}sctx.closePath(); }
         else sctx.roundRect(x-r,y-r,s,s,s*.48);
         sctx.fill(); };
-      const place=(u,v,kind)=>{ const x=cx0+u*c-v*sn,y=cy0+u*sn+v*c; if(x>=-s&&x<=w+s&&y>=-s&&y<=h+s) draw(x,y,sample(x,y),kind); };
+      const place=(u,v,kind,rot=angle)=>{ const x=cx0+u*c-v*sn,y=cy0+u*sn+v*c; if(x>=-s&&x<=w+s&&y>=-s&&y<=h+s) draw(x,y,sample(x,y),kind,rot); };
       const half=Math.hypot(w,h)/2+s;
       if(shape===2){
         const th=s*Math.sqrt(3)/2, rows=Math.ceil(half/th)+2, cols=Math.ceil(half/s)+2, tr=s/Math.sqrt(3);
         for(let row=-rows;row<=rows;row++) for(let col=-cols;col<=cols;col++){
           const shift=(row&1)?s*.5:0;
-          place((col+.5)*s+shift,row*th+th/3,2);
-          place((col+1)*s+shift,row*th+2*th/3,2);
+          place((col+.5)*s+shift,row*th+th/3,2,angle+Math.PI);
+          place((col+1)*s+shift,row*th+2*th/3,2,angle);
         }
       } else if(shape===3){
         const hr=s/Math.sqrt(3), dx=hr*Math.sqrt(3), dy=hr*1.5, rows=Math.ceil(half/dy)+2, cols=Math.ceil(half/dx)+2;
         for(let row=-rows;row<=rows;row++) for(let col=-cols;col<=cols;col++) place(col*dx+(row&1)*dx*.5,row*dy,3);
       } else if(shape===5){
-        const r=s*.5, dx=Math.sqrt(3)*r, dy=1.5*r, rows=Math.ceil(half/dy)+2, cols=Math.ceil(half/dx)+2;
+        const r=s*.5, dx=2*r, dy=Math.sqrt(3)*r, rows=Math.ceil(half/dy)+2, cols=Math.ceil(half/dx)+2;
         for(let row=-rows;row<=rows;row++) for(let col=-cols;col<=cols;col++) place(col*dx+(row&1)*dx*.5,row*dy,1);
       } else {
         const n=Math.ceil(half/s)+2;
