@@ -62,25 +62,136 @@ if (px2.on && px2.size>1){
 }
 
 function applyHalftone(w,h){
-// ---- halftone: dot-matrix (dark=LED colour dots / light=newsprint black dots) ----
+// ---- halftone: rotatable dot/shape matrix (LED, newsprint, transparent, or white LED) ----
+// Grid Angle rotates the LATTICE, not the canvas — sample and dot share the same rotated
+// position so the picture stays put while the dot grid tilts. Triangles and hexagons are
+// placed at their true tessellation centroids so neighbours share edges rather than
+// overlapping inside square cells.
 const ht = state.halftone;
 if (ht.on){
-  const cell=Math.max(3,Math.round(ht.cell)), dark=ht.bg===0, before=ctx.getImageData(0,0,w,h), src=before.data;
+  ctx.setTransform(1,0,0,1,0,0);
+  const cell=Math.max(3,Math.round(ht.cell)), bg=ht.bg|0, dark=bg===0, whiteLed=bg===3;
   // ^ round: param drift (D) can hand us a fractional cell → fractional pixel indices → NaN → black frame
-  ctx.fillStyle = dark ? '#0a0a0a' : '#f0ede6'; ctx.fillRect(0,0,w,h);
-  for (let cy=0;cy<h;cy+=cell){
-    for (let cx=0;cx<w;cx+=cell){
-      let r=0,g=0,b=0,n=0;
-      for (let y=cy;y<Math.min(h,cy+cell);y++) for (let x=cx;x<Math.min(w,cx+cell);x++){ const i=(y*w+x)*4; r+=src[i];g+=src[i+1];b+=src[i+2];n++; }
-      r/=n; g/=n; b/=n;
-      const lum=(r*0.3+g*0.59+b*0.11)/255;
-      const rad=(dark?Math.sqrt(lum):Math.sqrt(1-lum))*cell*0.62;
-      if (rad<0.35) continue;
-      ctx.fillStyle = dark ? `rgb(${r|0},${g|0},${b|0})` : '#111';
-      ctx.beginPath(); ctx.arc(cx+cell/2, cy+cell/2, rad, 0, 7); ctx.fill();
+  const before=ctx.getImageData(0,0,w,h), src=before.data;
+  sc.width=w; sc.height=h; sctx.setTransform(1,0,0,1,0,0);
+  sctx.globalCompositeOperation='source-over'; sctx.globalAlpha=1; sctx.filter='none';
+  sctx.clearRect(0,0,w,h);
+  if (bg!==2){ sctx.fillStyle = (dark ? '#0a0a0a' : whiteLed ? '#fff' : '#f0ede6'); sctx.fillRect(0,0,w,h); }
+  const shape=ht.shape|0, angle=(+ht.angle||0)*Math.PI/180, inv=ht.invert|0;
+  const cos=Math.cos(angle), sin=Math.sin(angle);
+  const cxC=w/2, cyC=h/2;
+  // A rotated grid needs enough reach along both lattice axes to cover the canvas diagonal.
+  const halfDiag = Math.hypot(w, h)/2 + cell*2;
+
+  const sampleAvg = (px, py, rr) => {
+    const x0 = Math.max(0, Math.floor(px - rr));
+    const y0 = Math.max(0, Math.floor(py - rr));
+    const x1 = Math.min(w, Math.ceil(px + rr));
+    const y1 = Math.min(h, Math.ceil(py + rr));
+    let r=0, g=0, b=0, n=0;
+    for (let yy=y0; yy<y1; yy++) for (let xx=x0; xx<x1; xx++){
+      const i=(yy*w+xx)*4; r+=src[i]; g+=src[i+1]; b+=src[i+2]; n++;
+    }
+    if (n===0){
+      const ix=Math.max(0,Math.min(w-1,px|0)), iy=Math.max(0,Math.min(h-1,py|0)), q=(iy*w+ix)*4;
+      return {r:src[q], g:src[q+1], b:src[q+2]};
+    }
+    return {r:r/n, g:g/n, b:b/n};
+  };
+  const litRad = (r,g,b,maxR) => {
+    const lum=(r*0.3+g*0.59+b*0.11)/255, lit=inv?1-lum:lum;
+    return (dark||whiteLed ? Math.sqrt(lit) : Math.sqrt(1-lit)) * maxR;
+  };
+  const paint = (px,py,rad,r,g,b,kind,rot=0) => {
+    if (rad<0.35) return;
+    sctx.fillStyle = (dark||whiteLed) ? `rgb(${r|0},${g|0},${b|0})` : '#111';
+    sctx.beginPath();
+    if (kind===1){
+      // Square rotates with the grid so tilted grids read as a rotated dot matrix, not a
+      // tilted lattice of axis-aligned squares.
+      const c=Math.cos(rot), s=Math.sin(rot);
+      const ax=c*rad, ay=s*rad, bx=-s*rad, by=c*rad;
+      sctx.moveTo(px-ax-bx, py-ay-by);
+      sctx.lineTo(px+ax-bx, py+ay-by);
+      sctx.lineTo(px+ax+bx, py+ay+by);
+      sctx.lineTo(px-ax+bx, py-ay+by);
+      sctx.closePath();
+    } else if (kind===2){
+      for(let k=0;k<3;k++){ const a=rot-Math.PI/2+k*Math.PI*2/3; const qx=px+Math.cos(a)*rad, qy=py+Math.sin(a)*rad; k?sctx.lineTo(qx,qy):sctx.moveTo(qx,qy); }
+      sctx.closePath();
+    } else if (kind===3){
+      for(let k=0;k<6;k++){ const a=rot-Math.PI/2+k*Math.PI/3; const qx=px+Math.cos(a)*rad, qy=py+Math.sin(a)*rad; k?sctx.lineTo(qx,qy):sctx.moveTo(qx,qy); }
+      sctx.closePath();
+    } else {
+      sctx.arc(px, py, rad, 0, Math.PI*2);
+    }
+    sctx.fill();
+  };
+
+  if (shape<2){
+    // Square lattice: iterate (ix, iy) in lattice space, rotate to canvas coords.
+    const nHalf = Math.ceil(halfDiag/cell) + 1;
+    for (let iy=-nHalf; iy<=nHalf; iy++){
+      for (let ix=-nHalf; ix<=nHalf; ix++){
+        const u=(ix+0.5)*cell, v=(iy+0.5)*cell;
+        const x=cxC + u*cos - v*sin, y=cyC + u*sin + v*cos;
+        if (x<-cell||x>w+cell||y<-cell||y>h+cell) continue;
+        const s=sampleAvg(x, y, cell*0.5);
+        paint(x, y, litRad(s.r,s.g,s.b,cell*0.62), s.r, s.g, s.b, shape, angle);
+      }
+    }
+  } else if (shape===2){
+    // Triangular tessellation. Each strip of height triH holds one down- and one up-pointing
+    // triangle per cell width, and adjacent strips are offset horizontally by cell/2 so the
+    // vertices line up — otherwise triangles overlap where the offset was missing.
+    const triH=cell*Math.sqrt(3)/2, triR=cell/Math.sqrt(3);
+    const halfRow=Math.ceil(halfDiag/triH)+1, halfCol=Math.ceil(halfDiag/cell)+1;
+    for (let row=-halfRow; row<=halfRow; row++){
+      const shift=(row&1) ? cell*0.5 : 0;
+      for (let col=-halfCol; col<=halfCol; col++){
+        // Down-pointing triangle: vertices (col*cell, 0)-((col+1)*cell, 0)-((col+.5)*cell, triH)
+        // in strip 0. Centroid at ((col+.5)*cell, triH/3).
+        {
+          const u=(col+0.5)*cell+shift, v=row*triH + triH/3;
+          const x=cxC + u*cos - v*sin, y=cyC + u*sin + v*cos;
+          if (x>=-cell&&x<=w+cell&&y>=-cell&&y<=h+cell){
+            const s=sampleAvg(x, y, triR*0.6);
+            paint(x, y, litRad(s.r,s.g,s.b,triR), s.r, s.g, s.b, 2, angle + Math.PI);
+          }
+        }
+        // Up-pointing triangle: vertices (cell, 0)-((.5)cell, triH)-((1.5)cell, triH).
+        // Centroid at (cell, 2*triH/3) — shifted by cell/2 from the down triangle.
+        {
+          const u=(col+1)*cell+shift, v=row*triH + 2*triH/3;
+          const x=cxC + u*cos - v*sin, y=cyC + u*sin + v*cos;
+          if (x>=-cell&&x<=w+cell&&y>=-cell&&y<=h+cell){
+            const s=sampleAvg(x, y, triR*0.6);
+            paint(x, y, litRad(s.r,s.g,s.b,triR), s.r, s.g, s.b, 2, angle);
+          }
+        }
+      }
+    }
+  } else if (shape===3){
+    // Pointy-top hexagonal tessellation. Rows stack at dy=1.5*hr; adjacent ROWS (not columns)
+    // are offset horizontally by dx/2 so corners meet. The previous per-column vertical offset
+    // was a flat-top pattern and left the pointy-top hexes overlapping.
+    const hr=cell*0.58, dx=hr*Math.sqrt(3), dy=hr*1.5;
+    const halfRow=Math.ceil(halfDiag/dy)+1, halfCol=Math.ceil(halfDiag/dx)+1;
+    for (let row=-halfRow; row<=halfRow; row++){
+      const rowShift=(row&1) ? dx*0.5 : 0;
+      for (let col=-halfCol; col<=halfCol; col++){
+        const u=col*dx+rowShift, v=row*dy;
+        const x=cxC + u*cos - v*sin, y=cyC + u*sin + v*cos;
+        if (x<-cell||x>w+cell||y<-cell||y>h+cell) continue;
+        const s=sampleAvg(x, y, hr*0.6);
+        paint(x, y, litRad(s.r,s.g,s.b,hr), s.r, s.g, s.b, 3, angle);
+      }
     }
   }
+
+  ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.drawImage(sc,0,0); ctx.restore();
   mixWithOriginal(w,h,before,P('halftone','mix'),ht.fade|0,ht.cover);
+  ctx.setTransform(1,0,0,1,0,0);
 }
 }
 

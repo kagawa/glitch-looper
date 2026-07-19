@@ -358,32 +358,39 @@ function applyAura(w,h,phase){
 //      phase offset so multi-source halos breathe out of sync. ----
 const au = state.aura;
 if (!(au.on && au.amount>0)) return;
-const amt=P('aura','amount'), tone=au.tone|0, blend=au.blend|0;
+const amt=P('aura','amount'), tone=au.tone|0, blend=au.blend|0, mode=au.mode|0;
 const src=au.source|0, R0=Math.min(w,h)*(+au.radius||0.3);
-const soft=+au.soft||0, rings=au.rings|0, rays=au.rays|0;
+const core=+au.core||0, soft=+au.soft||0, rings=mode===1?Math.max(1,au.rings|0):au.rings|0, rays=mode===2?Math.max(4,au.rays|0):au.rays|0;
 const flow=au.flow|0, spinT=+au.spin||0, pulse=+au.pulse||0;
+const streak=+au.streak||0;
 if (R0<=0) return;
 const TWO=Math.PI*2;
 
 // gather sources: {x, y, str∈(0..1] size/alpha weight, ph∈[0,1] pulse phase offset}
 const sources=[];
 if (src<=8){                                           // 0..8 → preset anchor (single)
-  const AP=[[.5,.5],[.5,0],[.5,1],[0,.5],[1,.5],[0,0],[1,0],[0,1],[1,1]];
-  sources.push({x:w*AP[src][0], y:h*AP[src][1], str:1, ph:0});
+    const AP=[[.5,.5],[.5,-.12],[.5,1.12],[-.12,.5],[1.12,.5],[-.12,-.12],[1.12,-.12],[-.12,1.12],[1.12,1.12]];
+  sources.push({x:w*AP[src][0], y:h*AP[src][1], str:1, ph:0, col:null});
 } else if (src===9){                                   // Custom XY (single)
-  sources.push({x:w*(+au.x||.5), y:h*(+au.y||.5), str:1, ph:0});
+    sources.push({x:w*(+au.x||.5), y:h*(+au.y||.5), str:1, ph:0, col:null});
 } else {                                               // 10/11/12 → picture-driven, Bokeh-style
-  const mode=src-10, N=Math.round(6+((+au.density)||0.5)*80), thr=+au.thresh||0.5;
+  const mode=src-10, N=Math.round(8+((+au.density)||0.5)*96), thr=+au.thresh||0.5;
   const id=ctx.getImageData(0,0,w,h), d=id.data;
-  for (let i=0;i<N;i++){
-    const px=(rand(i*12.9+1)*w)|0, py=(rand(i*78.2+3)*h)|0, si=(py*w+px)*4;
+  const candidates=[]; const step=Math.max(2,Math.round(Math.min(w,h)/48));
+  for (let py=step>>1;py<h;py+=step) for (let px=step>>1;px<w;px+=step){
+    const si=(py*w+px)*4;
     const R=d[si],G=d[si+1],B=d[si+2];
     const lum=(R*0.299+G*0.587+B*0.114)/255;
     const mx=Math.max(R,G,B), sat=mx?(mx-Math.min(R,G,B))/mx:0;
     const metric = mode===0 ? lum : mode===1 ? sat : Math.max(lum,sat);
-    if (metric<thr) continue;
-    const str=(metric-thr)/(1-thr+1e-3);
-    sources.push({x:px, y:py, str:0.5+str*0.7, ph:rand(i*5.7)});
+    if (metric>=thr) candidates.push({x:px,y:py,metric,R,G,B});
+  }
+  candidates.sort((a,b)=>b.metric-a.metric);
+  const want=Math.max(3,Math.round(3+(+au.density||0.5)*24)), minGap=Math.max(step*2,Math.min(w,h)*.06);
+  for (const c of candidates){ if (sources.length>=want) break;
+    if (sources.some(s=>Math.hypot(s.x-c.x,s.y-c.y)<minGap)) continue;
+    const str=(c.metric-thr)/(1-thr+1e-3);
+    sources.push({x:c.x,y:c.y,str:0.5+str*0.7,ph:rand(c.x*0.013+c.y*0.017),col:[c.R,c.G,c.B]});
   }
 }
 if (!sources.length) return;
@@ -395,28 +402,40 @@ const ringOff = ((phase*flow)%1+1)%1;
 let ks=0, rot=0;
 if (spinning){ ks=Math.round(spinT*rays); if (ks===0) ks=spinT>0?1:-1; rot=ks*(TWO/rays)*phase; }
 
-for (const s of sources){
+for (let si=0;si<sources.length;si++){
+  const s=sources[si];
   const cx=s.x, cy=s.y;
   // pulse per source — a full seamless cycle whose phase is offset by the source seed
   const breath = Math.sin((phase+s.ph)*TWO);
   const pulseA = (1 + pulse*0.55*breath) * s.str;
   const Rp = R0 * s.str * (1 + pulse*0.18*breath);
   // base soft halo — a gentle wash so rings/rays can read on top (kept low so they aren't drowned)
+  const sourceC = tone===7 && s.col ? s.col : baseC;
+  const cs = a => `rgba(${sourceC[0]|0},${sourceC[1]|0},${sourceC[2]|0},${Math.min(1,Math.max(0,a)).toFixed(3)})`;
+  // wide environmental wash, followed by a tighter halo and a small bright core
+  const wide=Rp*1.45, env=sctx.createRadialGradient(cx,cy,0,cx,cy,wide);
+  env.addColorStop(0,cs(amt*0.10*pulseA)); env.addColorStop(.55,cs(amt*0.06*pulseA)); env.addColorStop(1,cs(0));
+  sctx.fillStyle=env; sctx.fillRect(cx-wide,cy-wide,wide*2,wide*2);
   const bg = sctx.createRadialGradient(cx,cy,0, cx,cy,Rp);
-  const cs = a => `rgba(${baseC[0]|0},${baseC[1]|0},${baseC[2]|0},${Math.min(1,Math.max(0,a)).toFixed(3)})`;
   bg.addColorStop(0,    cs(amt*0.45*pulseA));
   bg.addColorStop(0.35, cs(amt*0.18*pulseA));
   bg.addColorStop(1,    cs(0));
   sctx.fillStyle=bg; sctx.fillRect(cx-Rp, cy-Rp, Rp*2, Rp*2);
+  if (core>0){ const cr=Math.max(1,Rp*(.06+.16*core)*(1+.12*pulse*breath));
+    const cg=sctx.createRadialGradient(cx,cy,0,cx,cy,cr); cg.addColorStop(0,cs(amt*.9*pulseA)); cg.addColorStop(.45,cs(amt*.4*pulseA)); cg.addColorStop(1,cs(0));
+    sctx.fillStyle=cg; sctx.fillRect(cx-cr,cy-cr,cr*2,cr*2);
+  }
   // rings — soft radial BANDS via gradient stops (never a hard line stroke), but narrow enough to still read as rings after the final blur
   if (rings>0){
     for (let i=0;i<rings;i++){
-      const t = ((i+ringOff)%rings)/rings, r=t*Rp;
-      const shell = Math.min(1,t*5) * (1-t)*(1-t) * 3.0;         // brighter shell so rings survive the final blur
+      const baseT = ((i+ringOff)%rings)/rings;
+      const ringJ = (rand(si*91.7+i*17.3+4.1)-.5) * (rings>1?.18:0);
+      const t = Math.max(.015,Math.min(.99,baseT + ringJ/rings)), r=t*Rp;
+      const shell = Math.min(1,t*5) * (1-t)*(1-t) * (2.7 + rand(si*13.1+i*3.7)*.8); // irregular brightness
       const alpha = amt * shell * pulseA;
       if (alpha<0.02) continue;
-      const c = hypeLerp(tone, t + phase*flow*0.5, 0.95);
-      const band = Math.max(1, Rp*0.07);                          // narrow band → the ring reads even after the blur softens the edges
+      const c = tone===7 && s.col ? s.col : hypeLerp(tone, t + phase*flow*0.5, 0.95);
+      const band = Math.max(1, Rp*(.045 + rand(si*31.2+i*2.9)*.055));
       const inner = Math.max(0, r-band), outer = r+band;
       const rg = sctx.createRadialGradient(cx,cy, inner, cx,cy, outer);
       rg.addColorStop(0,   `rgba(${c[0]|0},${c[1]|0},${c[2]|0},0)`);
@@ -429,21 +448,29 @@ for (const s of sources){
   if (rays>0){
     const rayLen = Rp*1.15, halfW = (TWO/rays)*0.16;
     for (let i=0;i<rays;i++){
-      const a = i*(TWO/rays) + rot;
+      const spacing=TWO/rays;
+      const a = i*spacing + (rand(si*47.3+i*11.9+2.2)-.5)*spacing*.24 + rot;
       const frac = spinning ? (i/rays) + rot/TWO : (i/rays);
-      const c = hypeLerp(tone, frac, 0.95);
-      const tipx = cx + Math.cos(a)*rayLen, tipy = cy + Math.sin(a)*rayLen;
-      const aa = Math.min(1, amt*0.9*pulseA);
+      const c = tone===7 && s.col ? s.col : hypeLerp(tone, frac, 0.95);
+      const rayScale=.78+rand(si*23.7+i*7.1)*.44;
+      const tipx = cx + Math.cos(a)*rayLen*rayScale, tipy = cy + Math.sin(a)*rayLen*rayScale;
+      const aa = Math.min(1, amt*(.72+rand(si*19.4+i*5.3)*.35)*pulseA);
       const rg = sctx.createLinearGradient(cx,cy, tipx,tipy);
       rg.addColorStop(0,   `rgba(${c[0]|0},${c[1]|0},${c[2]|0},${aa.toFixed(3)})`);
       rg.addColorStop(0.4, `rgba(${c[0]|0},${c[1]|0},${c[2]|0},${(aa*0.5).toFixed(3)})`);
       rg.addColorStop(1,   `rgba(${c[0]|0},${c[1]|0},${c[2]|0},0)`);
       sctx.fillStyle=rg;
       sctx.beginPath(); sctx.moveTo(cx,cy);
-      sctx.lineTo(cx+Math.cos(a-halfW)*rayLen, cy+Math.sin(a-halfW)*rayLen);
-      sctx.lineTo(cx+Math.cos(a+halfW)*rayLen, cy+Math.sin(a+halfW)*rayLen);
+      const hw=halfW*(.72+rand(si*61.8+i*2.1)*.5), rr=rayLen*rayScale;
+      sctx.lineTo(cx+Math.cos(a-hw)*rr, cy+Math.sin(a-hw)*rr);
+      sctx.lineTo(cx+Math.cos(a+hw)*rr, cy+Math.sin(a+hw)*rr);
       sctx.closePath(); sctx.fill();
     }
+  }
+  if (streak>0){
+    const dx=cx-w*.5, dy=cy-h*.5, dl=Math.hypot(dx,dy)||1, ex=cx+dx/dl*Rp*1.8, ey=cy+dy/dl*Rp*1.8;
+    const sg=sctx.createLinearGradient(cx,cy,ex,ey); sg.addColorStop(0,cs(amt*streak*.7*pulseA)); sg.addColorStop(.35,cs(amt*streak*.18*pulseA)); sg.addColorStop(1,cs(0));
+    sctx.save(); sctx.globalCompositeOperation='screen'; sctx.strokeStyle=sg; sctx.lineWidth=Math.max(1,Rp*.035); sctx.beginPath(); sctx.moveTo(cx,cy); sctx.lineTo(ex,ey); sctx.stroke(); sctx.restore();
   }
 }
 
@@ -659,4 +686,3 @@ function drawHUD(w,h,phase){
   slot(hd.br, w-pad, h-pad-base, 'right',  'up');
   ctx.restore();
 }
-
