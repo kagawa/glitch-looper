@@ -174,10 +174,10 @@ if (ht.on){
     return {r:r/n, g:g/n, b:b/n};
   };
   const litRad = (r,g,b,maxR) => {
-    // Packed Round is a true tile pattern: keep every tile at its full extent so the
-    // cardinal sides meet. Image variation is carried by the sampled ink colour.
-    if (shape===6) return maxR;
-    if (fixedDots) return shape===6 ? maxR : maxR*0.72;
+    // Packed Round stays fully packed for pixel-colour LED backgrounds. With a single
+    // fixed ink colour, preserve the halftone signal through tile size instead.
+    if (shape===6 && !fixedInk) return maxR;
+    if (fixedDots) return maxR*0.72;
     const lum=(r*0.3+g*0.59+b*0.11)/255;
     // dark bg → bright pixels big; light bg → dark pixels big; Invert flips that. The XOR-ish
     // (dark===invert) form is the shortest way to express those four combinations.
