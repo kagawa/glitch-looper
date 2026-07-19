@@ -475,7 +475,10 @@ for (let si=0;si<sources.length;si++){
 
 // composite the whole layer under a light blur — enough to keep it reading as bounced light
 // without erasing the ring/ray structure (much lighter than before; Softness is the only knob).
-const blurPx = 2 + soft * 22;
+// Aura should always read as light, never as a crisp geometric overlay. Keep a small
+// baseline blur even when the control is at zero; higher Softness still expands strongly.
+const softEff = Math.max(0.2, soft);
+const blurPx = 2 + softEff * 22;
 const BLEND=['overlay','screen','lighter','soft-light'];
 ctx.save();
 ctx.globalCompositeOperation = HYPE_DARK.has(tone) ? 'multiply' : (BLEND[blend]||'screen');
