@@ -219,18 +219,64 @@ function drawBokeh(x,y,s,col,alpha,shape){
 
 function applySparkle(w,h,phase){
 // ---- Sparkle: seeded twinkling glints, screened on top — each twinkles an integer number of times
-//      over the loop so it lands back where it started (seamless), positions fixed by the seed ----
+//      over the loop so it lands back where it started (seamless), positions fixed by the seed.
+//      Motion adds a per-glint trajectory that plays out during each twinkle's visible arc. For
+//      Fall / Rise / Drift, spawn positions are extended past the frame in the opposite direction so
+//      glints can enter from off-screen (rain / snow / drifting particles cross the picture instead
+//      of appearing mid-frame). Explode fans outward from centre. Life Pattern shapes the alpha/size
+//      curve or leaves a trail. Loop stays seamless because each glint's motion is contained inside
+//      one twinkle period and integer twinkles/loop returns to the same start at phase 1. ----
 const sp = state.sparkle;
 if (sp.on && sp.amount>0){
   const a=P('sparkle','amount'), N=Math.round(8+sp.density*90), base=2+sp.size*11, tone=sp.tone|0, spd=sp.speed|0||1, shape=sp.shape|0;
+  const motion=sp.motion|0, life=sp.life|0, dist=+(sp.dist||0), driftAng=(sp.angle||0)*Math.PI/180;
+  const D=Math.hypot(w,h), cx=w*0.5, cy=h*0.5;
+  // Precompute per-life travel vector for directional motions (Fall/Rise/Drift)
+  let vxm=0, vym=0;
+  if (motion===1)      { vym = dist*D; }                                              // Fall (down)
+  else if (motion===2) { vym = -dist*D; }                                             // Rise (up)
+  else if (motion===3) { vxm = dist*D*Math.cos(driftAng); vym = dist*D*Math.sin(driftAng); }   // Drift
+  const dirMotion = motion>=1 && motion<=3;
+  const xW = dirMotion ? w + Math.abs(vxm) : w;                                       // spawn box extended past
+  const yH = dirMotion ? h + Math.abs(vym) : h;                                       // frame in the reverse
+  const xShift = dirMotion ? Math.max(vxm, 0) : 0;                                    // direction so glints can
+  const yShift = dirMotion ? Math.max(vym, 0) : 0;                                    // enter from off-screen
   ctx.save(); ctx.globalCompositeOperation = HYPE_DARK.has(tone) ? 'multiply' : 'screen';   // dark tones darken (for light backgrounds)
   for (let i=0;i<N;i++){
     const freq=(1+(rand(i*3.3)*3|0))*spd, ph=rand(i*5.7+.2);   // integer twinkles/loop → seamless
-    const tw=Math.sin((phase*freq+ph)*Math.PI*2); if (tw<=0.05) continue;
+    const cyc=(phase*freq+ph)%1;                                // 0..1 within one twinkle period
+    const tw=Math.sin(cyc*Math.PI*2); if (tw<=0.05) continue;
     const pop=tw*tw;                                            // sharpen the flash
-    const x=rand(i*12.9+1)*w, y=rand(i*78.2+3)*h, s=base*(0.5+rand(i*9.1)*0.9);
+    const s0=base*(0.5+rand(i*9.1)*0.9);
     const col=hypeColor(tone, rand(i*2.1), 0.55);              // seed picks the hue / palette entry
-    drawGlint(x,y, s*pop, col, a*pop, shape);
+    if (motion===0){                                            // fast path — twinkle in place
+      const x=rand(i*12.9+1)*w, y=rand(i*78.2+3)*h;
+      drawGlint(x,y, s0*pop, col, a*pop, shape);
+      continue;
+    }
+    const prog=Math.min(1, cyc*2);                              // 0..1 across the visible arc (cyc ∈ [0, 0.5])
+    const x0=rand(i*12.9+1)*xW - xShift, y0=rand(i*78.2+3)*yH - yShift;
+    let vx, vy;
+    if (motion===4){                                            // Explode — from centre, per-glint direction
+      const dx=x0-cx, dy=y0-cy, len=Math.hypot(dx,dy)||1;
+      vx = dist*D*prog*dx/len; vy = dist*D*prog*dy/len;
+    } else {                                                    // Fall / Rise / Drift — shared vector
+      vx = vxm*prog; vy = vym*prog;
+    }
+    const x=x0+vx, y=y0+vy;
+    if (life===0){                                              // Fade — sin-shaped in/out
+      drawGlint(x,y, s0*pop, col, a*pop, shape);
+    } else if (life===1){                                       // Shrink — full at start, shrinks to nothing
+      const k=1-prog;
+      drawGlint(x,y, s0*k, col, a*k*Math.min(1,prog*8), shape); // brief fade-in so glint appears cleanly
+    } else if (life===2){                                       // Burst — grows and fades explosively
+      drawGlint(x,y, s0*(0.5+prog*prog*3), col, a*pop*(1-prog*prog), shape);
+    } else {                                                    // Trail — fading echoes behind
+      for (let t=0;t<4;t++){
+        const tp=t/3, tx=x-vx*tp, ty=y-vy*tp, k=(1-tp)*(1-tp)*pop;
+        drawGlint(tx,ty, s0*k*1.2, col, a*k, shape);
+      }
+    }
   }
   ctx.restore();
 }
@@ -297,6 +343,118 @@ ctx.globalCompositeOperation=COMP[mode]||'screen';
 ctx.globalAlpha=amt;
 ctx.filter=`blur(${Math.max(1,reach*0.2).toFixed(1)}px)`;        // soft bokeh-like bleed, no hard frame edge
 ctx.drawImage(sc,0,0);
+ctx.filter='none';
+ctx.restore();
+}
+
+function applyAura(w,h,phase){
+// ---- Aura: soft radial halos read as bounced/indirect light. Source picks WHERE the halos come
+//      from — a fixed anchor (Center / edges / corners / Custom XY, a single glow) OR the picture
+//      itself (Image Highlights / Saturated / Any — Bokeh-style: sample pixels, keep the ones that
+//      pass a metric, spawn one halo per hit). Rings and Rays are optional and layered on each
+//      source. The whole thing is drawn onto a scratch canvas and composited under a heavy blur,
+//      like Edge Glow, so it reads as ambient bounce rather than a crisp cutout. Ring Flow and
+//      Ray Spin are integer per loop for seamless animation; each source's Pulse gets a stable
+//      phase offset so multi-source halos breathe out of sync. ----
+const au = state.aura;
+if (!(au.on && au.amount>0)) return;
+const amt=P('aura','amount'), tone=au.tone|0, blend=au.blend|0;
+const src=au.source|0, R0=Math.min(w,h)*(+au.radius||0.3);
+const soft=+au.soft||0, rings=au.rings|0, rays=au.rays|0;
+const flow=au.flow|0, spinT=+au.spin||0, pulse=+au.pulse||0;
+if (R0<=0) return;
+const TWO=Math.PI*2;
+
+// gather sources: {x, y, str∈(0..1] size/alpha weight, ph∈[0,1] pulse phase offset}
+const sources=[];
+if (src<=8){                                           // 0..8 → preset anchor (single)
+  const AP=[[.5,.5],[.5,0],[.5,1],[0,.5],[1,.5],[0,0],[1,0],[0,1],[1,1]];
+  sources.push({x:w*AP[src][0], y:h*AP[src][1], str:1, ph:0});
+} else if (src===9){                                   // Custom XY (single)
+  sources.push({x:w*(+au.x||.5), y:h*(+au.y||.5), str:1, ph:0});
+} else {                                               // 10/11/12 → picture-driven, Bokeh-style
+  const mode=src-10, N=Math.round(6+((+au.density)||0.5)*80), thr=+au.thresh||0.5;
+  const id=ctx.getImageData(0,0,w,h), d=id.data;
+  for (let i=0;i<N;i++){
+    const px=(rand(i*12.9+1)*w)|0, py=(rand(i*78.2+3)*h)|0, si=(py*w+px)*4;
+    const R=d[si],G=d[si+1],B=d[si+2];
+    const lum=(R*0.299+G*0.587+B*0.114)/255;
+    const mx=Math.max(R,G,B), sat=mx?(mx-Math.min(R,G,B))/mx:0;
+    const metric = mode===0 ? lum : mode===1 ? sat : Math.max(lum,sat);
+    if (metric<thr) continue;
+    const str=(metric-thr)/(1-thr+1e-3);
+    sources.push({x:px, y:py, str:0.5+str*0.7, ph:rand(i*5.7)});
+  }
+}
+if (!sources.length) return;
+
+sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h);
+const baseC = hypeLerp(tone, phase*flow*0.5, 0.6);
+const spinning = rays>0 && Math.abs(spinT)>1e-6;
+const ringOff = ((phase*flow)%1+1)%1;
+let ks=0, rot=0;
+if (spinning){ ks=Math.round(spinT*rays); if (ks===0) ks=spinT>0?1:-1; rot=ks*(TWO/rays)*phase; }
+
+for (const s of sources){
+  const cx=s.x, cy=s.y;
+  // pulse per source — a full seamless cycle whose phase is offset by the source seed
+  const breath = Math.sin((phase+s.ph)*TWO);
+  const pulseA = (1 + pulse*0.55*breath) * s.str;
+  const Rp = R0 * s.str * (1 + pulse*0.18*breath);
+  // base soft halo — a gentle wash so rings/rays can read on top (kept low so they aren't drowned)
+  const bg = sctx.createRadialGradient(cx,cy,0, cx,cy,Rp);
+  const cs = a => `rgba(${baseC[0]|0},${baseC[1]|0},${baseC[2]|0},${Math.min(1,Math.max(0,a)).toFixed(3)})`;
+  bg.addColorStop(0,    cs(amt*0.45*pulseA));
+  bg.addColorStop(0.35, cs(amt*0.18*pulseA));
+  bg.addColorStop(1,    cs(0));
+  sctx.fillStyle=bg; sctx.fillRect(cx-Rp, cy-Rp, Rp*2, Rp*2);
+  // rings — soft radial BANDS via gradient stops (never a hard line stroke), but narrow enough to still read as rings after the final blur
+  if (rings>0){
+    for (let i=0;i<rings;i++){
+      const t = ((i+ringOff)%rings)/rings, r=t*Rp;
+      const shell = Math.min(1,t*5) * (1-t)*(1-t) * 3.0;         // brighter shell so rings survive the final blur
+      const alpha = amt * shell * pulseA;
+      if (alpha<0.02) continue;
+      const c = hypeLerp(tone, t + phase*flow*0.5, 0.95);
+      const band = Math.max(1, Rp*0.07);                          // narrow band → the ring reads even after the blur softens the edges
+      const inner = Math.max(0, r-band), outer = r+band;
+      const rg = sctx.createRadialGradient(cx,cy, inner, cx,cy, outer);
+      rg.addColorStop(0,   `rgba(${c[0]|0},${c[1]|0},${c[2]|0},0)`);
+      rg.addColorStop(0.5, `rgba(${c[0]|0},${c[1]|0},${c[2]|0},${Math.min(1,alpha).toFixed(3)})`);
+      rg.addColorStop(1,   `rgba(${c[0]|0},${c[1]|0},${c[2]|0},0)`);
+      sctx.fillStyle=rg; sctx.fillRect(cx-outer, cy-outer, outer*2, outer*2);
+    }
+  }
+  // rays — soft triangular wedges (like Burst), coloured by world angle so a spin is seamless
+  if (rays>0){
+    const rayLen = Rp*1.15, halfW = (TWO/rays)*0.16;
+    for (let i=0;i<rays;i++){
+      const a = i*(TWO/rays) + rot;
+      const frac = spinning ? (i/rays) + rot/TWO : (i/rays);
+      const c = hypeLerp(tone, frac, 0.95);
+      const tipx = cx + Math.cos(a)*rayLen, tipy = cy + Math.sin(a)*rayLen;
+      const aa = Math.min(1, amt*0.9*pulseA);
+      const rg = sctx.createLinearGradient(cx,cy, tipx,tipy);
+      rg.addColorStop(0,   `rgba(${c[0]|0},${c[1]|0},${c[2]|0},${aa.toFixed(3)})`);
+      rg.addColorStop(0.4, `rgba(${c[0]|0},${c[1]|0},${c[2]|0},${(aa*0.5).toFixed(3)})`);
+      rg.addColorStop(1,   `rgba(${c[0]|0},${c[1]|0},${c[2]|0},0)`);
+      sctx.fillStyle=rg;
+      sctx.beginPath(); sctx.moveTo(cx,cy);
+      sctx.lineTo(cx+Math.cos(a-halfW)*rayLen, cy+Math.sin(a-halfW)*rayLen);
+      sctx.lineTo(cx+Math.cos(a+halfW)*rayLen, cy+Math.sin(a+halfW)*rayLen);
+      sctx.closePath(); sctx.fill();
+    }
+  }
+}
+
+// composite the whole layer under a light blur — enough to keep it reading as bounced light
+// without erasing the ring/ray structure (much lighter than before; Softness is the only knob).
+const blurPx = 1 + soft * 10;
+const BLEND=['overlay','screen','lighter','soft-light'];
+ctx.save();
+ctx.globalCompositeOperation = HYPE_DARK.has(tone) ? 'multiply' : (BLEND[blend]||'screen');
+ctx.filter=`blur(${blurPx.toFixed(1)}px)`;
+ctx.drawImage(sc, 0, 0);
 ctx.filter='none';
 ctx.restore();
 }

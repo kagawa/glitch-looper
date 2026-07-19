@@ -33,6 +33,13 @@ let audioFrames = [], audioReady = false, audioTimer = null, audioToken = 0;
 const asrc = document.createElement('canvas');
 const actx = asrc.getContext('2d', { willReadFrequently:true });
 
+// Real-codec stages are rebuilt as one dependency chain. One shared blend canvas applies each
+// stage's Output Mix before its frames become the input to the next codec.
+let codecPipelineTimer = null, codecPipelineToken = 0;
+const codecBlend = document.createElement('canvas');
+const codecBlendCtx = codecBlend.getContext('2d');
+const BAKED_CODEC_IDS = ['jpeg','png','webp','gifg','audio'];
+
 // ---------- build UI ----------
 const controls = document.getElementById('controls');   // wrapper: queries/delegation span both inner panels
 const fxPanel = document.getElementById('fxPanel');      // per-frame image effects
@@ -162,22 +169,14 @@ function buildUI(){
     r.addEventListener('input', ()=>{
       state[r.dataset.fx][r.dataset.k] = parseFloat(r.value);
       document.getElementById(`v-${r.dataset.fx}-${r.dataset.k}`).textContent = r.value;
-      if (r.dataset.fx==='jpeg') scheduleJpeg();
-      if (r.dataset.fx==='png')  schedulePng();
-      if (r.dataset.fx==='webp') scheduleWebp();
-      if (r.dataset.fx==='gifg') scheduleGifg();
-      if (r.dataset.fx==='audio') scheduleAudio();
+      if (BAKED_CODEC_IDS.includes(r.dataset.fx)) scheduleCodecPipeline();
       updateRows();     // a show() can key off a slider too, not just a select
     });
   });
   controls.querySelectorAll('.fxtoggle').forEach(c=>{
     c.addEventListener('change', ()=>{
       state[c.dataset.fx].on = c.checked;
-      if (c.dataset.fx==='jpeg'){ if (c.checked) scheduleJpeg(); else if (state.png.on) schedulePng(); }
-      if (c.dataset.fx==='png'  && c.checked) schedulePng();
-      if (c.dataset.fx==='webp' && c.checked) scheduleWebp();
-      if (c.dataset.fx==='gifg' && c.checked) scheduleGifg();
-      if (c.dataset.fx==='audio' && c.checked) scheduleAudio();
+      if (BAKED_CODEC_IDS.includes(c.dataset.fx)) scheduleCodecPipeline();
       updateCatCounts();
       if (document.querySelector('.seqcat.open')) buildSeqGrid();   // rows follow which effects are on
     });
@@ -194,9 +193,7 @@ function buildUI(){
   controls.querySelectorAll('.fxsel').forEach(s=>{
     s.addEventListener('change', ()=>{
       state[s.dataset.fx][s.dataset.k] = parseInt(s.value, 10);
-      if (s.dataset.fx==='jpeg') scheduleJpeg();   // e.g. the Target select re-corrupts a different segment
-      if (s.dataset.fx==='audio') scheduleAudio();
-      if (s.dataset.fx==='png') schedulePng();
+      if (BAKED_CODEC_IDS.includes(s.dataset.fx)) scheduleCodecPipeline();
       if (s.dataset.fx==='mask' && s.dataset.k==='source') state.mask.mode=(state.mask.source|0)===6?1:0;
       if (s.dataset.fx==='hud' && s.dataset.k==='layout'){ applyHudPreset(state.hud.layout|0); syncUI(); }
       updateRows();          // any select can gate rows, not just the mask's
@@ -348,11 +345,7 @@ function syncUI(){
 // (re)build the real-byte codec frame pools for whatever is enabled. Their corruption is seeded off
 // randomSeed, so this must also run whenever the Pattern Seed changes — not just on a param change.
 function rebuildCodecs(){
-  if (state.jpeg.on) scheduleJpeg(); else jpegReady = false;
-  if (state.png.on)  schedulePng();  else pngReady  = false;
-  if (state.webp.on) scheduleWebp(); else webpReady = false;
-  if (state.gifg.on) scheduleGifg(); else gifgReady = false;
-  if (state.audio.on) scheduleAudio(); else audioReady = false;
+  scheduleCodecPipeline();
 }
 // envelope multiplier for destructive effects — makes the glitch "breathe" over the loop
 function motionMul(phase){
@@ -379,6 +372,9 @@ function envCurve(phase, mode, rate){
     case 7: return Math.abs(Math.sin(Math.PI*phase*rate)) * hump(phase);   // bounce — decaying bounces within a peak
     case 8: { const N=Math.max(1,rate*3), seg=phase*N, i=Math.floor(seg)%N, j=(i+1)%N, t=seg-Math.floor(seg);
       const a=rand(i+0.5); return a+(rand(j+0.5)-a)*sm(t); }              // wander — smooth random
+    case 9: { const N=Math.max(1,Math.round(rate)), seg=phase*N, i=Math.floor(seg)%N, u=seg-Math.floor(seg);
+      const width=.08+.16*rand(i*4.7+1.3), center=.12+.76*rand(i*7.1+2.9), d=Math.abs(u-center);
+      return d<width ? Math.pow(1-d/width,2) : 0; }                       // burst — narrow seeded impacts
     default: return hump(phase);
   }
 }

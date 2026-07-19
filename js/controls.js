@@ -24,11 +24,7 @@ function commitImage(src, sw, sh){
   drop.classList.add('hidden');
   canvas.classList.remove('hidden');
   startT = performance.now();
-  if (state.jpeg.on) scheduleJpeg();
-  if (state.png.on)  schedulePng();
-  if (state.webp.on) scheduleWebp();
-  if (state.gifg.on) scheduleGifg();
-  if (state.audio.on) scheduleAudio();
+  scheduleCodecPipeline();
   return { w, h };
 }
 function loadImage(file){
@@ -164,7 +160,7 @@ const RAND_PROB = { png:.12, jpeg:.15, warp:.18, halftone:.12, feedback:.12, mel
                     duotone:.14, solarize:.14, posterize:.14, emboss:.04,
                     gold:.08, rainbow:.07, sparkle:.1, burst:.05,   // loud hype effects — keep them occasional
                     prism:.09, iris:.08, starf:.08, kaleido:.05,   // dream / optics
-                    bokeh:.08, foil:.07, liquid:.08, paper:.08,
+                    bokeh:.08, liquid:.08, paper:.08,
                     edgeglow:.06 };   // gaming-PC hype — keep it occasional too
 // three strength levels: prob = on-probability scale, str = how far params stray from their default.
 // str stays low at Normal so params sit near their (gentle) defaults instead of jumping to extremes.
@@ -207,6 +203,12 @@ function randomizeFX(){
       if (p.type==='select'){
         if (f.id==='glitch' && p.k==='edge')     // Slice reads best as a clean hard cut — favour Hard heavily
           state[f.id][p.k] = Math.random()<0.8 ? 0 : [3,1,2][Math.floor(Math.random()*3)];  // 80% Hard, else Round/Ramp/Overshoot
+        else if (['jpeg','png','webp','gifg'].includes(f.id) && p.k==='mutation'){
+          // Random should not turn one mild codec roll into a total decoder collapse. Normal stays
+          // on bit-level/copy damage; the structural-looking byte replacements arrive by tier.
+          const modes=randLevelVal==='wild'?[0,1,2,3,4,5,6]:randLevelVal==='strong'?[0,1,1,2,5,6]:[1,1,1,5];
+          state[f.id][p.k]=modes[Math.floor(Math.random()*modes.length)];
+        }
         else if (f.id==='pixsort' && p.k==='ivl')  // the picture-aware intervals stay legible; the tiling ones shred
           state[f.id][p.k] = Math.random()<0.8 ? [0,2][Math.floor(Math.random()*2)]           // 80% Threshold/Edges
                                                : [1,3,4][Math.floor(Math.random()*3)];        // 20% Random/Waves/Whole line

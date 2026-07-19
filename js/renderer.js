@@ -42,7 +42,7 @@ function rand(seed){ const x = Math.sin((seed+randomSeed)*12.9898)*43758.5453; r
 // per-pixel/per-row lookups; the codecs instead consume a long *sequence* of numbers, so each
 // build takes its own generator seeded off randomSeed + a tag. Same seed + same params ->
 // byte-identical corruption, so a fixed Pattern Seed now holds the databending too.
-const RNG_TAG = { jpeg:1, png:2, webp:3, gifg:4 };
+const RNG_TAG = { jpeg:1, png:2, webp:3, gifg:4, audio:5 };
 function makeRng(tag){
   let s = (randomSeed + Math.imul(tag, 2654435761)) >>> 0;
   return ()=>{ s = (s + 0x6D2B79F5)|0;
@@ -89,14 +89,19 @@ function drawFrame(phase){    // phase in [0,1)
 
   applyWarp(w,h,phase);
 
-  const gl = applyRgbShift(w,h,t,v);
+  const gl = applyRgbShift(w,h,t,v,false);          // VHS horizontal split remains a whole-frame signal effect
 
+  let glitchGate = glitchGateBegin(w,h,'glitch');
+  applyRgbShift(w,h,t,v,true);                      // Slice's vertical RGB split follows its Apply To / Coverage
   applySliceGlitch(w,h,phase,gl);
+  glitchGateEnd(w,h,'glitch',glitchGate);
 
   // ---- datamosh: modern per-frame corruption ----
   if (state.mosh.on && state.mosh.intensity>0){
+    glitchGate = glitchGateBegin(w,h,'mosh');
     const moshFrame = Math.floor(phase*state.mosh.rate);   // change rate: distinct states per loop
-    applyMosh(w,h,moshFrame, envF('mosh','intensity'));
+    applyMosh(w,h,moshFrame, envF('mosh','intensity'), phase);
+    glitchGateEnd(w,h,'mosh',glitchGate);
   }
 
   applyPixelate(w,h);
@@ -145,11 +150,17 @@ function drawFrame(phase){    // phase in [0,1)
 
   applyPixelSort(w,h);
 
+  glitchGate = glitchGateBegin(w,h,'databend');
   applyDatabendShift(w,h,phase);
+  glitchGateEnd(w,h,'databend',glitchGate);
 
+  glitchGate = glitchGateBegin(w,h,'bmpmisread');
   applyBmpRowMisread(w,h);
+  glitchGateEnd(w,h,'bmpmisread',glitchGate);
 
+  glitchGate = glitchGateBegin(w,h,'wrongfmt');
   applyWrongFormat(w,h,phase);
+  glitchGateEnd(w,h,'wrongfmt',glitchGate);
 
   applyRleDatabend(w,h,phase);
 
@@ -159,7 +170,9 @@ function drawFrame(phase){    // phase in [0,1)
 
   applySonify(w,h);
 
+  glitchGate = glitchGateBegin(w,h,'byteshift');
   applyByteShift(w,h);
+  glitchGateEnd(w,h,'byteshift',glitchGate);
 
   applyBitPlane(w,h);
 
@@ -179,13 +192,13 @@ function drawFrame(phase){    // phase in [0,1)
 
   applyStarFilter(w,h,phase);
 
-  applyFoil(w,h,phase);
-
   applyBokeh(w,h,phase);
 
   const cr = applyCrtTube(w,h);
 
   applyBurst(w,h,phase);
+
+  applyAura(w,h,phase);
 
   applySparkle(w,h,phase);
 

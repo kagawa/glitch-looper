@@ -83,30 +83,61 @@ function edgeEase(t, mode){
 }
 
 function applySliceGlitch(w,h,phase,gl){
-// ---- glitch: horizontal slice displacement ----
+// ---- glitch: directional slice displacement / duplication / replacement ----
 if (gl.on && gl.amount>0){
-  const slices = gl.slices, edge = gl.edge|0, ew = Math.max(1, gl.edgew|0);
+  const slices = gl.slices, edge = gl.edge|0, ew = Math.max(1, gl.edgew|0), direction=gl.direction|0, fill=gl.fill|0;
   const step = Math.floor(phase*slices*2);             // changes over loop, wraps
   const amt = Math.min(1, P('glitch','amount')), maxOff = P('glitch','shift');
   const jit = gl.jitter;                               // uneven slice heights
-  // slice boundaries: even, or jittered around the even spacing (seed steps with the loop → seamless)
-  const ys=[0];
-  for (let i=1;i<slices;i++){
-    let y = h*i/slices;
-    if (jit>0) y += (rand(i*4.7+step*1.3)-0.5)*(h/slices)*jit*0.9;
-    ys.push(Math.max(1, Math.min(h-1, Math.round(y))));
-  }
-  ys.push(h); ys.sort((a,b)=>a-b);
-  const useScratch = edge!==0;
-  if (useScratch){ sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h); sctx.drawImage(canvas,0,0); }
+  // The original Horizontal + Shift + Hard path is retained by the same operations below. A single
+  // snapshot is also the clean source for Duplicate/Freeze, so later slices never feed on earlier ones.
+  sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h); sctx.drawImage(canvas,0,0);
+  const bounds=(length,seed)=>{
+    const out=[0];
+    for(let i=1;i<slices;i++){
+      let p=length*i/slices;
+      if(jit>0) p+=(rand(i*4.7+step*1.3+seed)-.5)*(length/slices)*jit*.9;
+      out.push(Math.max(1,Math.min(length-1,Math.round(p))));
+    }
+    out.push(length); out.sort((a,b)=>a-b); return out;
+  };
+  const ys=bounds(h,0), xs=bounds(w,91.7);
   for (let i=0;i<slices;i++){
     if (rand(i*7.1 + step) <= 1-amt) continue;
-    const sy=ys[i], sh=ys[i+1]-sy; if (sh<=0) continue;
+    const vertical = direction===1 || (direction===2 && rand(i*11.9+step+2.7)>.5);
+    const bb=vertical?xs:ys, pos=bb[i], thick=bb[i+1]-pos; if(thick<=0) continue;
     const off=(rand(i*3.3+step)-0.5)*2*maxOff;
-    if (edge===0){                                     // hard block — the original path, unchanged
-      const slice = ctx.getImageData(0,sy,w,sh);
-      ctx.clearRect(0,sy,w,sh);
-      ctx.putImageData(slice, Math.round(off), sy);
+    if(fill>=3){
+      if(fill===4 || fill===5){ ctx.fillStyle=fill===4?'#000':'#fff'; vertical?ctx.fillRect(pos,0,thick,h):ctx.fillRect(0,pos,w,thick); }
+      else { const im=vertical?ctx.getImageData(pos,0,thick,h):ctx.getImageData(0,pos,w,thick), d=im.data;
+        for(let p=0;p<d.length;p+=4){ d[p]=255-d[p]; d[p+1]=255-d[p+1]; d[p+2]=255-d[p+2]; }
+        vertical?ctx.putImageData(im,pos,0):ctx.putImageData(im,0,pos); }
+      continue;
+    }
+    if(fill===2){                                      // Freeze: replace with a stable strip from elsewhere
+      const limit=(vertical?w:h)-thick, src=Math.max(0,Math.floor(rand(i*19.3+step*.17+8.1)*Math.max(1,limit)));
+      if(vertical) ctx.drawImage(sc,src,0,thick,h,pos,0,thick,h);
+      else ctx.drawImage(sc,0,src,w,thick,0,pos,w,thick);
+      continue;
+    }
+    if(fill===1){                                      // Duplicate: shifted copy over the untouched picture
+      if(vertical) ctx.drawImage(sc,pos,0,thick,h,pos,Math.round(off),thick,h);
+      else ctx.drawImage(sc,0,pos,w,thick,Math.round(off),pos,w,thick);
+      continue;
+    }
+    if(edge===0){                                      // hard wrapped shift
+      if(!vertical && direction===0){                  // legacy Horizontal/Shift/Hard path: keep old links pixel-identical
+        const slice=ctx.getImageData(0,pos,w,thick); ctx.clearRect(0,pos,w,thick);
+        ctx.putImageData(slice,Math.round(off),pos);
+      } else if(vertical){
+        const shf=((Math.round(off)%h)+h)%h; ctx.clearRect(pos,0,thick,h);
+        ctx.drawImage(sc,pos,0,thick,h-shf,pos,shf,thick,h-shf);
+        if(shf) ctx.drawImage(sc,pos,h-shf,thick,shf,pos,0,thick,shf);
+      } else {
+        const shf=((Math.round(off)%w)+w)%w; ctx.clearRect(0,pos,w,thick);
+        ctx.drawImage(sc,0,pos,w-shf,thick,shf,pos,w-shf,thick);
+        if(shf) ctx.drawImage(sc,w-shf,pos,shf,thick,0,pos,shf,thick);
+      }
       continue;
     }
     // ease the shift in over the top edge and back out over the bottom, so the slice doesn't
@@ -117,14 +148,16 @@ if (gl.on && gl.amount>0){
     // lands in one line): mixing genuine hard cuts among the soft ones sells the slice glitch.
     const ewAt = (s)=> rand(s) < 0.25 ? 0 : ew*(0.3 + rand(s*1.7)*1.2);   // 25% hard, else 0.3–1.5×
     const ewTop = ewAt(i*9.3+step*2.1), ewBot = ewAt(i*6.1+step*3.7);
-    const eTop = Math.min(0.49, ewTop/sh), eBot = Math.min(0.49, ewBot/sh);
-    ctx.clearRect(0,sy,w,sh);
-    for (let yy=0; yy<sh; yy++){
-      const t=(yy+0.5)/sh;
+    const eTop = Math.min(0.49, ewTop/thick), eBot = Math.min(0.49, ewBot/thick);
+    vertical?ctx.clearRect(pos,0,thick,h):ctx.clearRect(0,pos,w,thick);
+    for (let q=0; q<thick; q++){
+      const t=(q+0.5)/thick;
       const prof=Math.min(edgeEase(Math.min(1,t/eTop),edge), edgeEase(Math.min(1,(1-t)/eBot),edge));
-      const shf=((Math.round(off*prof)%w)+w)%w, y=sy+yy;
-      ctx.drawImage(sc, 0,y,w-shf,1, shf,y,w-shf,1);
-      if (shf>0) ctx.drawImage(sc, w-shf,y,shf,1, 0,y,shf,1);
+      if(vertical){ const shf=((Math.round(off*prof)%h)+h)%h, x=pos+q;
+        ctx.drawImage(sc,x,0,1,h-shf,x,shf,1,h-shf); if(shf)ctx.drawImage(sc,x,h-shf,1,shf,x,0,1,shf);
+      } else { const shf=((Math.round(off*prof)%w)+w)%w, y=pos+q;
+        ctx.drawImage(sc,0,y,w-shf,1,shf,y,w-shf,1); if(shf)ctx.drawImage(sc,w-shf,y,shf,1,0,y,shf,1);
+      }
     }
   }
 }
@@ -459,11 +492,11 @@ function meltBands(w,h,span,sexp,bwAvg,wrap,sd,od){
     }
   }
 }
-function applyRgbShift(w,h,t,v){
+function applyRgbShift(w,h,t,v,sliceOnly=null){
 // RGB channel shift — VHS aberration = horizontal, Slice RGB = vertical (distinct axes)
 const gl = state.glitch;
-const hAb  = v.on ? P('vhs','aberration')*(0.7+0.3*Math.sin(t)) : 0;   // horizontal shift (VHS)
-const vRGB = gl.on ? P('glitch','rgb') : 0;                            // vertical shift (Slice)
+const hAb  = sliceOnly===true ? 0 : (v.on ? P('vhs','aberration')*(0.7+0.3*Math.sin(t)) : 0);   // horizontal shift (VHS)
+const vRGB = sliceOnly===false ? 0 : (gl.on ? P('glitch','rgb') : 0);                            // vertical shift (Slice)
 if (hAb > 0.5 || vRGB > 0.5){
   const base = ctx.getImageData(0,0,w,h);
   const out = ctx.createImageData(w,h);

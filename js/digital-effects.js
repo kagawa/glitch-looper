@@ -1,3 +1,41 @@
+// Effect-local region gating for the live glitch family. Capture the clean input, let the effect
+// render normally, then restore pixels outside the selected picture-derived region. Coverage is a
+// second axis from Amount: it decides where destruction may happen, not how hard it is there.
+function glitchGateBegin(w,h,fx){
+  const s=state[fx]; if(!s || !s.on) return null;
+  const coverage=s.coverage==null?1:s.coverage, apply=s.applyto|0;
+  return (coverage>=1 && apply===0) ? null : ctx.getImageData(0,0,w,h);
+}
+function glitchGateEnd(w,h,fx,before){
+  if(!before) return;
+  const s=state[fx], coverage=Math.max(0,Math.min(1,s.coverage==null?1:s.coverage)), apply=s.applyto|0;
+  if(coverage<=0){ ctx.putImageData(before,0,0); return; }
+  const after=ctx.getImageData(0,0,w,h), a=after.data, b=before.data;
+  const tag=fx.split('').reduce((n,ch)=>n*33+ch.charCodeAt(0),0)*.001;
+  const smooth=(lo,hi,x)=>{ if(x<=lo)return 0; if(x>=hi)return 1; const t=(x-lo)/(hi-lo); return t*t*(3-2*t); };
+  const lum=i=>(b[i]*.299+b[i+1]*.587+b[i+2]*.114)/255;
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    const i=(y*w+x)*4; let keep;
+    if(apply===0){
+      // Coarse cells make partial Coverage read as broken regions, not translucent full-frame FX.
+      const cell=12, cx=(x/cell)|0, cy=(y/cell)|0;
+      keep=smooth(1-coverage-.08,1-coverage+.08,1-rand(cx*17.1+cy*31.7+tag));
+    } else {
+      let score=0;
+      if(apply===1) score=lum(i);
+      else if(apply===2) score=1-lum(i);
+      else if(apply===4){ const mx=Math.max(b[i],b[i+1],b[i+2]), mn=Math.min(b[i],b[i+1],b[i+2]); score=mx? (mx-mn)/mx : 0; }
+      else { // edge magnitude from the clean input
+        const ir=(y*w+Math.min(w-1,x+1))*4, id=(Math.min(h-1,y+1)*w+x)*4;
+        score=Math.min(1,(Math.abs(lum(ir)-lum(i))+Math.abs(lum(id)-lum(i)))*3.5);
+      }
+      keep=smooth(1-coverage-.08,1-coverage+.08,score);
+    }
+    if(keep<1){ a[i]=b[i]+(a[i]-b[i])*keep; a[i+1]=b[i+1]+(a[i+1]-b[i+1])*keep; a[i+2]=b[i+2]+(a[i+2]-b[i+2])*keep; }
+  }
+  ctx.putImageData(after,0,0);
+}
+
 // ---- DCT Glitch: the genuine JPEG mechanism, run live — forward 8×8 DCT, bend the coefficients,
 //      inverse. Deterministic per block (seeded on block position) so it stays seamless, and because
 //      it recomputes every frame it takes an Envelope, unlike the baked real-JPEG pool. ----
@@ -239,15 +277,17 @@ if (db.on){
   const amt = P('databend','amount');
   if (amt>0){
     const TAU=Math.PI*2, nsp=Math.round(db.speed);
+    const chunk=Math.max(1,db.chunk|0);
     const stepPhase = Math.floor(phase*Math.max(1,db.speed)*4);
     const wrap = xx => { let m=xx%w; if(m<0)m+=w; return m|0; };
     const src = ctx.getImageData(0,0,w,h), out=ctx.createImageData(w,h), sd=src.data, od=out.data;
     for (let y=0;y<h;y++){
-      let sh = amt*w*( db.skew*0.05*(y/h) + 0.007*Math.sin(y*0.04 + phase*TAU*nsp) );
+      const cy=Math.floor(y/chunk)*chunk;
+      let sh = amt*w*( db.skew*0.05*(cy/h) + 0.007*Math.sin(cy*0.04 + phase*TAU*nsp) );
       let chroma=0;
-      if (db.scramble>0 && rand(y*0.7+stepPhase) < db.scramble*0.25){
-        sh += (rand(y*1.9+stepPhase)-0.5)*w*0.033*amt;  // packet break (scaled by amount)
-        chroma = (rand(y*2.3+stepPhase)-0.5)*amt*4;     // misread colour → rainbow
+      if (db.scramble>0 && rand(cy*0.7+stepPhase) < db.scramble*0.25){
+        sh += (rand(cy*1.9+stepPhase)-0.5)*w*0.033*amt;  // packet break (scaled by amount)
+        chroma = (rand(cy*2.3+stepPhase)-0.5)*amt*4;     // misread colour → rainbow
       }
       const shR=sh+chroma, shG=sh, shB=sh-chroma, row=y*w;
       for (let x=0;x<w;x++){
@@ -289,6 +329,7 @@ const wf = state.wrongfmt;
 if (!(wf.on)) return;
 const amt = P('wrongfmt','amount'); if (amt<=0) return;
 const mode = wf.mode|0, roam = wf.roam, np = w*h;
+const chunk=Math.max(1,wf.chunk|0);
 const src = ctx.getImageData(0,0,w,h), s = src.data;
 const out = ctx.createImageData(w,h), d = out.data;
 const drift = Math.round(phase*w*Math.max(1,Math.round(roam*6)));   // integer px/loop → seamless
@@ -313,7 +354,7 @@ if (mode===0){                                     // Planar (triple-ghost): Y /
 } else if (mode===1){                               // Stride Shear: wrong row stride → diagonal wrap-tear
   const stride = amt*w*0.9;
   for (let y=0;y<h;y++){
-    const off = (Math.round(y*stride/h*8) + drift);
+    const cy=Math.floor(y/chunk)*chunk, off = (Math.round(cy*stride/h*8) + drift);
     for (let x=0;x<w;x++){
       let sx=(x+off)%w; if(sx<0)sx+=w;
       const si=(y*w+sx)*4, di=(y*w+x)*4;
@@ -508,7 +549,8 @@ if (bsf.on){
     const px=Math.round(amt*w*0.6);
     const src=ctx.getImageData(0,0,w,h), out=ctx.createImageData(w,h), sd=src.data, od=out.data;
     for (let y=0;y<h;y++){
-      const rowShift=px+Math.round(y*bsf.skew*1.5), row=y*w;
+      const cy=Math.floor(y/Math.max(1,bsf.chunk|0))*Math.max(1,bsf.chunk|0);
+      const rowShift=px+Math.round(cy*bsf.skew*1.5), row=y*w;
       for (let x=0;x<w;x++){
         const i=(row+x)*4, sx=((x+rowShift)%w+w)%w, si=(row+sx)*4;
         od[i]=sd[si+r0]; od[i+1]=sd[si+r1]; od[i+2]=sd[si+r2]; od[i+3]=255;
@@ -558,13 +600,57 @@ function sampleFlow(seed,u,v,GX,GY){
     v00[1]*(1-tx)*(1-ty)+v10[1]*tx*(1-ty)+v01[1]*(1-tx)*ty+v11[1]*tx*ty,
   ];
 }
+
+// Accumulate reconstructs the history since the latest reset from the current loop position. Each
+// event reads the pixel buffer after the previous event, so pasted damage itself becomes the source
+// of later blocks and genuinely piles up. No mutable history cache is used: preview seeks, temporal
+// effects and exporters can request frames out of order and still receive the same result.
+function applyAccumulatedMoshBlocks(w,h,phase,intensity,d){
+  const m=state.mosh, resets=Math.max(1,m.reset|0), push=m.push|0;
+  const loopFrames=Math.max(1,Math.round((typeof LOOP_MS==='number'?LOOP_MS:3000)/1000*30));
+  const segment= Math.min(resets-1,Math.floor(phase*resets));
+  const local=phase*resets-segment;
+  const history=Math.floor(local*loopFrames/resets);     // 0 exactly at reset; then one new event per 30fps frame
+  const maxReps=Math.max(1,m.bloom|0), GX=3+Math.round(m.chaos*5), GY=2+Math.round(m.chaos*3);
+  for(let frame=0;frame<history;frame++){
+    const seed=Math.floor((segment*1009+frame)*(1+m.chaos*4))+1;
+    // Accumulation adds one packet per frame. Blocks controls its footprint instead of multiplying
+    // the event count, keeping a three-second pile practical even at full-resolution export.
+    const bw=Math.max(4,Math.floor((.025+m.blocks*.14)*(.55+.9*rand(seed*3.1))*w));
+    const bh=Math.max(2,Math.floor((.008+m.blocks*.065)*(.55+.9*rand(seed*5.7))*h));
+    const sx=Math.floor(rand(seed*9.3)*Math.max(1,w-bw)), sy=Math.floor(rand(seed*1.7)*Math.max(1,h-bh));
+    let [fvx,fvy]=sampleFlow(seed,(sx+bw/2)/w,(sy+bh/2)/h,GX,GY);
+    const mag=Math.max(.14,Math.hypot(fvx,fvy));
+    if(push===1){ fvx=0; fvy=mag; }
+    else if(push===2){ fvx=0; fvy=-mag; }
+    else if(push===3){ fvx=-mag; fvy=0; }
+    else if(push===4){ fvx=mag; fvy=0; }
+    else if(push===5){ const rx=(sx+bw/2)/w-.5, ry=(sy+bh/2)/h-.5, rl=Math.hypot(rx,ry)||1; fvx=rx/rl*mag; fvy=ry/rl*mag; }
+    const dx=Math.round(fvx*w*intensity), dy=Math.round(fvy*h*intensity*(push===0?.4*m.vert:.55));
+    const reps=Math.round(1+rand(seed*7.3)*(maxReps-1));
+    for(let p=1;p<=reps;p++){
+      const ox=dx*p, oy=dy*p;
+      const left=Math.max(0,-(sx+ox)), right=Math.min(bw,w-(sx+ox));
+      if(right<=left) continue;
+      for(let y=0;y<bh;y++){
+        const ty=sy+y+oy; if(ty<0||ty>=h) continue;
+        // copyWithin is overlap-safe and keeps this a fast row copy. It reads the already-mutated
+        // buffer, so later events can pick up damage laid down by earlier simulated frames.
+        const si=((sy+y)*w+sx+left)*4, ti=(ty*w+sx+ox+left)*4;
+        d.copyWithin(ti,si,si+(right-left)*4);
+      }
+    }
+  }
+}
 // seed varies per frame; higher chaos = seed jumps more => different breakage each frame
-function applyMosh(w,h,fseed,em=1){
+function applyMosh(w,h,fseed,em=1,phase=0){
   const m = state.mosh;
   const intensity = m.intensity*em;
   const seed = Math.floor(fseed*(1+m.chaos*4)) + 1;
+  const blockMode=m.mode|0;
   const id = ctx.getImageData(0,0,w,h);
   const d = id.data;
+  if(blockMode===4 && m.blocks>0 && intensity>0) applyAccumulatedMoshBlocks(w,h,phase,intensity,d);
   const src = new Uint8ClampedArray(d);        // snapshot to read from
 
   // 1) block displacement (datamosh smear), dragged along a shared flow field
@@ -574,27 +660,44 @@ function applyMosh(w,h,fseed,em=1){
   //    block draws its own repeat count from 1..Bloom, so the trails come out uneven. 1 = every
   //    block applied once (a plain displacement). Chaos also sets the flow grid's turbulence: calm
   //    = a few broad coherent sweeps, chaotic = many small swirling ones.
-  if (m.blocks>0){
+  if (m.blocks>0 && blockMode!==4){
     const n = Math.floor(1 + m.blocks*10*intensity);
     const maxReps = Math.max(1, m.bloom|0);
+    const push=m.push|0;
     const GX = 3+Math.round(m.chaos*5), GY = 2+Math.round(m.chaos*3);
     for (let k=0;k<n;k++){
       const bw = Math.max(4, Math.floor((0.08+0.35*rand(seed*3.1+k))*w));
       const bh = Math.max(2, Math.floor((0.02+0.14*rand(seed*5.7+k))*h));
       const sx = Math.floor(rand(seed*9.3+k)*(w-bw));
       const sy = Math.floor(rand(seed*1.7+k)*(h-bh));
-      const [fvx,fvy] = sampleFlow(seed, (sx+bw/2)/w, (sy+bh/2)/h, GX, GY);
-      const dxo = Math.round(fvx*w*intensity), dyo = Math.round(fvy*h*intensity*0.4*m.vert);   // flow drags sideways; Vertical Drift opts into vertical movement too (0 = purely horizontal, the original look)
+      let [fvx,fvy] = sampleFlow(seed, (sx+bw/2)/w, (sy+bh/2)/h, GX, GY);
+      const mag=Math.max(.18,Math.hypot(fvx,fvy));
+      if(push===1){ fvx=0; fvy=mag; }
+      else if(push===2){ fvx=0; fvy=-mag; }
+      else if(push===3){ fvx=-mag; fvy=0; }
+      else if(push===4){ fvx=mag; fvy=0; }
+      else if(push===5){ const rx=(sx+bw/2)/w-.5, ry=(sy+bh/2)/h-.5, rl=Math.hypot(rx,ry)||1; fvx=rx/rl*mag; fvy=ry/rl*mag; }
+      const dxo = Math.round(fvx*w*intensity);
+      const dyo = Math.round(fvy*h*intensity*(push===0?0.4*m.vert:0.55));   // Flow keeps the legacy Vertical Drift; explicit directions own both axes.
       const reps = Math.round(1 + rand(seed*7.3+k)*(maxReps-1));
-      for (let p=1;p<=reps;p++){
+      const first=blockMode===2?reps:1;                   // Duplicate jumps once; Smear leaves every intermediate copy
+      for (let p=first;p<=reps;p++){
         const offx = dxo*p, offy = dyo*p;
+        let readX=sx, readY=sy;
+        if(blockMode===1){                                // Freeze: repeat a coarse, stable reference tile
+          readX=Math.max(0,Math.min(w-bw,Math.floor(Math.floor(rand(k*2.7+1.1)*4)/4*w)));
+          readY=Math.max(0,Math.min(h-bh,Math.floor(Math.floor(rand(k*4.1+2.3)*3)/3*h)));
+        } else if(blockMode===3){                         // Random Paste: unrelated packet lands in this block
+          readX=Math.max(0,Math.floor(rand(seed*12.7+k)*Math.max(1,w-bw)));
+          readY=Math.max(0,Math.floor(rand(seed*15.1+k)*Math.max(1,h-bh)));
+        }
         for (let y=0;y<bh;y++){
           const ty = sy+y+offy;
           if (ty<0||ty>=h) continue;
           for (let x=0;x<bw;x++){
             const tx = sx+x+offx;
             if (tx<0||tx>=w) continue;
-            const si=((sy+y)*w+sx+x)*4, ti=(ty*w+tx)*4;
+            const si=((readY+y)*w+readX+x)*4, ti=(ty*w+tx)*4;
             d[ti]=src[si]; d[ti+1]=src[si+1]; d[ti+2]=src[si+2];
           }
         }

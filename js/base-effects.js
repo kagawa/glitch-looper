@@ -15,17 +15,10 @@ function drawBaseFrame(w,h,phase,t,c,v,rl,fm,fseed){
 let fp = [];
 if (c.on){ fp.push(`saturate(${c.saturate})`, `contrast(${c.contrast})`, `brightness(${P('color','bright')})`); if (c.hue) fp.push(`hue-rotate(${c.hue}deg)`); }
 if (fm.on && fm.sepia>0){ fp.push(`sepia(${fm.sepia})`); }
-// pick base image: real PNG glitch > real JPEG databend > real WebP databend > original
+// Pick the last successful stage in the real-codec pipeline. Every later pool already contains the
+// earlier enabled stages, so selecting only the tail displays the complete stack once (not twice).
 let base = img;
-if (state.png.on && pngReady && pngFrames.length)
-  base = pngFrames[Math.floor(phase*pngFrames.length) % pngFrames.length];
-else if (state.jpeg.on && jpegReady && jpegFrames.length)
-  base = jpegFrames[Math.floor(phase*jpegFrames.length) % jpegFrames.length];
-else if (state.webp.on && webpReady && webpFrames.length)
-  base = webpFrames[Math.floor(phase*webpFrames.length) % webpFrames.length];
-else if (state.gifg.on && gifgReady && gifgFrames.length)
-  base = gifgFrames[Math.floor(phase*gifgFrames.length) % gifgFrames.length];
-else if (state.audio.on && audioReady && audioFrames.length){
+if (state.audio.on && audioReady && audioFrames.length){
   // pool is an intensity ramp (weak→strong): drive it by the destruction envelope when Amount's ⓔ
   // is on, else by a seamless triangle pulse so it still breathes.
   const an=audioFrames.length;
@@ -34,6 +27,14 @@ else if (state.audio.on && audioReady && audioFrames.length){
     : 1-Math.abs(2*phase-1);
   base = audioFrames[Math.round(g*(an-1))];
 }
+else if (state.gifg.on && gifgReady && gifgFrames.length)
+  base = gifgFrames[Math.floor(phase*gifgFrames.length) % gifgFrames.length];
+else if (state.webp.on && webpReady && webpFrames.length)
+  base = webpFrames[Math.floor(phase*webpFrames.length) % webpFrames.length];
+else if (state.png.on && pngReady && pngFrames.length)
+  base = pngFrames[Math.floor(phase*pngFrames.length) % pngFrames.length];
+else if (state.jpeg.on && jpegReady && jpegFrames.length)
+  base = jpegFrames[Math.floor(phase*jpegFrames.length) % jpegFrames.length];
 tctx.clearRect(0,0,w,h);
 tctx.filter = fp.length ? fp.join(' ') : 'none';
 tctx.drawImage(base, 0, 0, w, h);
