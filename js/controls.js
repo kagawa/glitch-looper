@@ -197,6 +197,10 @@ function randomizeFX(){
     if (state[f.id]._locked) return;
     if (f.id==='mask' || f.id==='zoom') return;                // leave Mask & Zoom exactly as the user set them
     if (f.id==='motion'){ state.motion.on = true; return; }    // Envelope always on, but don't randomise its values
+    // Skip effects whose real-codec pipeline can't produce output in this browser (probed at
+    // startup) — otherwise Random would silently roll a nothing-effect.
+    if (f.id==='webp'  && !BROWSER_CAPS.webpEncode)   { state[f.id].on = false; return; }
+    if (f.id==='audio' && !BROWSER_CAPS.audioDatabend){ state[f.id].on = false; return; }
     state[f.id].on = Math.random() < Math.min(0.95, (RAND_PROB[f.id] ?? 0.5) * lv.prob);
     f.params.forEach(p=>{
       if (p.type==='text') return;               // free text isn't randomised (HUD fills it from the layout below)

@@ -19,21 +19,24 @@ function frame(now){
 requestAnimationFrame(frame);
 
 buildUI();
-// restore from a shared link if present, otherwise open with either a random roll or a random preset
-const sm = location.hash.match(/[#&]s=([^&]+)/);
-const fromLink = sm && applyState(sm[1]);
-let openedWith = '🎲 Random';
-if (!fromLink){
-  if (Math.random() < 0.5){
-    randomizeFX();
-  } else {                                          // 50%: open on a random preset instead
-    const names = Object.keys(PRESETS).filter(n => n !== 'Clean');
-    const pick = names[Math.floor(Math.random()*names.length)];
-    applyPreset(pick);
-    if (presetSel) presetSel.value = 'builtin:' + pick;
-    openedWith = 'Preset · ' + pick;
+// restore from a shared link if present, otherwise open with either a random roll or a random preset.
+// Wait for browser-capability probes so the first Random roll already skips unsupported effects.
+capsReady.then(() => {
+  const sm = location.hash.match(/[#&]s=([^&]+)/);
+  const fromLink = sm && applyState(sm[1]);
+  let openedWith = '🎲 Random';
+  if (!fromLink){
+    if (Math.random() < 0.5){
+      randomizeFX();
+    } else {                                          // 50%: open on a random preset instead
+      const names = Object.keys(PRESETS).filter(n => n !== 'Clean');
+      const pick = names[Math.floor(Math.random()*names.length)];
+      applyPreset(pick);
+      if (presetSel) presetSel.value = 'builtin:' + pick;
+      openedWith = 'Preset · ' + pick;
+    }
   }
-}
-loadSample();                 // give the effects something to render; the status says how to swap it
-setStatus(fromLink ? 'Loaded from link 🎛️ · tap the image to use your own'
-                   : openedWith + ' · tap the image to load your own');
+  loadSample();                 // give the effects something to render; the status says how to swap it
+  setStatus(fromLink ? 'Loaded from link 🎛️ · tap the image to use your own'
+                     : openedWith + ' · tap the image to load your own');
+});

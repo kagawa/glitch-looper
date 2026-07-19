@@ -33,6 +33,32 @@ let audioFrames = [], audioReady = false, audioTimer = null, audioToken = 0;
 const asrc = document.createElement('canvas');
 const actx = asrc.getContext('2d', { willReadFrequently:true });
 
+// Runtime browser capabilities. Not every browser can encode WebP (older iOS Safari falls back
+// to a PNG blob) or run an OfflineAudioContext pipeline end-to-end. We probe at startup so
+// Random can skip effects whose real pipeline would silently produce nothing on this device.
+const BROWSER_CAPS = { webpEncode:true, audioDatabend:true };
+const capsReady = (async () => {
+  try {                                            // WebP encoding
+    const c = document.createElement('canvas'); c.width=c.height=2;
+    const cc = c.getContext('2d'); cc.fillStyle='#f00'; cc.fillRect(0,0,2,2);
+    const blob = await new Promise(res => c.toBlob(res, 'image/webp', 0.5));
+    BROWSER_CAPS.webpEncode = !!(blob && /webp/.test(blob.type));
+  } catch { BROWSER_CAPS.webpEncode = false; }
+  try {                                            // Audio Databend end-to-end probe
+    const OACtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!OACtx) throw new Error('no OfflineAudioContext');
+    const octx = new OACtx(1, 128, 44100);
+    const buf = octx.createBuffer(1, 128, 44100);
+    const src = octx.createBufferSource(); src.buffer = buf;
+    src.connect(octx.destination); src.start();
+    await octx.startRendering();
+    // buildAudioFrames also needs createImageBitmap(ImageData) to reach the canvas.
+    if (typeof createImageBitmap !== 'function') throw new Error('no createImageBitmap');
+    await createImageBitmap(new ImageData(2, 2));
+    BROWSER_CAPS.audioDatabend = true;
+  } catch { BROWSER_CAPS.audioDatabend = false; }
+})();
+
 // Real-codec stages are rebuilt as one dependency chain. One shared blend canvas applies each
 // stage's Output Mix before its frames become the input to the next codec.
 let codecPipelineTimer = null, codecPipelineToken = 0;
