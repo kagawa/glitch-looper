@@ -154,6 +154,9 @@ if (ht.on){
     return {r:r/n, g:g/n, b:b/n};
   };
   const litRad = (r,g,b,maxR) => {
+    // Packed Round is a true tile pattern: keep every tile at its full extent so the
+    // cardinal sides meet. Image variation is carried by the sampled ink colour.
+    if (shape===6) return maxR;
     if (fixedDots) return shape===6 ? maxR : maxR*0.72;
     const lum=(r*0.3+g*0.59+b*0.11)/255;
     // dark bg → bright pixels big; light bg → dark pixels big; Invert flips that. The XOR-ish
@@ -179,7 +182,7 @@ if (ht.on){
     } else if (kind===6){
       // Packed Round: rounded-square tiles touch on the four cardinal sides while
       // their corners leave a four-point negative-space star between neighbouring cells.
-      sctx.roundRect(px-rad,py-rad,rad*2,rad*2,rad*.38);
+      sctx.roundRect(px-rad,py-rad,rad*2,rad*2,rad*.48);
     } else if (kind===2){
       for(let k=0;k<3;k++){ const a=rot-Math.PI/2+k*Math.PI*2/3; const qx=px+Math.cos(a)*rad, qy=py+Math.sin(a)*rad; k?sctx.lineTo(qx,qy):sctx.moveTo(qx,qy); }
       sctx.closePath();
@@ -201,7 +204,7 @@ if (ht.on){
         const x=cxC + u*cos - v*sin, y=cyC + u*sin + v*cos;
         if (x<-cell||x>w+cell||y<-cell||y>h+cell) continue;
         const s=sampleAvg(x, y, cell*0.5);
-        const maxR=shape===6 ? cell*0.5 : cell*0.62;
+        const maxR=shape===6 ? cell*0.515 : cell*0.62;
         paint(x, y, litRad(s.r,s.g,s.b,maxR), s.r, s.g, s.b, shape, angle);
       }
     }
