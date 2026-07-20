@@ -523,11 +523,11 @@ if (bs.on && bs.amount>0){
     let k=Math.round(spinT*N); if (spinning && k===0) k=spinT>0?1:-1;
     const rot=spinning ? k*(TWO/N)*phase : 0;                                // multiple of 2π/N → seamless
     const R=Math.hypot(w,h)*(0.08+(bs.size==null?0.5:bs.size)*0.6);          // covers well past the corners at max Size
-    const streak=bs.streak==null?0.6:bs.streak, K=1+Math.round(streak*8);
-    const dir=(k<0)?-1:1, half=(Math.PI/N)*0.34*(1+jit*0.35), step=(Math.PI/N)*0.5*(0.25+streak);
+    const streak=bs.streak==null?0.6:bs.streak, K=1+Math.round(streak*4);
+    const dir=(k<0)?-1:1, half=(Math.PI/N)*0.27*(1+jit*0.25), step=(Math.PI/N)*0.75*(0.35+streak);
     sctx.save(); sctx.translate(cx,cy);
     for (let i=0;i<N;i++){
-      const baseAng=i*(TWO/N)+rot, frac=spinning ? (i/N)+rot/TWO : i/N;
+      const baseAng=i*(TWO/N)+rot, frac=((baseAng/TWO)%1+1)%1;
       const col=hypeColor(tone, frac, 0.9, N);
       for (let kk=0;kk<K;kk++){
         const ang=baseAng-dir*kk*step, alpha=(1-kk/K)*(K>1?0.5:0.85);
@@ -551,9 +551,10 @@ if (bs.on && bs.amount>0){
     const rot=spinning?k*(TWO/N)*phase:0, beamW=Math.max(1,Math.min(R*.025,1.5+bs.size*4));
     sctx.save(); sctx.translate(cx,cy);
     for(let i=0;i<N;i++){
-      const spacing=TWO/N, ang=i*spacing+jit*(burstNoise(i/N)-.5)*spacing*.5+rot, col=hypeColor(tone,((ang/TWO)%1+1)%1,.95,N), ex=Math.cos(ang)*R, ey=Math.sin(ang)*R;
-      const g=sctx.createLinearGradient(0,0,ex,ey); g.addColorStop(0,`rgba(${col[0]},${col[1]},${col[2]},.95)`); g.addColorStop(.25,`rgba(${col[0]},${col[1]},${col[2]},.55)`); g.addColorStop(1,`rgba(${col[0]},${col[1]},${col[2]},0)`);
-      sctx.strokeStyle=g; sctx.lineWidth=beamW; sctx.beginPath(); sctx.moveTo(0,0); sctx.lineTo(ex,ey); sctx.stroke();
+      const spacing=TWO/N, ang=i*spacing+jit*(burstNoise(i/N)-.5)*spacing*.5+rot, col=hypeColor(tone,((ang/TWO)%1+1)%1,.95,N);
+      const originJ=jit*(burstNoise(i/N+9.7)-.5)*Math.min(w,h)*.08, ox=-Math.sin(ang)*originJ, oy=Math.cos(ang)*originJ, ex=ox+Math.cos(ang)*R, ey=oy+Math.sin(ang)*R;
+      const g=sctx.createLinearGradient(ox,oy,ex,ey); g.addColorStop(0,`rgba(${col[0]},${col[1]},${col[2]},.95)`); g.addColorStop(.25,`rgba(${col[0]},${col[1]},${col[2]},.55)`); g.addColorStop(1,`rgba(${col[0]},${col[1]},${col[2]},0)`);
+      sctx.strokeStyle=g; sctx.lineWidth=beamW; sctx.beginPath(); sctx.moveTo(ox,oy); sctx.lineTo(ex,ey); sctx.stroke();
     }
     sctx.restore();
   } else {
