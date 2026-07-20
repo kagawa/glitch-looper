@@ -551,13 +551,13 @@ if (bs.on && bs.amount>0){
     const rot=spinning?k*(TWO/N)*phase:0, beamW=Math.max(1,Math.min(R*.025,1.5+bs.size*4));
     sctx.save(); sctx.translate(cx,cy);
     for(let i=0;i<N;i++){
-      const ang=i*TWO/N+rot, col=hypeColor(tone,spinning?i/N+rot/TWO:i/N,.95,N), ex=Math.cos(ang)*R, ey=Math.sin(ang)*R;
+      const spacing=TWO/N, ang=i*spacing+jit*(burstNoise(i/N)-.5)*spacing*.5+rot, col=hypeColor(tone,((ang/TWO)%1+1)%1,.95,N), ex=Math.cos(ang)*R, ey=Math.sin(ang)*R;
       const g=sctx.createLinearGradient(0,0,ex,ey); g.addColorStop(0,`rgba(${col[0]},${col[1]},${col[2]},.95)`); g.addColorStop(.25,`rgba(${col[0]},${col[1]},${col[2]},.55)`); g.addColorStop(1,`rgba(${col[0]},${col[1]},${col[2]},0)`);
-      sctx.strokeStyle=g; sctx.lineWidth=beamW*(.65+.35*burstNoise(i/N)); sctx.beginPath(); sctx.moveTo(0,0); sctx.lineTo(ex,ey); sctx.stroke();
+      sctx.strokeStyle=g; sctx.lineWidth=beamW; sctx.beginPath(); sctx.moveTo(0,0); sctx.lineTo(ex,ey); sctx.stroke();
     }
     sctx.restore();
   } else {
-    const cx=(bs.cx==null ? .5 : bs.cx)*w, cy=(bs.cy==null ? .5 : bs.cy)*h, R=Math.hypot(w,h)/2*1.1;
+    const cx=(bs.cx==null ? .5 : bs.cx)*w, cy=(bs.cy==null ? .5 : bs.cy)*h, R=Math.hypot(w,h)*1.5;
     const N=Math.round(12+bs.lines*44);
     const spinT=bs.spin==null?0:bs.spin, spinning=Math.abs(spinT)>1e-6;
     let k=Math.round(spinT*N); if (spinning && k===0) k=spinT>0?1:-1;        // snap to a line-spacing step
@@ -565,7 +565,7 @@ if (bs.on && bs.amount>0){
     sctx.save(); sctx.translate(cx,cy); sctx.rotate(rot);
     for (let i=0;i<N;i++){
       const ang=i*(TWO/N);
-      const frac=spinning ? (i/N)+rot/TWO : i/N;                            // colour/width by world position when spinning
+      const frac=((ang+rot)/TWO%1+1)%1;                                      // colour follows the rotated world angle
       // Width variation: per-wedge random when static; a smooth angle-periodic noise when spinning, so the
       // widths ride the wedges through the loop and still match at the seam (integer harmonics = periodic).
       const nz = spinning ? burstNoise(frac) : rand(i*7.3);
