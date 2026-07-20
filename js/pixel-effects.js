@@ -513,7 +513,7 @@ if (rb.on && rb.amount>0){
   const tileAt=(x,y)=>{ const tx=tileSide?Math.max(0,Math.min(tileCols-1,Math.floor((x-tileOX)/tileSide))):0, ty=tileSide?Math.max(0,Math.min(tileRows-1,Math.floor((y-tileOY)/tileSide))):0; return {tx,ty,lx:tileSide?(x-(tileOX+tx*tileSide))/tileSide:.5,ly:tileSide?(y-(tileOY+ty*tileSide))/tileSide:.5}; };
   const BLEND=['overlay','screen','hue','soft-light'];
   if (style===1){
-    const cs=Math.cos(ang), sn=Math.sin(ang), freq=Math.max(1,rb.bands|0), speed=rb.speed|0||1;
+    const cs=Math.cos(ang), sn=Math.sin(ang), freq=Math.max(1,rb.bands|0), speed=+rb.speed||0;
     const width=rb.width==null?0.5:rb.width, kf=3.0-width*2.6;                // Wave Width: thin (kf 3.0) → wide (kf 0.4)
     const span=(Math.abs(cs)*w+Math.abs(sn)*h)||1, off0=Math.min(0,cs)*w+Math.min(0,sn)*h;
     const scroll=phase*speed;                                                // integer turns/loop → seamless
@@ -536,7 +536,7 @@ if (rb.on && rb.amount>0){
     // Foil: fine diffraction bands modulated by picture luminance + a moving sheen across.
     // Reads on brighter areas (as a real hologram sticker only shows against light), so a dark
     // frame stays dark. Bands = band count, Sheen = strength of the sweeping specular highlight.
-    const cs=Math.cos(ang), sn=Math.sin(ang), dens=Math.max(1,rb.bands|0), speed=rb.speed|0||1;
+    const cs=Math.cos(ang), sn=Math.sin(ang), dens=Math.max(1,rb.bands|0), speed=+rb.speed||0;
     const span=(Math.abs(cs)*w+Math.abs(sn)*h)||1, off0=Math.min(0,cs)*w+Math.min(0,sn)*h;
     const sweep=((phase*speed)%1+1)%1;                                       // integer turns/loop → seamless
     const sheen=(+rb.sheen||0);
@@ -557,10 +557,10 @@ if (rb.on && rb.amount>0){
     ctx.putImageData(id,0,0);
   } else {
     if (tileN>2){
-      const im=sctx.createImageData(w,h), d=im.data, rot=(rb.tilemotion|0)===1?phase*(rb.speed|0||1)*Math.PI*2:0;
+      const im=sctx.createImageData(w,h), d=im.data, rot=(rb.tilemotion|0)===1?phase*(+rb.speed||0)*Math.PI*2:0;
       for(let p=0,i=0;i<d.length;i+=4,p++){
         const x=p%w,y=(p/w)|0,ti=tileAt(x,y),lx=ti.lx-.5,ly=ti.ly-.5;
-        const local=(rb.tilemotion|0)===1?(Math.atan2(ly,lx)/(Math.PI*2)+.5+phase*(rb.speed|0||1)):( (ti.lx*Math.cos(ang)+ti.ly*Math.sin(ang)+1)/2 );
+        const local=(rb.tilemotion|0)===1?(Math.atan2(ly,lx)/(Math.PI*2)+.5+phase*(+rb.speed||0)):( (ti.lx*Math.cos(ang)+ti.ly*Math.sin(ang)+1)/2 );
         const c=hypeLerp(tone,local,1);
         d[i]=c[0]; d[i+1]=c[1]; d[i+2]=c[2]; d[i+3]=255;
       }
@@ -569,7 +569,7 @@ if (rb.on && rb.amount>0){
     }
     const cx=w/2, cy=h/2, L=(Math.abs(Math.cos(ang))*w+Math.abs(Math.sin(ang))*h)/2;
     const g=ctx.createLinearGradient(cx-Math.cos(ang)*L, cy-Math.sin(ang)*L, cx+Math.cos(ang)*L, cy+Math.sin(ang)*L);
-    const N=24, off=phase*(rb.speed|0||1);                                   // integer cycles/loop → seamless
+    const N=24, off=phase*(+rb.speed||0);                                     // zero speed = a still foil
     for(let i=0;i<=N;i++){ const c=hypeLerp(tone, i/N+off, 1); g.addColorStop(i/N, `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`); }
     ctx.save(); ctx.globalCompositeOperation=BLEND[rb.blend|0]||'overlay'; ctx.globalAlpha=a;
     ctx.fillStyle=g; ctx.fillRect(0,0,w,h); ctx.restore();
