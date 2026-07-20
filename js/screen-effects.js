@@ -605,7 +605,9 @@ if (bs.on && bs.amount>0){
   const pulse=0.8+0.2*Math.sin(phase*Math.PI*2);
   ctx.save(); ctx.globalCompositeOperation=BLEND[bs.blend|0]||'screen'; ctx.globalAlpha=a*pulse;
   const blur=(bs.blur==null?.25:bs.blur);
-  if (blur>0) ctx.filter=`blur(${(blur*(style===1?5:12)).toFixed(1)}px)`;
+  // Laser Reach is a hard light-source cut: keep its disappearing centre crisp instead
+  // of letting the layer blur bleed back into the masked area.
+  if (blur>0 && style!==2) ctx.filter=`blur(${(blur*(style===1?5:12)).toFixed(1)}px)`;
   ctx.drawImage(sc,0,0);
   ctx.filter='none';
   ctx.restore();
