@@ -22,6 +22,12 @@ const FX = [
     { k:'applyto',  label:'Apply To', type:'select', def:0, options:[[0,'Whole'],[1,'Bright'],[2,'Dark'],[3,'Edges'],[4,'Saturated']] },
     { k:'coverage', label:'Coverage', min:0, max:1, step:.01, def:1 },
   ]},
+  { id:'rgbsplit', name:'RGB Split', hint:'standalone chromatic separation — RGB channels shifted without VHS or slice damage', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.7, env:1 },
+    { k:'x', label:'Horizontal Shift', min:0, max:40, step:.5, def:8, env:1 },
+    { k:'y', label:'Vertical Shift', min:0, max:40, step:.5, def:0, env:1 },
+    { k:'mode', label:'Mode', type:'select', def:0, options:[[0,'RGB Split'],[1,'Red / Cyan'],[2,'Red / Blue']] },
+  ]},
   { id:'noise', name:'Noise', hint:'grain — luma / colour / salt & pepper', on:false, open:false, params:[
     { k:'grain',    label:'Grain',   min:0, max:1, step:.01, def:.18, env:1, envd:1 },
     { k:'size',     label:'Grain Size', min:0, max:1, step:.01, def:0 },
@@ -589,7 +595,7 @@ const FX = [
 // effect cards are shown grouped by sub-genre (order here = display order)
 const FX_GROUPS = [
   ['File Corruption',       ['jpeg','png','webp','gifg','audio','sonify','byteshift','bitplane']],   // real encoded-byte damage + raw reinterpret
-  ['Digital Glitch',        ['glitch','mosh','compress','dct','pixsort','databend','bmpmisread','wrongfmt','rle','gif','pixelate']],
+  ['Digital Glitch',        ['glitch','rgbsplit','mosh','compress','dct','pixsort','databend','bmpmisread','wrongfmt','rle','gif','pixelate']],
   ['Analog Signal',         ['vhs','sync','roll','noise','ghost','dotcrawl','hum','herring','degauss']],
   ['Film / Display',        ['film','crt','hud','halftone']],
   ['Light / Optics',        ['bloom','leak','aura','sparkle','burst','prism','iris','starf','bokeh','edgeglow']],

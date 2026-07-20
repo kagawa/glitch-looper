@@ -95,6 +95,7 @@ function drawFrame(phase){    // phase in [0,1)
   applyRgbShift(w,h,t,v,true);                      // Slice's vertical RGB split follows its Apply To / Coverage
   applySliceGlitch(w,h,phase,gl);
   glitchGateEnd(w,h,'glitch',glitchGate);
+  applyStandaloneRgbSplit(w,h);
 
   // ---- datamosh: modern per-frame corruption ----
   if (state.mosh.on && state.mosh.intensity>0){
