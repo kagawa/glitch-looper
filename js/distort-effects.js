@@ -523,15 +523,26 @@ function applyStandaloneRgbSplit(w,h,phase){
   const base=ctx.getImageData(0,0,w,h), bd=base.data, out=ctx.createImageData(w,h), od=out.data;
   let dx=P('rgbsplit','x'), dy=P('rgbsplit','y');
   const amt=P('rgbsplit','amount'), mode=s.mode|0;
-  if (mode===3){ const a=P('rgbsplit','spin')*Math.PI*2*phase, c=Math.cos(a), q=Math.sin(a); [dx,dy]=[dx*c-dy*q,dx*q+dy*c]; }
+  if (mode===3||mode===4){ const a=P('rgbsplit','spin')*Math.PI*2*phase, c=Math.cos(a), q=Math.sin(a); [dx,dy]=[dx*c-dy*q,dx*q+dy*c]; }
   dx=Math.round(dx); dy=Math.round(dy);
   for(let y=0;y<h;y++) for(let x=0;x<w;x++){
     const i=(y*w+x)*4, rx=Math.max(0,Math.min(w-1,x+dx)), bx=Math.max(0,Math.min(w-1,x-dx)), ry=Math.max(0,Math.min(h-1,y+dy)), by=Math.max(0,Math.min(h-1,y-dy));
     const ri=(ry*w+rx)*4, bi=(by*w+bx)*4;
     let R=bd[ri],G=bd[i+1],B=bd[bi+2];
+    if(mode===4){
+      const a=Math.atan2(dy,dx)+Math.PI*2/3, b=Math.atan2(dy,dx)+Math.PI*4/3, mag=Math.hypot(dx,dy);
+      const gx=Math.max(0,Math.min(w-1,Math.round(x+Math.cos(a)*mag))), gy=Math.max(0,Math.min(h-1,Math.round(y+Math.sin(a)*mag)));
+      const bx2=Math.max(0,Math.min(w-1,Math.round(x+Math.cos(b)*mag))), by2=Math.max(0,Math.min(h-1,Math.round(y+Math.sin(b)*mag)));
+      G=bd[(gy*w+gx)*4+1]; B=bd[(by2*w+bx2)*4+2];
+    }
     if(mode===1){ G=bd[bi+1]; B=bd[bi+2]; }
     if(mode===2){ G=bd[i+1]; B=bd[ri+2]; }
-    od[i]=bd[i]+(R-bd[i])*amt; od[i+1]=bd[i+1]+(G-bd[i+1])*amt; od[i+2]=bd[i+2]+(B-bd[i+2])*amt; od[i+3]=255;
+    const lum=(bd[i]*.299+bd[i+1]*.587+bd[i+2]*.114)/255, mx=Math.max(bd[i],bd[i+1],bd[i+2]), mn=Math.min(bd[i],bd[i+1],bd[i+2]);
+    let gate=1, apply=s.apply|0;
+    if(apply===1) gate=lum; else if(apply===2) gate=1-lum; else if(apply===4) gate=mx?(mx-mn)/mx:0;
+    else if(apply===3){ const x2=Math.min(w-1,x+1), y2=Math.min(h-1,y+1), j=(y*w+x2)*4, k=(y2*w+x)*4; const l2=(bd[j]*.299+bd[j+1]*.587+bd[j+2]*.114)/255, l3=(bd[k]*.299+bd[k+1]*.587+bd[k+2]*.114)/255; gate=Math.min(1,Math.abs(lum-l2)+Math.abs(lum-l3)*1.5); }
+    const rd=+s.radial||0, dxn=x/w-.5, dyn=y/h-.5, radial=rd?1-rd*Math.min(1,Math.hypot(dxn,dyn)*2):1, gain=Math.max(0,Math.min(1,amt*gate*radial));
+    od[i]=bd[i]+(R-bd[i])*gain; od[i+1]=bd[i+1]+(G-bd[i+1])*gain; od[i+2]=bd[i+2]+(B-bd[i+2])*gain; od[i+3]=255;
   }
   ctx.putImageData(out,0,0);
 }

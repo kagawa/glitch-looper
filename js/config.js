@@ -26,8 +26,10 @@ const FX = [
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.7, env:1 },
     { k:'x', label:'Horizontal Shift', min:-40, max:40, step:.5, def:8, env:1 },
     { k:'y', label:'Vertical Shift', min:-40, max:40, step:.5, def:0, env:1 },
-    { k:'mode', label:'Mode', type:'select', def:0, options:[[0,'RGB Split'],[1,'Red / Cyan'],[2,'Red / Blue'],[3,'Rotating Split']] },
+    { k:'mode', label:'Mode', type:'select', def:0, options:[[0,'RGB Split'],[1,'Red / Cyan'],[2,'Red / Blue'],[3,'Rotating Split'],[4,'Three-Colour Rotate']] },
     { k:'spin', label:'Spin (turns/loop)', min:-2, max:2, step:.05, def:.25, env:1, show:s=> (s.mode|0)===3 },
+    { k:'apply', label:'Apply To', type:'select', def:0, options:[[0,'Whole'],[1,'Bright'],[2,'Dark'],[3,'Edges'],[4,'Saturated']] },
+    { k:'radial', label:'Radial Falloff', min:0, max:1, step:.01, def:0, env:1 },
   ]},
   { id:'noise', name:'Noise', hint:'grain — luma / colour / salt & pepper', on:false, open:false, params:[
     { k:'grain',    label:'Grain',   min:0, max:1, step:.01, def:.18, env:1, envd:1 },
