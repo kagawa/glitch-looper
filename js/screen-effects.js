@@ -558,6 +558,15 @@ if (bs.on && bs.amount>0){
       sctx.strokeStyle=g; sctx.lineWidth=beamW; sctx.beginPath(); sctx.moveTo(ox,oy); sctx.lineTo(ex,ey); sctx.stroke();
     }
     sctx.restore();
+    const reach=bs.reach==null?0.7:bs.reach, hole=Math.min(.82,reach*.72)*R;
+    if (hole>0){
+      const mask=sctx.createRadialGradient(cx,cy,0,cx,cy,R);
+      mask.addColorStop(0,'rgba(0,0,0,0)');
+      mask.addColorStop(Math.min(.98,hole/R),'rgba(0,0,0,0)');
+      mask.addColorStop(Math.min(1,hole/R+.12),'rgba(0,0,0,1)');
+      mask.addColorStop(1,'rgba(0,0,0,1)');
+      sctx.globalCompositeOperation='destination-in'; sctx.fillStyle=mask; sctx.fillRect(0,0,w,h); sctx.globalCompositeOperation='source-over';
+    }
   } else {
     const cx=(bs.cx==null ? .5 : bs.cx)*w, cy=(bs.cy==null ? .5 : bs.cy)*h, R=Math.hypot(w,h)*1.5;
     const N=Math.round(12+bs.lines*44);
