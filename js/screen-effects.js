@@ -544,8 +544,20 @@ if (bs.on && bs.amount>0){
       }
     }
     sctx.restore();
+  } else if (style===2){
+    const cx=(bs.cx==null ? .5 : bs.cx)*w, cy=(bs.cy==null ? .5 : bs.cy)*h, R=Math.hypot(w,h)*1.2;
+    const N=Math.round(8+(bs.lines==null?.5:bs.lines)*36), spinT=bs.spin==null?0:bs.spin, spinning=Math.abs(spinT)>1e-6;
+    let k=Math.round(spinT*N); if(spinning&&k===0) k=spinT>0?1:-1;
+    const rot=spinning?k*(TWO/N)*phase:0, beamW=Math.max(1,Math.min(R*.025,1.5+bs.size*4));
+    sctx.save(); sctx.translate(cx,cy);
+    for(let i=0;i<N;i++){
+      const ang=i*TWO/N+rot, col=hypeColor(tone,spinning?i/N+rot/TWO:i/N,.95,N), ex=Math.cos(ang)*R, ey=Math.sin(ang)*R;
+      const g=sctx.createLinearGradient(0,0,ex,ey); g.addColorStop(0,`rgba(${col[0]},${col[1]},${col[2]},.95)`); g.addColorStop(.25,`rgba(${col[0]},${col[1]},${col[2]},.55)`); g.addColorStop(1,`rgba(${col[0]},${col[1]},${col[2]},0)`);
+      sctx.strokeStyle=g; sctx.lineWidth=beamW*(.65+.35*burstNoise(i/N)); sctx.beginPath(); sctx.moveTo(0,0); sctx.lineTo(ex,ey); sctx.stroke();
+    }
+    sctx.restore();
   } else {
-    const cx=w/2, cy=h/2, R=Math.hypot(w,h)/2*1.1;
+    const cx=(bs.cx==null ? .5 : bs.cx)*w, cy=(bs.cy==null ? .5 : bs.cy)*h, R=Math.hypot(w,h)/2*1.1;
     const N=Math.round(12+bs.lines*44);
     const spinT=bs.spin==null?0:bs.spin, spinning=Math.abs(spinT)>1e-6;
     let k=Math.round(spinT*N); if (spinning && k===0) k=spinT>0?1:-1;        // snap to a line-spacing step
@@ -578,9 +590,10 @@ if (bs.on && bs.amount>0){
   const BLEND=['screen','lighter','overlay','source-over','multiply'];
   const pulse=0.8+0.2*Math.sin(phase*Math.PI*2);
   ctx.save(); ctx.globalCompositeOperation=BLEND[bs.blend|0]||'screen'; ctx.globalAlpha=a*pulse;
-  if (style===1) ctx.filter=`blur(${(3+(bs.size==null?0.5:bs.size)*5).toFixed(1)}px)`;   // extra softness → reads as indirect bounce, not a crisp cutout
+  const blur=(bs.blur==null?.25:bs.blur);
+  if (blur>0) ctx.filter=`blur(${(blur*(style===1?5:12)).toFixed(1)}px)`;
   ctx.drawImage(sc,0,0);
-  if (style===1) ctx.filter='none';
+  ctx.filter='none';
   ctx.restore();
 }
 }
