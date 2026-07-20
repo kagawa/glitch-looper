@@ -541,7 +541,14 @@ function applyStandaloneRgbSplit(w,h,phase){
     let gate=1, apply=s.apply|0;
     if(apply===1) gate=lum; else if(apply===2) gate=1-lum; else if(apply===4) gate=mx?(mx-mn)/mx:0;
     else if(apply===3){ const x2=Math.min(w-1,x+1), y2=Math.min(h-1,y+1), j=(y*w+x2)*4, k=(y2*w+x)*4; const l2=(bd[j]*.299+bd[j+1]*.587+bd[j+2]*.114)/255, l3=(bd[k]*.299+bd[k+1]*.587+bd[k+2]*.114)/255; gate=Math.min(1,Math.abs(lum-l2)+Math.abs(lum-l3)*1.5); }
-    const rd=+s.radial||0, dxn=x/w-.5, dyn=y/h-.5, radial=rd?1-rd*Math.min(1,Math.hypot(dxn,dyn)*2):1, gain=Math.max(0,Math.min(1,amt*gate*radial));
+    const rd=+s.radial||0, fall=s.fall|0, dxn=x/w-.5, dyn=y/h-.5;
+    let edge=1;
+    if(fall===0) edge=1-Math.min(1,Math.hypot(dxn,dyn)*2);
+    else if(fall===1) edge=x/Math.max(1,w-1);
+    else if(fall===2) edge=1-x/Math.max(1,w-1);
+    else if(fall===3) edge=y/Math.max(1,h-1);
+    else if(fall===4) edge=1-y/Math.max(1,h-1);
+    const falloff=1-rd+rd*edge, gain=Math.max(0,Math.min(1,amt*gate*falloff));
     od[i]=bd[i]+(R-bd[i])*gain; od[i+1]=bd[i+1]+(G-bd[i+1])*gain; od[i+2]=bd[i+2]+(B-bd[i+2])*gain; od[i+3]=255;
   }
   ctx.putImageData(out,0,0);
