@@ -558,7 +558,9 @@ if (bs.on && bs.amount>0){
       sctx.strokeStyle=g; sctx.lineWidth=beamW; sctx.beginPath(); sctx.moveTo(ox,oy); sctx.lineTo(ex,ey); sctx.stroke();
     }
     sctx.restore();
-    const reach=bs.reach==null?0.7:bs.reach, hole=Math.min(.58,reach*.34)*R;
+    // Match Speed Lines semantics: higher Reach lets beams approach the hub, so the
+    // central cut-out shrinks. Keep the laser cut-out gentler than the filled wedges.
+    const reach=bs.reach==null?0.7:bs.reach, hole=Math.min(.28,(1-reach)*.28)*R;
     if (hole>0){
       const mask=sctx.createRadialGradient(cx,cy,0,cx,cy,R);
       mask.addColorStop(0,'rgba(0,0,0,0)');
