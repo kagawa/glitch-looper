@@ -551,7 +551,7 @@ if (bs.on && bs.amount>0){
     const rot=spinning?k*(TWO/N)*phase:0, beamW=Math.max(1,Math.min(R*.025,1.5+bs.size*4));
     sctx.save(); sctx.translate(cx,cy);
     for(let i=0;i<N;i++){
-      const spacing=TWO/N, ang=i*spacing+jit*(burstNoise(i/N)-.5)*spacing*.5+rot, col=hypeColor(tone,((ang/TWO)%1+1)%1,.95,N);
+      const spacing=TWO/N, ang=i*spacing+jit*(burstNoise(i/N)-.5)*spacing*.5+rot, col=hypeColor(tone,((ang/TWO+phase*spinT)%1+1)%1,.95,N);
       const originJ=jit*(burstNoise(i/N+9.7)-.5)*Math.min(w,h)*.08, ox=-Math.sin(ang)*originJ, oy=Math.cos(ang)*originJ, ex=ox+Math.cos(ang)*R, ey=oy+Math.sin(ang)*R;
       const g=sctx.createLinearGradient(ox,oy,ex,ey); g.addColorStop(0,`rgba(${col[0]},${col[1]},${col[2]},.95)`); g.addColorStop(.25,`rgba(${col[0]},${col[1]},${col[2]},.55)`); g.addColorStop(1,`rgba(${col[0]},${col[1]},${col[2]},0)`);
       sctx.strokeStyle=g; sctx.lineWidth=beamW; sctx.beginPath(); sctx.moveTo(ox,oy); sctx.lineTo(ex,ey); sctx.stroke();
@@ -566,7 +566,7 @@ if (bs.on && bs.amount>0){
     sctx.save(); sctx.translate(cx,cy); sctx.rotate(rot);
     for (let i=0;i<N;i++){
       const ang=i*(TWO/N);
-      const frac=((ang+rot)/TWO%1+1)%1;                                      // colour follows the rotated world angle
+      const frac=((ang/TWO+phase*spinT)%1+1)%1;                                // colour follows the rotated world angle and continuous spin
       // Width variation: per-wedge random when static; a smooth angle-periodic noise when spinning, so the
       // widths ride the wedges through the loop and still match at the seam (integer harmonics = periodic).
       const nz = spinning ? burstNoise(frac) : rand(i*7.3);
