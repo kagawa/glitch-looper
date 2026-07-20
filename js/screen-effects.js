@@ -594,7 +594,7 @@ if (bs.on && bs.amount>0){
     sctx.restore();
     // Reach controls how far in from the rim the lines run: low = a thin ring near the edge (clear
     // middle), high = all the way to the centre. Lines always fade to nothing at the very centre.
-    const reach = bs.reach==null?0.7:bs.reach, s0=Math.min(0.9,0.5*(1-reach)), s1=Math.min(0.98,s0+0.45);
+    const reach = bs.reach==null?0.7:bs.reach, s0=Math.min(0.28,(1-reach)*0.28), s1=Math.min(0.98,s0+0.12);
     const rg=sctx.createRadialGradient(cx,cy,0, cx,cy,R);
     rg.addColorStop(0,'rgba(0,0,0,0)');
     if (s0>0.001) rg.addColorStop(s0,'rgba(0,0,0,0)');
