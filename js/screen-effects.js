@@ -558,7 +558,7 @@ if (bs.on && bs.amount>0){
       sctx.strokeStyle=g; sctx.lineWidth=beamW; sctx.beginPath(); sctx.moveTo(ox,oy); sctx.lineTo(ex,ey); sctx.stroke();
     }
     sctx.restore();
-    const reach=bs.reach==null?0.7:bs.reach, hole=Math.min(.82,reach*.72)*R;
+    const reach=bs.reach==null?0.7:bs.reach, hole=Math.min(.58,reach*.34)*R;
     if (hole>0){
       const mask=sctx.createRadialGradient(cx,cy,0,cx,cy,R);
       mask.addColorStop(0,'rgba(0,0,0,0)');
