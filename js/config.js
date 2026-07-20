@@ -294,7 +294,7 @@ const FX = [
     { k:'width',   label:'Wave Width', min:0, max:1, step:.01, def:.5, show:s=> (s.style|0)===1 },
     { k:'sheen',   label:'Sheen', min:0, max:1, step:.01, def:.5, show:s=> (s.style|0)===2 },
     { k:'tiles',   label:'Tile Split', min:0, max:1, step:.01, def:0, show:s=> (s.style|0)!==0 },
-    { k:'tilemotion', label:'Tile Motion', type:'select', def:0, options:[[0,'Independent'],[1,'Radial Rotate']], show:s=> (s.tiles||0)>0 && (s.style|0)!==0 },
+    { k:'tilemotion', label:'Tile Motion', type:'select', def:0, options:[[0,'Independent'],[1,'Burst Rotate']], show:s=> (s.tiles||0)>0 },
     { k:'speed',   label:'Cycle / Scroll Speed', min:1, max:6, step:1, def:1 },
     { k:'angle',   label:'Angle', min:0, max:345, step:15, def:45 },
     { k:'blend',   label:'Blend', type:'select', def:0, options:[[0,'Overlay'],[1,'Screen'],[2,'Hue (recolor)'],[3,'Soft']] },

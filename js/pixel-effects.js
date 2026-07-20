@@ -508,6 +508,9 @@ const rb = state.rainbow;
 if (rb.on && rb.amount>0){
   const a=P('rainbow','amount'), ang=(rb.angle|0)*Math.PI/180, style=rb.style|0, tone=(rb.palette==null?2:rb.palette)|0;
   const tileN=Math.round(2+(+rb.tiles||0)*18), tileRot=(rb.tilemotion|0)===1;
+  const tileSide=tileN>2 ? Math.min(w,h)/tileN : 0, tileCols=tileSide?Math.ceil(w/tileSide):0, tileRows=tileSide?Math.ceil(h/tileSide):0;
+  const tileOX=tileSide?(w-tileCols*tileSide)/2:0, tileOY=tileSide?(h-tileRows*tileSide)/2:0;
+  const tileAt=(x,y)=>{ const tx=tileSide?Math.max(0,Math.min(tileCols-1,Math.floor((x-tileOX)/tileSide))):0, ty=tileSide?Math.max(0,Math.min(tileRows-1,Math.floor((y-tileOY)/tileSide))):0; return {tx,ty,lx:tileSide?(x-(tileOX+tx*tileSide))/tileSide:.5,ly:tileSide?(y-(tileOY+ty*tileSide))/tileSide:.5}; };
   const BLEND=['overlay','screen','hue','soft-light'];
   if (style===1){
     const cs=Math.cos(ang), sn=Math.sin(ang), freq=Math.max(1,rb.bands|0), speed=rb.speed|0||1;
@@ -518,9 +521,8 @@ if (rb.on && rb.amount>0){
     const im=sctx.createImageData(w,h), d=im.data;
     for (let p=0,i=0;i<d.length;i+=4,p++){
       const x=p%w, y=(p/w)|0, proj=(x*cs+y*sn-off0)/span;
-      const tx=Math.floor(x/w*tileN), ty=Math.floor(y/h*tileN), lx=(x/w*tileN-tx), ly=(y/h*tileN-ty);
-      const tilePhase=tileN>2 ? rand(tx*17.3+ty*31.1)*.8 : 0, rr=tileRot ? phase*speed*Math.PI*2 : 0, lxx=lx-.5, lyy=ly-.5, rlx=lxx*Math.cos(rr)-lyy*Math.sin(rr)+.5, rly=lxx*Math.sin(rr)+lyy*Math.cos(rr)+.5;
-      const localProj=tileN>2 ? (rlx*cs+rly*sn+1)/2 : proj;
+      const ti=tileAt(x,y), lx=ti.lx, ly=ti.ly, rr=tileRot ? phase*speed*Math.PI*2 : 0, lxx=lx-.5, lyy=ly-.5;
+      const localProj=tileN>2 ? (tileRot ? (Math.atan2(lyy,lxx)/(Math.PI*2)+.5+phase*speed) % 1 : (lx*cs+ly*sn+1)/2) : proj, tilePhase=0;
       const bandFrac=((localProj*freq-scroll+tilePhase)%1+1)%1, dist=Math.abs(bandFrac-0.5)*2;
       const bp=Math.max(0,1-dist*kf); const bright=bp*bp;                    // squared falloff → a crisp travelling pulse
       if (bright<=0.002) continue;
@@ -542,10 +544,8 @@ if (rb.on && rb.amount>0){
     for (let y=0;y<h;y++) for (let x=0;x<w;x++){
       const i=(y*w+x)*4, lum=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255;
       const proj=(x*cs+y*sn-off0)/span;
-      const tx=Math.floor(x/w*tileN), ty=Math.floor(y/h*tileN), lx=(x/w*tileN-tx), ly=(y/h*tileN-ty);
-      const tcx=(tx+.5)/tileN-.5, tcy=(ty+.5)/tileN-.5, tilePhase=tileN>2 ? (tileRot ? Math.atan2(tcy,tcx)/(Math.PI*2) : rand(tx*17.3+ty*31.1)*.8) : 0;
-      const rr=tileRot ? phase*speed*Math.PI*2 : 0, lxx=lx-.5, lyy=ly-.5, rlx=lxx*Math.cos(rr)-lyy*Math.sin(rr)+.5, rly=lxx*Math.sin(rr)+lyy*Math.cos(rr)+.5;
-      const localProj=(rlx*cs+rly*sn+1)/2;
+      const ti=tileAt(x,y), lx=ti.lx, ly=ti.ly, lxx=lx-.5, lyy=ly-.5;
+      const localProj=tileRot ? (Math.atan2(lyy,lxx)/(Math.PI*2)+.5+phase*speed)%1 : (lx*cs+ly*sn+1)/2, tilePhase=0;
       const c=hypeLerp(tone, localProj*dens + phase*speed + tilePhase, 0.9); // each tile owns its foil phase
       const band=0.5+0.5*Math.sin(proj*dens*Math.PI*4);                      // fine ripple within each band
       const shDist=Math.abs(((proj-sweep+1.5)%1)-0.5)*2, sh=Math.max(0,1-shDist*4)*sheen;
@@ -559,10 +559,9 @@ if (rb.on && rb.amount>0){
     if (tileN>2){
       const im=sctx.createImageData(w,h), d=im.data, rot=(rb.tilemotion|0)===1?phase*(rb.speed|0||1)*Math.PI*2:0;
       for(let p=0,i=0;i<d.length;i+=4,p++){
-        const x=p%w,y=(p/w)|0,tx=Math.floor(x/w*tileN),ty=Math.floor(y/h*tileN),lx=x/w*tileN-tx-.5,ly=y/h*tileN-ty-.5;
-        const qx=lx*Math.cos(rot)-ly*Math.sin(rot)+.5,qy=lx*Math.sin(rot)+ly*Math.cos(rot)+.5;
-        const tilePhase=(rb.tilemotion|0)===1?Math.atan2((ty+.5)/tileN-.5,(tx+.5)/tileN-.5)/(Math.PI*2):rand(tx*17.3+ty*31.1)*.8;
-        const c=hypeLerp(tone,(qx*Math.cos(ang)+qy*Math.sin(ang))*1.1+phase*(rb.speed|0||1)+tilePhase,1);
+        const x=p%w,y=(p/w)|0,ti=tileAt(x,y),lx=ti.lx-.5,ly=ti.ly-.5;
+        const local=(rb.tilemotion|0)===1?(Math.atan2(ly,lx)/(Math.PI*2)+.5+phase*(rb.speed|0||1)):( (ti.lx*Math.cos(ang)+ti.ly*Math.sin(ang)+1)/2 );
+        const c=hypeLerp(tone,local,1);
         d[i]=c[0]; d[i+1]=c[1]; d[i+2]=c[2]; d[i+3]=255;
       }
       sctx.putImageData(im,0,0); ctx.save(); ctx.globalCompositeOperation=BLEND[rb.blend|0]||'overlay'; ctx.globalAlpha=a; ctx.drawImage(sc,0,0); ctx.restore();
