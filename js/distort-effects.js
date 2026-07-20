@@ -517,13 +517,16 @@ if (hAb > 0.5 || vRGB > 0.5){
 }
   return gl;
 }
-function applyStandaloneRgbSplit(w,h){
+function applyStandaloneRgbSplit(w,h,phase){
   const s=state.rgbsplit;
   if (!(s && s.on && s.amount>0)) return;
   const base=ctx.getImageData(0,0,w,h), bd=base.data, out=ctx.createImageData(w,h), od=out.data;
-  const dx=Math.round(P('rgbsplit','x')), dy=Math.round(P('rgbsplit','y')), amt=P('rgbsplit','amount'), mode=s.mode|0;
+  let dx=P('rgbsplit','x'), dy=P('rgbsplit','y');
+  const amt=P('rgbsplit','amount'), mode=s.mode|0;
+  if (mode===3){ const a=P('rgbsplit','spin')*Math.PI*2*phase, c=Math.cos(a), q=Math.sin(a); [dx,dy]=[dx*c-dy*q,dx*q+dy*c]; }
+  dx=Math.round(dx); dy=Math.round(dy);
   for(let y=0;y<h;y++) for(let x=0;x<w;x++){
-    const i=(y*w+x)*4, rx=Math.min(w-1,x+dx), bx=Math.max(0,x-dx), ry=Math.min(h-1,y+dy), by=Math.max(0,y-dy);
+    const i=(y*w+x)*4, rx=Math.max(0,Math.min(w-1,x+dx)), bx=Math.max(0,Math.min(w-1,x-dx)), ry=Math.max(0,Math.min(h-1,y+dy)), by=Math.max(0,Math.min(h-1,y-dy));
     const ri=(ry*w+rx)*4, bi=(by*w+bx)*4;
     let R=bd[ri],G=bd[i+1],B=bd[bi+2];
     if(mode===1){ G=bd[bi+1]; B=bd[bi+2]; }

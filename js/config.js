@@ -24,9 +24,10 @@ const FX = [
   ]},
   { id:'rgbsplit', name:'RGB Split', hint:'standalone chromatic separation — RGB channels shifted without VHS or slice damage', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.7, env:1 },
-    { k:'x', label:'Horizontal Shift', min:0, max:40, step:.5, def:8, env:1 },
-    { k:'y', label:'Vertical Shift', min:0, max:40, step:.5, def:0, env:1 },
-    { k:'mode', label:'Mode', type:'select', def:0, options:[[0,'RGB Split'],[1,'Red / Cyan'],[2,'Red / Blue']] },
+    { k:'x', label:'Horizontal Shift', min:-40, max:40, step:.5, def:8, env:1 },
+    { k:'y', label:'Vertical Shift', min:-40, max:40, step:.5, def:0, env:1 },
+    { k:'mode', label:'Mode', type:'select', def:0, options:[[0,'RGB Split'],[1,'Red / Cyan'],[2,'Red / Blue'],[3,'Rotating Split']] },
+    { k:'spin', label:'Spin (turns/loop)', min:-2, max:2, step:.05, def:.25, env:1, show:s=> (s.mode|0)===3 },
   ]},
   { id:'noise', name:'Noise', hint:'grain — luma / colour / salt & pepper', on:false, open:false, params:[
     { k:'grain',    label:'Grain',   min:0, max:1, step:.01, def:.18, env:1, envd:1 },
