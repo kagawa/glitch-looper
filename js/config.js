@@ -9,7 +9,7 @@ const FX = [
     { k:'wobmode',    label:'Wobble Pattern', type:'select', def:0,
       options:[[0,'Wave'],[1,'Pulse'],[2,'Jitter'],[3,'Step'],[4,'Drift']] },
   ]},
-  { id:'glitch', name:'Slice', hint:'directional cuts · shift / duplicate / freeze / invert / solid fill + RGB split', on:false, open:false, params:[
+  { id:'glitch', name:'Slice', hint:'directional cuts — shift / duplicate / freeze / invert', on:false, open:false, params:[
     { k:'amount',   label:'Amount', min:0, max:1, step:.01, def:.4, env:1, envd:1 },
     { k:'direction',label:'Direction', type:'select', def:0, options:[[0,'Horizontal'],[1,'Vertical'],[2,'Both']] },
     { k:'fill',     label:'Break Method', type:'select', def:0, options:[[0,'Shift'],[1,'Duplicate'],[2,'Freeze'],[3,'Invert'],[4,'Solid Black'],[5,'Solid White']] },
@@ -22,7 +22,7 @@ const FX = [
     { k:'applyto',  label:'Apply To', type:'select', def:0, options:[[0,'Whole'],[1,'Bright'],[2,'Dark'],[3,'Edges'],[4,'Saturated']] },
     { k:'coverage', label:'Coverage', min:0, max:1, step:.01, def:1 },
   ]},
-  { id:'rgbsplit', name:'RGB Split', hint:'standalone chromatic separation — RGB channels shifted without VHS or slice damage', on:false, open:false, params:[
+  { id:'rgbsplit', name:'RGB Split', hint:'standalone chromatic separation', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.7, env:1 },
     { k:'x', label:'Horizontal Shift', min:-40, max:40, step:.5, def:8, env:1 },
     { k:'y', label:'Vertical Shift', min:-40, max:40, step:.5, def:0, env:1 },
@@ -61,7 +61,7 @@ const FX = [
     { k:'sepia',   label:'Sepia', min:0, max:1, step:.01, def:.5 },
     { k:'burn',    label:'Burn/Flicker', min:0, max:1, step:.01, def:.3, env:1 },
   ]},
-  { id:'mosh', name:'Datamosh', hint:'directional block smear / freeze / duplicate / random paste / frame accumulation + pixel sort + channel jitter', on:false, open:false, params:[
+  { id:'mosh', name:'Datamosh', hint:'block corruption — smear / freeze / duplicate / accumulate', on:false, open:false, params:[
     { k:'intensity', label:'Intensity',   min:0, max:1, step:.01, def:.5, env:1, envd:1 },
     { k:'push',      label:'Push Direction', type:'select', def:0, options:[[0,'Flow'],[1,'Down'],[2,'Up'],[3,'Left'],[4,'Right'],[5,'Radial']] },
     { k:'mode',      label:'Block Mode', type:'select', def:0, options:[[0,'Smear'],[1,'Freeze'],[2,'Duplicate'],[3,'Random Paste'],[4,'Accumulate']] },
@@ -75,7 +75,7 @@ const FX = [
     { k:'applyto',   label:'Apply To', type:'select', def:0, options:[[0,'Whole'],[1,'Bright'],[2,'Dark'],[3,'Edges'],[4,'Saturated']] },
     { k:'coverage',  label:'Coverage', min:0, max:1, step:.01, def:1 },
   ]},
-  { id:'jpeg', name:'JPEG Glitch', hint:'real byte corruption — entropy melt / quant tone-shift / Huffman collapse', on:false, open:false, params:[
+  { id:'jpeg', name:'JPEG Glitch', hint:'real JPEG byte corruption — entropy / DQT / DHT', on:false, open:false, params:[
     { k:'amount',  label:'Corruption', min:0, max:1, step:.01, def:.3 },
     { k:'mix',     label:'Output Mix', min:0, max:1, step:.01, def:1 },
     { k:'density', label:'Damage Density', min:0, max:1, step:.01, def:1 },
@@ -90,7 +90,7 @@ const FX = [
     { k:'quality', label:'Quality (coarse)', min:.05, max:.95, step:.01, def:.35 },
     { k:'frames',  label:'Frames', min:1, max:16, step:1, def:6 },
   ]},
-  { id:'png', name:'PNG Glitch', hint:'real · scanline-filter corruption (H/V/diagonal bleed + noise)', on:false, open:false, params:[
+  { id:'png', name:'PNG Glitch', hint:'real PNG scanline-filter corruption', on:false, open:false, params:[
     { k:'amount', label:'Bleed (filter)', min:0, max:1, step:.01, def:.3 },
     { k:'noise',  label:'Random Noise', min:0, max:1, step:.01, def:.2 },
     { k:'mix',    label:'Output Mix', min:0, max:1, step:.01, def:1 },
@@ -114,7 +114,7 @@ const FX = [
     { k:'soft',   label:'Softness (detail loss)', min:0, max:1, step:.01, def:0, env:1 },
     { k:'block',  label:'Block', min:4, max:16, step:2, def:8 },
   ]},
-  { id:'dct', name:'DCT Glitch', hint:'real 8×8 DCT — flatten / quantise / DC-shift / scramble coefficients (live)', on:false, open:false, params:[
+  { id:'dct', name:'DCT Glitch', hint:'real 8×8 DCT — live coefficient corruption', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
     { k:'mix',    label:'Mix', min:0, max:1, step:.01, def:.7, env:1 },
     { k:'mode',   label:'Mode', type:'select', def:0, options:[[0,'Flatten (blocky)'],[1,'Quantise (banding)'],[2,'DC Shift (block jumps)'],[3,'Scramble AC (ringing)']] },
@@ -151,7 +151,7 @@ const FX = [
     { k:'applyto', label:'Apply To', type:'select', def:0, options:[[0,'Whole'],[1,'Bright'],[2,'Dark'],[3,'Edges'],[4,'Saturated']] },
     { k:'coverage',label:'Coverage', min:0, max:1, step:.01, def:1 },
   ]},
-  { id:'wrongfmt', name:'Wrong Format', hint:'reinterpret the raw frame with the wrong pixel layout — planar YUV triple-ghost / stride shear / bit-depth', on:false, open:false, params:[
+  { id:'wrongfmt', name:'Wrong Format', hint:'wrong pixel layout — planar / stride / bit-depth reinterpret', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.6, env:1, envd:1 },
     { k:'mode',   label:'Layout', type:'select', def:0, options:[[0,'Planar (triple-ghost)'],[1,'Stride Shear'],[2,'Bit Depth (16→8)'],[3,'Channel Planar']] },
     { k:'chunk',  label:'Chunk Size (rows)', min:1, max:64, step:1, def:1, show:s=> (s.mode|0)===1 },
@@ -164,14 +164,14 @@ const FX = [
     { k:'colors', label:'Colours', min:2, max:128, step:1, def:48 },
     { k:'speed',  label:'Speed', min:1, max:12, step:1, def:4 },
   ]},
-  { id:'gif', name:'Indexed / GIF', hint:'256-colour palette · dither · scramble / colour-cycle / streaks', on:false, open:false, params:[
+  { id:'gif', name:'Indexed / GIF', hint:'palette + dither + palette FX', on:false, open:false, params:[
     { k:'colors', label:'Colours', min:2, max:64, step:1, def:16 },
     { k:'dither', label:'Dither', min:0, max:1, step:.01, def:.4 },
     { k:'glitch', label:'Palette FX', type:'select', def:0,
       options:[[0,'None'],[1,'Scramble'],[2,'Colour Cycle'],[3,'Index Streaks']] },
     { k:'amount', label:'FX Amount', min:0, max:1, step:.01, def:.5, env:1 },
   ]},
-  { id:'sonify', name:'Sonify', hint:'audio-style databend on the raw byte stream — echo / reverse / reverb / tremolo', on:false, open:false, params:[
+  { id:'sonify', name:'Sonify', hint:'audio-style databend on raw bytes', on:false, open:false, params:[
     { k:'mode',   label:'Effect', type:'select', def:0, options:[[0,'Echo'],[1,'Reverse'],[2,'Reverb'],[3,'Tremolo'],[4,'Ring Mod'],[5,'Overdrive'],[6,'Stutter'],[7,'Decimate']] },
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
     { k:'delay',  label:'Delay / Rate', min:1, max:100, step:1, def:30, env:1 },
@@ -189,7 +189,7 @@ const FX = [
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
     { k:'bits',   label:'Bit Split', min:2, max:7, step:1, def:6 },
   ]},
-  { id:'webp', name:'WebP Glitch', hint:'real WebP re-encode + byte corruption (VP8 predictive glitch)', on:false, open:false, params:[
+  { id:'webp', name:'WebP Glitch', hint:'real WebP byte corruption (VP8 payload)', on:false, open:false, params:[
     { k:'amount', label:'Corruption', min:0, max:1, step:.01, def:.3 },
     { k:'mix',    label:'Output Mix', min:0, max:1, step:.01, def:1 },
     { k:'density',label:'Damage Density', min:0, max:1, step:.01, def:1 },
@@ -203,7 +203,7 @@ const FX = [
     { k:'quality',label:'Quality', min:1, max:90, step:1, def:40 },
     { k:'frames', label:'Frames', min:1, max:12, step:1, def:6 },
   ]},
-  { id:'gifg', name:'GIF Glitch', hint:'real GIF encode + byte corruption — LZW image data & colour table (separate)', on:false, open:false, params:[
+  { id:'gifg', name:'GIF Glitch', hint:'real GIF byte corruption — LZW / palette', on:false, open:false, params:[
     { k:'data',    label:'Data (LZW)', min:0, max:1, step:.01, def:.5 },
     { k:'palette', label:'Palette', min:0, max:1, step:.01, def:.4 },
     { k:'palmode', label:'Palette Method', type:'select', def:0, options:[[0,'Replace'],[1,'Rotate'],[2,'Swap'],[3,'Invert'],[4,'Channel Roll']] },
@@ -219,7 +219,7 @@ const FX = [
     { k:'window',  label:'Window Size', min:.02, max:1, step:.01, def:.35, show:s=> (s.where|0)!==0 },
     { k:'frames',  label:'Frames', min:1, max:12, step:1, def:6 },
   ]},
-  { id:'audio', name:'Audio Databend', hint:'real — route the raw bytes through a WebAudio graph (echo / reverb / crush / filter / distortion / compressor / chorus)', on:false, open:false, params:[
+  { id:'audio', name:'Audio Databend', hint:'real — bytes through a WebAudio DSP graph', on:false, open:false, params:[
     { k:'mode',   label:'Effect', type:'select', def:0, options:[[0,'Echo'],[1,'Reverb'],[2,'Bit-crush'],[3,'Low-pass Sweep'],[4,'High-pass'],[5,'Band-pass'],[6,'Comb'],[7,'Distortion'],[8,'Compressor'],[9,'Chorus']] },
     { k:'layout', label:'Byte Layout', type:'select', def:0, options:[[0,'Planar RGB'],[1,'Interleaved Rows'],[2,'Interleaved Columns'],[3,'Rotated Planes (GBR)']] },
     { k:'tune',   label:'DSP Controls', type:'select', def:0, options:[[0,'Auto (legacy response)'],[1,'Custom']] },
@@ -235,7 +235,7 @@ const FX = [
     { k:'depth',  label:'Chorus Depth', min:0, max:1, step:.01, def:.5, show:s=> (s.tune|0)===1 && (s.mode|0)===9 },
     { k:'frames', label:'Steps', min:1, max:8, step:1, def:5 },
   ]},
-  { id:'degauss', name:'Degauss', hint:'degaussing CRT — the picture ripples and the colour goes impure', on:false, open:false, params:[
+  { id:'degauss', name:'Degauss', hint:'degaussing CRT — ripple + colour impurity', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.6, env:1 },
     { k:'sway',   label:'Screen Ripple', min:0, max:1, step:.01, def:.5, env:1 },
     { k:'freq',   label:'Shimmer', min:1, max:8, step:1, def:4 },
@@ -276,12 +276,12 @@ const FX = [
     { k:'size',    label:'Size', min:.5, max:2.5, step:.1, def:1 },
     { k:'opacity', label:'Opacity', min:0, max:1, step:.01, def:.9 },
   ]},
-  { id:'bloom', name:'Bloom', hint:'glow / light bleed — Halation lifts the whole frame (high-key)', on:false, open:false, params:[
+  { id:'bloom', name:'Bloom', hint:'glow / light bleed — Halation lifts the frame', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
     { k:'size',   label:'Radius', min:1, max:30, step:1, def:8 },
     { k:'glow',   label:'Halation (high-key)', min:0, max:1, step:.01, def:0, env:1 },
   ]},
-  { id:'leak', name:'Light Leak', hint:'warm light bleeds in from an edge and drifts over the loop — brightens', on:false, open:false, params:[
+  { id:'leak', name:'Light Leak', hint:'warm light bleeds in from an edge — brightens', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
     { k:'tone',   label:'Tone', type:'select', def:0, options:[[0,'Warm'],[1,'Gold'],[2,'Red'],[3,'White'],[4,'Cool']] },
     { k:'pos',    label:'From', type:'select', def:0, options:[[0,'Left'],[1,'Right'],[2,'Top'],[3,'Bottom'],[4,'Corner']] },
@@ -289,7 +289,7 @@ const FX = [
     { k:'drift',  label:'Drift', min:0, max:1, step:.01, def:.4 },
   ]},
   // ---- hype / dopamine ----
-  { id:'gold', name:'Metallic', hint:'metallic tone-map with a shine sweep — gold / chrome / rose / bronze / rainbow', on:false, open:false, params:[
+  { id:'gold', name:'Metallic', hint:'metallic tone-map — gold / chrome / rose / bronze', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.8, env:1 },
     { k:'shine',  label:'Shine', min:0, max:1, step:.01, def:.6, env:1 },
     { k:'speed',  label:'Shine Speed', min:1, max:6, step:1, def:1, show:s=> s.shine>0 },
@@ -337,7 +337,7 @@ const FX = [
     { k:'cx',     label:'Hub X', min:0, max:1, step:.01, def:.5 },
     { k:'cy',     label:'Hub Y', min:0, max:1, step:.01, def:.5 },
   ]},
-  { id:'edgeglow', name:'Edge Glow', hint:'ambient border bounce — colour bleeds in from the edges like indirect light, no source drawn', on:false, open:false, params:[
+  { id:'edgeglow', name:'Edge Glow', hint:'ambient border bounce — indirect edge glow', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.7, env:1, envd:1 },
     { k:'reach',  label:'Reach', min:0, max:1, step:.01, def:.35 },
     { k:'jitter', label:'Reach Variation', min:0, max:1, step:.01, def:0 },
@@ -387,7 +387,7 @@ const FX = [
     { k:'from',    label:'From', type:'select', def:0, options:[[0,'Highlights'],[1,'Saturated'],[2,'Any bright/vivid']] },
     { k:'shape',   label:'Shape', type:'select', def:0, options:[[0,'Circle'],[1,'Hexagon'],[2,'Star (5pt)'],[3,'Heart'],[4,'Diamond'],[5,'Star (4pt)'],[6,'Star (6pt)'],[7,'Sparkle (8pt)']] },
   ]},
-  { id:'aura', name:'Aura', hint:'soft radial halo from a fixed anchor or from image highlights / saturated / any pixels — Bokeh-like sources, Edge-Glow-soft look', on:false, open:false, params:[
+  { id:'aura', name:'Aura', hint:'soft radial halo — from an anchor or image highlights', on:false, open:false, params:[
     { k:'amount',   label:'Amount', min:0, max:1, step:.01, def:.7, env:1 },
     { k:'mode',     label:'Mode', type:'select', def:0, options:[[0,'Ambient'],[1,'Bokeh'],[2,'Radiant']] },
     { k:'source',   label:'Source', type:'select', def:10, options:[[0,'Center'],[1,'Top'],[2,'Bottom'],[3,'Left'],[4,'Right'],[5,'Top-Left'],[6,'Top-Right'],[7,'Bottom-Left'],[8,'Bottom-Right'],[9,'Custom (X/Y)'],[10,'Image Highlights'],[11,'Image Saturated'],[12,'Image Any']] },
@@ -433,7 +433,7 @@ const FX = [
       options:[[0,'Even'],[1,'Right'],[2,'Left'],[3,'Bottom'],[4,'Top'],[5,'Bright areas'],[6,'Dark areas']] },
     { k:'cover', label:'Coverage', min:0, max:1, step:.01, def:.5, env:1, show:s=> s.fade!==0 },
   ]},
-  { id:'crt', name:'CRT', hint:'tube curve · RGB phosphor mask · scanlines · convergence · glow', on:false, open:false, params:[
+  { id:'crt', name:'CRT', hint:'tube curve · phosphor mask · scanlines · glow', on:false, open:false, params:[
     { k:'amount',   label:'Curvature',     min:0, max:1, step:.01, def:.3 },
     { k:'round',    label:'Screen Bulge',  min:0, max:1, step:.01, def:.2 },
     { k:'corner',   label:'Corner Dark',   min:0, max:1, step:.01, def:.5 },
@@ -445,7 +445,7 @@ const FX = [
     { k:'converge', label:'Convergence',   min:0, max:1, step:.01, def:.25, env:1 },
     { k:'glow',     label:'Phosphor Glow', min:0, max:1, step:.01, def:.3, env:1 },
   ]},
-  { id:'sync', name:'Signal / Sync', hint:'horizontal-sync instability — diagonal skew · flagging · bad contact', on:false, open:false, params:[
+  { id:'sync', name:'Signal / Sync', hint:'H-sync instability — skew / flagging / bad contact', on:false, open:false, params:[
     { k:'hsync',   label:'H-Sync',      min:-1, max:1, step:.01, def:0 },
     { k:'flag',    label:'Flagging',    min:0, max:1, step:.01, def:0, env:1 },
     { k:'contact', label:'Bad Contact', min:0, max:1, step:.01, def:0, env:1 },
@@ -483,7 +483,7 @@ const FX = [
     { k:'speed',  label:'Fast Spin (whole turns/loop)', min:-1, max:1, step:1, def:0 },
     { k:'pulse',  label:'Zoom Pulse', min:0, max:1, step:.01, def:0 },
   ]},
-  { id:'extrude', name:'Extrude', hint:'pick a band of the picture (tone / colour / edges) and push it out — angle or radial, plain or colour-tinted, pseudo-3D', on:false, open:false, params:[
+  { id:'extrude', name:'Extrude', hint:'push a tonal / edge band outward — pseudo-3D', on:false, open:false, params:[
     { k:'key',    label:'Select By', type:'select', def:0, options:[[0,'Lightness'],[1,'Saturation'],[2,'Hue'],[3,'Edges']] },
     { k:'center', label:'Range Centre', min:0, max:1, step:.01, def:.78, show:s=> s.key!==3 },
     { k:'width',  label:'Range Width', min:.01, max:1, step:.01, def:.22, show:s=> s.key!==3 },
@@ -500,7 +500,7 @@ const FX = [
     { k:'bmode',  label:'Side Blend', type:'select', def:0, options:[[0,'Replace'],[1,'Screen'],[2,'Multiply'],[3,'Add'],[4,'Overlay']] },
     { k:'opacity',label:'Side Opacity', min:0, max:1, step:.01, def:1 },
   ]},
-  { id:'melt', name:'Melt', hint:'pixel drip (breathes over the loop) — Drip or vertical Wrap', on:false, open:false, params:[
+  { id:'melt', name:'Melt', hint:'pixel drip — Drip or vertical Wrap', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.4, env:1 },
     { k:'mode',   label:'Mode', type:'select', def:0, options:[[0,'Drip'],[1,'Wrap']] },
     { k:'width',  label:'Drip Width', min:1, max:16, step:1, def:1 },
@@ -530,7 +530,7 @@ const FX = [
   { id:'zoom', name:'Zoom', hint:'enlarge / overscan (also hides wobble wrap seams)', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.3, env:1 },
   ]},
-  { id:'mask', name:'Region Mask', hint:'confine effects to a rectangle — fixed / roaming / invertable', on:false, open:false, params:[
+  { id:'mask', name:'Region Mask', hint:'confine effects to a region', on:false, open:false, params:[
     { k:'source',   label:'Mask Source', type:'select', def:0, options:[[0,'Rectangle'],[6,'Roaming Rectangle'],[1,'Shadows'],[2,'Midtones'],[3,'Highlights'],[4,'Edges'],[5,'Noise']] },
     { k:'threshold',label:'Threshold', min:0, max:1, step:.01, def:.5, show:s=> s.source!==0 && s.source!==6 },
     { k:'mode',     label:'Mode', type:'select', def:0, options:[[0,'Fixed'],[1,'Roam']], show:()=>false },  // legacy: kept so old links still decode
@@ -563,7 +563,7 @@ const FX = [
     { k:'gop',    label:'Keyframe (GOP, frames)', min:0, max:45, step:1, def:0 },
     { k:'rate',   label:'Re-roll Rate (per loop)', min:1, max:30, step:1, def:6, show:s=> (s.gop|0)===0 },
   ]},
-  { id:'synctear', name:'Sync Tear', hint:'horizontal hold failure — the picture steps sideways at the tear', on:false, open:false, params:[
+  { id:'synctear', name:'Sync Tear', hint:'H-hold failure — sideways step at each tear', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:1, env:1 },
     { k:'tears',  label:'Tears', min:1, max:6, step:1, def:3 },
     { k:'shift',  label:'Slip (px)', min:0, max:64, step:2, def:36 },
@@ -572,23 +572,23 @@ const FX = [
     { k:'edge',   label:'Edge', type:'select', def:0, options:[[0,'Hard'],[3,'Round'],[1,'Ramp'],[2,'Overshoot']] },
     { k:'edgew',  label:'Edge (px)', min:2, max:40, step:1, def:14, show:s=> (s.edge|0)!==0 },
   ]},
-  { id:'playback', name:'Playback', hint:'reorder the frames — ping-pong / reverse / stutter / jitter', on:false, open:false, params:[
+  { id:'playback', name:'Playback', hint:'reorder frames — ping-pong / reverse / stutter / jitter', on:false, open:false, params:[
     { k:'order',  label:'Order', type:'select', def:1,
       options:[[1,'Ping-Pong'],[2,'Reverse Burst'],[3,'Stutter Loop'],[4,'Jitter']] },
     { k:'olen',   label:'Segment (frames)', min:2, max:30, step:1, def:8, show:s=> [1,2,3].includes(s.order|0) },
   ]},
-  { id:'chroma', name:'Chroma Persistence', hint:'the colour lags behind the picture — drips off moving edges', on:false, open:false, params:[
+  { id:'chroma', name:'Chroma Persistence', hint:'colour lags behind — drips off moving edges', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:1, env:1 },
     { k:'delay',  label:'Lag (frames)', min:1, max:12, step:1, def:4 },
     { k:'mode',   label:'What Lags', type:'select', def:0, options:[[0,'Colour (crisp shape)'],[1,'Brightness (double exposure)']] },
   ]},
-  { id:'interlace', name:'Interlace', hint:'two fields scanned a moment apart — combing on anything that moved', on:false, open:false, params:[
+  { id:'interlace', name:'Interlace', hint:'two fields scanned apart — combing on motion', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:1, env:1 },
     { k:'delay',  label:'Field Delay (frames)', min:1, max:12, step:1, def:2 },
     { k:'thick',  label:'Field Height (lines)', min:1, max:8, step:1, def:1 },
     { k:'swap',   label:'Field Order', type:'select', def:0, options:[[0,'Odd lines lag'],[1,'Even lines lag']] },
   ]},
-  { id:'motion', name:'Envelope', hint:'makes destruction breathe over the loop (pick targets via ⓔ)', on:false, open:false, params:[
+  { id:'motion', name:'Envelope', hint:'breathe params over the loop (via ⓔ)', on:false, open:false, params:[
     { k:'mode', label:'Curve', type:'select', def:1,
       options:[[0,'Constant'],[1,'Peak (crash mid)'],[2,'Pulse'],[3,'Build → Drop'],[4,'Stutter'],[5,'Swell'],[6,'Drop → Build'],[7,'Bounce'],[8,'Wander'],[9,'Burst']] },
     { k:'depth', label:'Depth', min:0, max:1, step:.01, def:.7 },

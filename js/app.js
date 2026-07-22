@@ -22,6 +22,13 @@ buildUI();
 // restore from a shared link if present, otherwise open with either a random roll or a random preset.
 // Wait for browser-capability probes so the first Random roll already skips unsupported effects.
 capsReady.then(() => {
+  // Flag effects whose real pipeline can't run in this browser so the card shows a warning.
+  const markUnsupported = id => {
+    const grp = document.querySelector(`.grp .fxtoggle[data-fx="${id}"]`)?.closest('.grp');
+    if (grp) grp.classList.add('unsupported');
+  };
+  if (!BROWSER_CAPS.webpEncode)   markUnsupported('webp');
+  if (!BROWSER_CAPS.audioDatabend) markUnsupported('audio');
   const sm = location.hash.match(/[#&]s=([^&]+)/);
   const fromLink = sm && applyState(sm[1]);
   let openedWith = '🎲 Random';
