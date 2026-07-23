@@ -381,6 +381,113 @@ if (ht.on){
 }
 }
 
+function applyScreentone(w,h){
+// ---- Manga Screentone: variable-density dot / line / cross-hatch patterns for manga shading.
+//      Different from Halftone (single dot per fixed cell, size varies with luma) — this uses
+//      REGULAR cell positions with density mapped to darkness (dots grow larger as tone gets
+//      darker, or lines get thicker), with a hard-cut on/off decision at each pixel so the output
+//      is BINARY (paper vs ink) instead of continuous. Range filters pick which tone bands get
+//      screened: keeping highlights untouched and just screening the mid-tones / shadows is the
+//      real manga convention (whites stay whites, shadows get the tone). Ink modes: Black on
+//      Paper (standard), White on Ink (inverted, for night scenes), Coloured (keeps source hue
+//      but posterises to two tones per band). Pattern types: variable dots (size), lines
+//      (thickness), cross-hatch (two-axis lines), radial dots (checker offset), gradient dots
+//      (soft-edged for smooth toning).
+const st = state.screentone;
+if (!(st.on && P('screentone','amount')>0)) return;
+const amt = P('screentone','amount');
+const pattern = st.pattern|0;
+const cell = Math.max(2, st.cell|0);
+const angle = (+st.angle || 0) * Math.PI/180;
+const range = st.range|0;
+const ink = st.ink|0;
+const contrast = +st.contrast || 0;
+const cs = Math.cos(angle), sn = Math.sin(angle);
+const cxC = w/2, cyC = h/2;
+const src = ctx.getImageData(0,0,w,h), s = src.data;
+const out = ctx.createImageData(w,h), d = out.data;
+for (let y=0; y<h; y++){
+  for (let x=0; x<w; x++){
+    const i = (y*w+x)*4;
+    const lum = (0.299*s[i] + 0.587*s[i+1] + 0.114*s[i+2]) / 255;
+    // Range gate — smoothly fades at the edges of the selected tone band so it isn't a hard clip.
+    let inRange;
+    if (range===0) inRange = 1;
+    else if (range===1) inRange = lum < 0.72 ? 1 : Math.max(0, 1 - (lum-0.72)/0.18);
+    else if (range===2) inRange = lum < 0.4 ? 1 : Math.max(0, 1 - (lum-0.4)/0.15);
+    else if (range===3){ const dm=lum-0.5; inRange = Math.max(0, 1 - Math.abs(dm)*4); }
+    else                 inRange = lum > 0.68 ? 1 : Math.max(0, 1 - (0.68-lum)/0.18);
+    if (inRange < 0.01){
+      d[i]=s[i]; d[i+1]=s[i+1]; d[i+2]=s[i+2]; d[i+3]=255; continue;
+    }
+    // Screen density — darker pixels get more ink. Contrast expands the range so mids can be
+    // pushed toward pure dark or pure light.
+    let density = 1 - lum;
+    density = Math.pow(density, 1 - contrast*0.5) * (1 + contrast*0.4);
+    if (density < 0) density = 0; else if (density > 1) density = 1;
+    // Rotated screen coord (so all patterns can tilt with Screen Angle).
+    const dx = x - cxC, dy = y - cyC;
+    const rx = dx*cs - dy*sn, ry = dx*sn + dy*cs;
+    // Decide if this pixel is "on ink". Different pattern strategies:
+    let onInk = false, softMask = 0;
+    if (pattern===0){                                                  // variable dot size
+      const px = Math.round(rx/cell)*cell, py = Math.round(ry/cell)*cell;
+      const ddx = rx-px, ddy = ry-py;
+      const dr = Math.sqrt(ddx*ddx + ddy*ddy);
+      const R = cell * 0.5 * Math.sqrt(density);
+      onInk = dr <= R;
+    } else if (pattern===1){                                           // parallel lines, thickness by density
+      const lineP = ry - Math.round(ry/cell)*cell;                     // signed distance to nearest line centre
+      onInk = Math.abs(lineP) < cell*density*0.5;
+    } else if (pattern===2){                                           // cross-hatch
+      const lp1 = ry - Math.round(ry/cell)*cell;
+      const lp2 = rx - Math.round(rx/cell)*cell;
+      const t = cell*density*0.45;
+      onInk = Math.abs(lp1) < t || Math.abs(lp2) < t;
+    } else if (pattern===3){                                           // radial dots (offset checker)
+      const row = Math.round(ry/cell), col = Math.round(rx/cell);
+      const cshift = (row & 1) ? cell*0.5 : 0;
+      const px = col*cell + cshift, py = row*cell;
+      const ddx = rx-px, ddy = ry-py;
+      const dr = Math.sqrt(ddx*ddx + ddy*ddy);
+      const R = cell * 0.5 * Math.sqrt(density);
+      onInk = dr <= R;
+    } else {                                                            // gradient (soft) dots
+      const px = Math.round(rx/cell)*cell, py = Math.round(ry/cell)*cell;
+      const ddx = rx-px, ddy = ry-py;
+      const dr = Math.sqrt(ddx*ddx + ddy*ddy) / (cell*0.5);
+      const R = Math.sqrt(density);
+      softMask = Math.max(0, Math.min(1, (R - dr) * 3));                // partial-coverage soft dot
+      onInk = softMask > 0;
+    }
+    // Ink and paper colours.
+    let paperR, paperG, paperB, inkR, inkG, inkB;
+    if (ink===0){                                                       // Black on Paper
+      paperR=245; paperG=242; paperB=234; inkR=18; inkG=18; inkB=22;
+    } else if (ink===1){                                                // White on Ink
+      paperR=15; paperG=14; paperB=18; inkR=232; inkG=232; inkB=228;
+    } else {                                                             // Coloured — keep source hue
+      // paper = lightened source, ink = darkened source (posterise into two tones)
+      paperR = 235 + (s[i]-235)*0.35; paperG = 235 + (s[i+1]-235)*0.35; paperB = 235 + (s[i+2]-235)*0.35;
+      inkR = s[i]*0.32; inkG = s[i+1]*0.32; inkB = s[i+2]*0.32;
+    }
+    let outR, outG, outB;
+    if (pattern===4){                                                    // soft dot: alpha-blend paper→ink
+      outR = paperR + (inkR - paperR)*softMask;
+      outG = paperG + (inkG - paperG)*softMask;
+      outB = paperB + (inkB - paperB)*softMask;
+    } else if (onInk){ outR=inkR; outG=inkG; outB=inkB; }
+    else               { outR=paperR; outG=paperG; outB=paperB; }
+    const mix = amt * inRange;
+    d[i]   = s[i]   + (outR - s[i])   * mix;
+    d[i+1] = s[i+1] + (outG - s[i+1]) * mix;
+    d[i+2] = s[i+2] + (outB - s[i+2]) * mix;
+    d[i+3] = 255;
+  }
+}
+ctx.putImageData(out, 0, 0);
+}
+
 function applyEmboss(w,h){
 // ---- emboss: directional-gradient relief ----
 const emb = state.emboss;
@@ -407,6 +514,135 @@ if (emb.on && emb.amount>0){
   }
   ctx.putImageData(out,0,0);
 }
+}
+
+function applyWireframe(w,h,phase){
+// ---- Wireframe: SGI IRIS demo / Tron look. Sobel edges → glowing coloured lines, interior filled
+//      with a chosen mode (black, flat posterised shading, dim source, chrome-lit posterise, or
+//      transparent). Completely different from Emboss (which is a grey directional relief) — this
+//      strips the image to LINES + FILL, the way an early-3DCG polygon renderer showed it before
+//      shading. Line Tone picks the phosphor colour, Rainbow uses screen angle for the hue (spins
+//      slowly with phase), RGB Per-channel takes edges from R/G/B separately for a chromatic-
+//      aberrated wire look. Line Glow softens each edge over Line Thickness, so wide+glowy lines
+//      read like a scan-converted CRT vector display.
+const wf = state.wireframe;
+if (!(wf.on && P('wireframe','amount')>0)) return;
+const amt = P('wireframe','amount');
+const threshold = 0.03 + wf.threshold*0.35;                            // 0.03..0.38 edge cutoff
+const thick = Math.max(0, Math.round(wf.thickness*4));                 // 0..4 dilation radius
+const glow = P('wireframe','glow');
+const fill = wf.fill|0, tone = wf.tone|0, levels = Math.max(2, wf.levels|0);
+const TONES = [
+  [230,240,255],[80,240,220],[80,255,120],[255,200,80], null, null,
+];
+const toneC = TONES[tone];
+const src = ctx.getImageData(0,0,w,h), s = src.data;
+const out = ctx.createImageData(w,h), d = out.data;
+// per-channel gradient magnitudes (for RGB Per-channel tone we keep separate channels; else we
+// collapse to luma). Precompute luma once so Sobel is O(N).
+const CH = (tone===5) ? 3 : 1;
+const chans = new Array(CH);
+for (let c=0; c<CH; c++) chans[c] = new Uint8ClampedArray(w*h);
+if (CH===1){
+  for (let i=0, p=0; i<s.length; i+=4, p++) chans[0][p] = 0.299*s[i] + 0.587*s[i+1] + 0.114*s[i+2];
+} else {
+  for (let i=0, p=0; i<s.length; i+=4, p++){ chans[0][p]=s[i]; chans[1][p]=s[i+1]; chans[2][p]=s[i+2]; }
+}
+// gradient magnitude per channel; kept separately so RGB Per-channel can colour each channel's
+// edge in its own hue afterwards.
+const grads = new Array(CH); for (let c=0; c<CH; c++) grads[c] = new Float32Array(w*h);
+for (let c=0; c<CH; c++){
+  const src_c = chans[c], dst = grads[c];
+  for (let y=1; y<h-1; y++){
+    const row = y*w;
+    for (let x=1; x<w-1; x++){
+      const p = row+x;
+      const gxV = -src_c[p-w-1]-2*src_c[p-1]-src_c[p+w-1] + src_c[p-w+1]+2*src_c[p+1]+src_c[p+w+1];
+      const gyV = -src_c[p-w-1]-2*src_c[p-w]-src_c[p-w+1] + src_c[p+w-1]+2*src_c[p+w]+src_c[p+w+1];
+      dst[p] = Math.sqrt(gxV*gxV + gyV*gyV) / 1020;
+    }
+  }
+}
+// Separable dilation (max filter) → line thickness, then a small blur → line glow. Doing the two
+// as a single hybrid horiz+vert max pass keeps it O(k) rather than O(k²).
+const dilated = new Array(CH); for (let c=0; c<CH; c++) dilated[c] = new Float32Array(w*h);
+if (thick>0){
+  const temp = new Float32Array(w*h);
+  for (let c=0; c<CH; c++){
+    const grad = grads[c], dst = dilated[c];
+    for (let y=0; y<h; y++) for (let x=0; x<w; x++){
+      let mx=0; const x0=Math.max(0,x-thick), x1=Math.min(w-1,x+thick);
+      for (let xx=x0; xx<=x1; xx++){ const v=grad[y*w+xx]; if (v>mx) mx=v; }
+      temp[y*w+x] = mx;
+    }
+    for (let y=0; y<h; y++) for (let x=0; x<w; x++){
+      let mx=0; const y0=Math.max(0,y-thick), y1=Math.min(h-1,y+thick);
+      for (let yy=y0; yy<=y1; yy++){ const v=temp[yy*w+x]; if (v>mx) mx=v; }
+      dst[y*w+x] = mx;
+    }
+  }
+} else {
+  for (let c=0; c<CH; c++) dilated[c] = grads[c];
+}
+// Compose output
+const cx = w/2, cy = h/2;
+for (let y=0; y<h; y++){
+  for (let x=0; x<w; x++){
+    const i = (y*w+x)*4, p = y*w+x;
+    // Edge strength (soft): saturates above threshold, ramps below.
+    let e; if (CH===1){
+      const v = dilated[0][p];
+      e = v>=threshold ? 1 : (v/threshold)*0.35 + glow*(v/threshold)*0.4;
+    } else {
+      const vr = dilated[0][p], vg = dilated[1][p], vb = dilated[2][p];
+      e = Math.max(vr,vg,vb) >= threshold ? 1 : (Math.max(vr,vg,vb)/threshold)*0.35 + glow*0.3;
+    }
+    // Interior fill
+    let fr, fg, fb, fa = 1;
+    const lum = 0.299*s[i]+0.587*s[i+1]+0.114*s[i+2];
+    if (fill===0){ fr=fg=fb=0; }
+    else if (fill===1){                                                // Flat Shade (posterised)
+      const lv = Math.round(lum/255*(levels-1))/(levels-1);
+      fr = 30 + lv*80; fg = 40 + lv*90; fb = 60 + lv*120;
+    } else if (fill===2){                                              // Dim Source
+      fr = s[i]*0.28; fg = s[i+1]*0.28; fb = s[i+2]*0.28;
+    } else if (fill===3){                                              // Chrome-lit posterise — coloured tone bands
+      const lv = Math.round(lum/255*(levels-1))/(levels-1);
+      const c = hsv(200 + lv*160 + phase*30, 0.55, 0.15 + lv*0.75);
+      fr = c[0]; fg = c[1]; fb = c[2];
+    } else { fr=s[i]; fg=s[i+1]; fb=s[i+2]; fa=0; }                    // Transparent (skip fill blend)
+    // Line colour
+    let lr, lg, lb;
+    if (tone===4){                                                     // Rainbow angular
+      const ang = (Math.atan2(y-cy, x-cx)/(Math.PI*2) + 0.5 + phase*0.15);
+      const c = hsv(ang*360, 0.85, 1);
+      lr = c[0]; lg = c[1]; lb = c[2];
+    } else if (tone===5){                                              // RGB Per-channel
+      const vr=dilated[0][p], vg=dilated[1][p], vb=dilated[2][p];
+      const norm = Math.max(1e-4, Math.max(vr,vg,vb));
+      lr = 255*(vr/norm); lg = 255*(vg/norm); lb = 255*(vb/norm);
+    } else { lr = toneC[0]; lg = toneC[1]; lb = toneC[2]; }
+    // Line + optional glow halo
+    const boost = 1 + glow*1.2;
+    const eE = Math.min(1, e*boost);
+    // Compose: line on top of fill (unless fill=Transparent → keep source visible outside lines)
+    let outR, outG, outB;
+    if (fa===0){                                                       // Transparent fill: only draw lines
+      outR = s[i]   + (lr - s[i])   * eE;
+      outG = s[i+1] + (lg - s[i+1]) * eE;
+      outB = s[i+2] + (lb - s[i+2]) * eE;
+    } else {
+      outR = fr + (lr - fr) * eE;
+      outG = fg + (lg - fg) * eE;
+      outB = fb + (lb - fb) * eE;
+    }
+    d[i]   = s[i]   + (outR - s[i])   * amt;
+    d[i+1] = s[i+1] + (outG - s[i+1]) * amt;
+    d[i+2] = s[i+2] + (outB - s[i+2]) * amt;
+    d[i+3] = 255;
+  }
+}
+ctx.putImageData(out,0,0);
 }
 
 function applyPosterize(w,h){
@@ -496,6 +732,122 @@ if (gd.on && gd.amount>0){
 }
 }
 
+function applyChromeReflect(w,h,phase){
+// ---- Chrome Reflect: environment-mapped chrome — a REFLECTION model, not a tonemap. The picture's
+//      luma is a HEIGHT map giving per-pixel surface normals; the view is reflected around each
+//      normal and the resulting direction samples an env-map. Three things make it read as chrome
+//      instead of Emboss (which is what a smooth env would collapse to): env is a HIGH-FREQUENCY
+//      studio card (sharp coloured horizontal bars, not a smooth gradient) so small normal shifts
+//      cause big colour flips; a bright SUN hot spot sits in the env at a position tied to Light
+//      Angle, so flat regions light up whenever their reflection direction points at the sun (real
+//      chrome's give-away — you always see the light source in it); Blinn-Phong specular + Fresnel
+//      rim glow add hot glints on ridges and bright edges at glancing angles. Light Spin walks the
+//      sun around the frame at integer turns/loop, so a seamless "sun travelling over polished
+//      chrome" pass rolls through the surface.
+const cr = state.chrome;
+if (!(cr.on && P('chrome','amount')>0)) return;
+const amt = P('chrome','amount');
+const bump = +cr.bump || 0, spec = P('chrome','spec');
+const env = cr.env|0;
+const spin = cr.spin|0;
+const bumpScale = 6 * bump + 0.8;                                      // never fully zero so detail always reads
+const lightRad = (cr.light|0)*Math.PI/180 + phase*spin*Math.PI*2;      // seamless (integer spin)
+const Lx = Math.cos(lightRad)*0.85, Ly = Math.sin(lightRad)*0.85, Lz = 0.55;
+const Ll = Math.hypot(Lx,Ly,Lz);
+const nLx = Lx/Ll, nLy = Ly/Ll, nLz = Lz/Ll;
+// Sun sits in env near the reflection direction of the light. Tracks Light Spin so as the light
+// moves, the sun in the reflection walks across the frame at the same rate.
+const sunX = nLx*0.7, sunY = nLy*0.7 - 0.15;
+// Env presets: banded studio cards + colour hot palette. High-frequency bands with a bright
+// specular sun disc — small normal variations cause visible flips between bands, exactly the
+// "shifting mirror" look real chrome has (and what a smooth gradient env can never fake).
+const ENVS = [
+  { bars:[[6,4,10],[28,44,110],[110,170,240],[240,240,248],[220,170,110],[70,45,20],[8,6,4]],
+    sun:[255,244,220], sunR:0.28 },   // 0 Sky / Ground
+  { bars:[[8,4,32],[220,84,180],[8,6,20],[16,220,220],[6,8,40],[220,80,180],[10,4,30]],
+    sun:[255,120,255], sunR:0.24 },   // 1 Neon
+  { bars:[[80,40,140],[220,80,120],[255,150,80],[255,200,120],[220,140,50],[100,50,20],[20,10,6]],
+    sun:[255,220,180], sunR:0.32 },   // 2 Sunset
+  { bars:[[255,255,255],[210,210,215],[130,130,138],[70,70,76],[30,30,34],[10,10,12]],
+    sun:[255,255,255], sunR:0.36 },   // 3 Studio Grey — classic product-shot lighting card
+  null,                                // 4 Rainbow — computed
+  { bars:[[180,210,250],[230,240,255],[255,250,220],[200,150,110],[80,55,35],[25,18,12]],
+    sun:[255,242,200], sunR:0.22 },   // 5 Chrome Ball — smoother chrome-sphere card
+];
+const envSpec = ENVS[env] || ENVS[0];
+const src = ctx.getImageData(0,0,w,h), s = src.data;
+const out = ctx.createImageData(w,h), d = out.data;
+const clamp = (v,m) => v<0?0:v>=m?m-1:v;
+for (let y=0; y<h; y++){
+  const posY = y/h*2 - 1;                                               // -1 top, +1 bottom — small env bias per row
+  for (let x=0; x<w; x++){
+    const i = (y*w+x)*4;
+    // Sobel-ish gradient from luma differences of the 4 axis neighbours = local surface tilt.
+    const iL=(y*w+clamp(x-1,w))*4, iR=(y*w+clamp(x+1,w))*4;
+    const iU=(clamp(y-1,h)*w+x)*4, iD=(clamp(y+1,h)*w+x)*4;
+    const lL=0.299*s[iL]+0.587*s[iL+1]+0.114*s[iL+2];
+    const lR=0.299*s[iR]+0.587*s[iR+1]+0.114*s[iR+2];
+    const lU=0.299*s[iU]+0.587*s[iU+1]+0.114*s[iU+2];
+    const lD=0.299*s[iD]+0.587*s[iD+1]+0.114*s[iD+2];
+    const gx=(lR-lL)/255, gy=(lD-lU)/255;
+    let nx = -gx*bumpScale, ny = -gy*bumpScale, nz = 1;
+    const nl = Math.sqrt(nx*nx + ny*ny + 1);
+    nx /= nl; ny /= nl; nz /= nl;
+    // Reflect view v=(0,0,-1) around N → r = (2·Nz·Nx, 2·Nz·Ny, ·).
+    const rx = 2*nz*nx, ry = 2*nz*ny;
+    // Env lookup uses reflection direction combined with a small posY bias so even flat regions
+    // (nearly-uniform normals across a plateau) still see env variation from top to bottom.
+    const envRx = rx, envRy = ry*0.9 + posY*0.25;
+    let er, eg, eb;
+    if (env===4){
+      const ang = (Math.atan2(envRy, envRx)/(Math.PI*2) + 0.5 + phase*0.25);
+      const c = hsv(ang*360, 0.85, 0.85);
+      er = c[0]; eg = c[1]; eb = c[2];
+    } else {
+      const bars = envSpec.bars;
+      const t = Math.max(0, Math.min(0.9999, envRy*0.5 + 0.5));
+      const bp = t * (bars.length - 1);
+      const b0 = bars[bp|0], b1 = bars[(bp|0)+1] || bars[bars.length-1];
+      const bf = bp - (bp|0);
+      er = b0[0] + (b1[0]-b0[0])*bf;
+      eg = b0[1] + (b1[1]-b0[1])*bf;
+      eb = b0[2] + (b1[2]-b0[2])*bf;
+      // Sun hot spot: bright disc that flares wherever the reflection direction is close to the
+      // light. THIS is what tells the eye "chrome" — a real light source visible in the mirror.
+      const dxs = envRx - sunX, dys = envRy - sunY;
+      const dSun = dxs*dxs + dys*dys;
+      const glow = Math.max(0, 1 - dSun/(envSpec.sunR*envSpec.sunR));
+      const g2 = glow*glow*glow;                                       // sharpen the sun disc
+      er = Math.min(255, er + envSpec.sun[0]*g2);
+      eg = Math.min(255, eg + envSpec.sun[1]*g2);
+      eb = Math.min(255, eb + envSpec.sun[2]*g2);
+    }
+    // Blinn-Phong specular: bright where the half-vector between light and view (V=(0,0,1))
+    // aligns with the normal. Shape-aware — clings to ridges instead of a global slab of shine.
+    const hx = nLx, hy = nLy, hz = nLz + 1;
+    const hl = Math.hypot(hx, hy, hz);
+    const Hx = hx/hl, Hy = hy/hl, Hz = hz/hl;
+    const ndoth = Math.max(0, nx*Hx + ny*Hy + nz*Hz);
+    const shine = Math.pow(ndoth, 12 + 60*spec) * spec * 1.4;
+    er = Math.min(255, er + 255*shine);
+    eg = Math.min(255, eg + 255*shine);
+    eb = Math.min(255, eb + 250*shine);
+    // Fresnel rim — normals tilted far from view (small nz) catch a bright grazing highlight,
+    // as they do on any real polished surface.
+    const fresnel = Math.pow(1 - nz, 3.5);
+    const rim = fresnel * 0.4;
+    er = Math.min(255, er + (255-er)*rim);
+    eg = Math.min(255, eg + (255-eg)*rim);
+    eb = Math.min(255, eb + (255-eb)*rim);
+    d[i]   = s[i]   + (er - s[i])   * amt;
+    d[i+1] = s[i+1] + (eg - s[i+1]) * amt;
+    d[i+2] = s[i+2] + (eb - s[i+2]) * amt;
+    d[i+3] = 255;
+  }
+}
+ctx.putImageData(out,0,0);
+}
+
 function applyRainbow(w,h,phase){
 // ---- Colour Sweep: a colour field laid over the frame. Three styles share the same palette /
 //      angle / speed axes. Full Gradient: colours cycling in place across a static gradient.
@@ -575,6 +927,68 @@ if (rb.on && rb.amount>0){
     ctx.fillStyle=g; ctx.fillRect(0,0,w,h); ctx.restore();
   }
 }
+}
+
+function applyDreamPalette(w,h,phase){
+// ---- Dream Palette: psychedelic hue rotation on the source image itself. Colour Sweep lays a
+//      new colour FIELD over the picture; this one instead ROTATES the picture's own hue so
+//      colours drift as if the image is under LSD. Speed sets integer hue cycles per loop
+//      (seamless), Spatial Pattern adds per-region phase offsets so different parts of the frame
+//      cycle out of sync (Vertical / Horizontal bands, Radial rings, seeded Region grid, and
+//      Kaleido wedges around the frame centre), Wave scales that spatial offset, Saturation
+//      Boost pushes everything toward vivid, Flat Shading posterises Value into N flat plateaus
+//      for a comic / cel-shaded read, and Hue Jitter adds a small per-pixel scatter so smooth
+//      gradients read as flickery/noisy hues (that queasy dream feel). Everything is a pure
+//      function of pixel + phase, so the loop closes cleanly.
+const dr = state.dream;
+if (!(dr.on && P('dream','amount')>0)) return;
+const amt = P('dream','amount');
+const speed = Math.max(0, dr.speed|0);                                 // integer turns/loop → seamless
+const pattern = dr.pattern|0;
+const wave = pattern===0 ? 0 : (+dr.wave || 0);
+const sat = +dr.saturate || 1;
+const flat = Math.max(1, dr.flat|0);
+const jit = +dr.jitter || 0;
+const globalHueTurns = phase * speed;                                  // in "turns" (0..speed)
+const cx = w/2, cy = h/2, maxR = Math.hypot(cx, cy) || 1;
+const src = ctx.getImageData(0,0,w,h), d = src.data;
+for (let y=0; y<h; y++){
+  for (let x=0; x<w; x++){
+    const i = (y*w+x)*4;
+    let spatial = 0;
+    switch (pattern){
+      case 1: spatial = (x/w) * wave; break;                            // Vertical Bands — hue shifts across x
+      case 2: spatial = (y/h) * wave; break;                            // Horizontal Bands
+      case 3: spatial = Math.hypot(x-cx, y-cy)/maxR * wave; break;      // Radial
+      case 4:                                                            // Region Grid — chunky per-region hue
+        spatial = rand(((x/32)|0)*13.7 + ((y/32)|0)*7.3) * wave; break;
+      case 5:                                                            // Kaleido Wedges — hue by angle
+        spatial = (Math.atan2(y-cy, x-cx)/(Math.PI*2) + 0.5) * wave; break;
+    }
+    const jitter = jit ? (rand(x*0.31 + y*0.17)*2 - 1) * jit * 0.5 : 0;
+    const hueShiftDeg = ((globalHueTurns + spatial + jitter) % 1) * 360;
+    const r = d[i], g = d[i+1], b = d[i+2];
+    // Inline RGB → HSV so we don't allocate per pixel.
+    const mx = r>g ? (r>b?r:b) : (g>b?g:b);
+    const mn = r<g ? (r<b?r:b) : (g<b?g:b);
+    const delta = mx - mn;
+    let hh;
+    if (delta===0) hh = 0;
+    else if (mx===r) hh = ((g-b)/delta) % 6;
+    else if (mx===g) hh = (b-r)/delta + 2;
+    else             hh = (r-g)/delta + 4;
+    hh = ((hh*60 + hueShiftDeg) % 360 + 360) % 360;
+    let ss = mx===0 ? 0 : delta/mx;
+    ss = Math.min(1, ss * sat);
+    let vv = mx/255;
+    if (flat>1) vv = Math.round(vv*(flat-1))/(flat-1);                 // posterise Value for flat shading
+    const c = hsv(hh, ss, vv);                                          // shared hsv() → [0..255]
+    d[i]   = d[i]   + (c[0] - d[i])   * amt;
+    d[i+1] = d[i+1] + (c[1] - d[i+1]) * amt;
+    d[i+2] = d[i+2] + (c[2] - d[i+2]) * amt;
+  }
+}
+ctx.putImageData(src,0,0);
 }
 
 function applyPrism(w,h,phase){

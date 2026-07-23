@@ -381,6 +381,131 @@ if (mode===0){                                     // Planar (triple-ghost): Y /
 ctx.putImageData(out,0,0);
 }
 
+function applyBankSwap(w,h,phase){
+// ---- Bank Swap: tile-grid hardware corruption — the "half-inserted cartridge" look. Divide the
+//      frame into fixed tiles; a share (Amount) of them are fetched from a wrong ROM address
+//      (Bank Shift), sometimes stuck in a horizontal run (a bus that quit reporting new tiles),
+//      and their attribute-table palette is periodically rotated over aligned Attribute Blocks
+//      (the NES's 2x2 or 4x4 tile palette regions). Timing shapes how the pattern evolves:
+//      Sync ticks the whole grid together (rigid), Async gives each tile its own clock offset
+//      (organic churn), Cascade sweeps the reroll across the frame, and Burst holds long stable
+//      stretches punctuated by brief flurries. Reroll Rate is the per-loop rate driving it.
+const bs = state.bankswap;
+if (!(bs.on && P('bankswap','amount')>0)) return;
+const amt = P('bankswap','amount');
+const tile = Math.max(4, bs.tile|0);
+const shift = bs.shift;
+const stuck = bs.stuck;
+const palette = bs.palette;
+const attr = bs.attr|0;                                                // 0=off, 1=2 tiles, 2=4 tiles
+const reroll = Math.max(1, bs.reroll|0);
+const timing = bs.timing|0;
+// Global tick — used by Sync and Burst; per-tile clocks branch off it. All modes wrap seamlessly
+// on the loop because reroll is an integer and phase ∈ [0,1).
+const pat = Math.floor(phase * reroll);
+// Burst mode holds Amount at 0 for most of the loop and blasts up to full during short "impact"
+// windows so the whole thing reads as sparse hits instead of a steady patter. Impact positions
+// come from a seeded schedule so the loop stays repeatable.
+let burstScale = 1;
+if (timing===3){
+  const impacts = Math.max(1, Math.round(reroll*0.6));                 // fewer, wider hits than Sync
+  const width = 0.06 + 0.10*(1-amt);                                   // width of each impact window
+  let closest = 1;
+  for (let k=0; k<impacts; k++){
+    const centre = rand(k*17.3 + 0.31);
+    const d = Math.abs(((phase - centre + 1.5) % 1) - 0.5);            // wrapped distance on the loop
+    if (d < closest) closest = d;
+  }
+  burstScale = Math.max(0, 1 - closest/width);                         // 1 at impact centre, 0 outside
+  if (burstScale <= 0.01) return;                                      // nothing to render this frame
+}
+const src = ctx.getImageData(0,0,w,h), s = src.data;
+const out = ctx.createImageData(w,h), d = out.data;
+const tw = Math.ceil(w/tile), th = Math.ceil(h/tile);
+// Per-tile clock. Sync ticks the whole grid at once; Async gives each tile its own phase offset
+// so the churn is continuous rather than a shared flip; Cascade rolls a wavefront across the
+// frame in a chosen direction. All modes wrap seamlessly on the loop.
+const nx = Math.max(1, tw-1), ny = Math.max(1, th-1);
+const sweep = bs.sweep|0;
+// Higher offset = earlier transition. Down sweep needs top row to transition first → top row
+// has the highest offset → offset = (ny - ty) / ny.
+const cascadeOff = (tx, ty) => {
+  switch (sweep){
+    case 0: return (ny - ty) / ny;                                      // Down ↓
+    case 1: return ty / ny;                                             // Up ↑
+    case 2: return (nx - tx) / nx;                                      // Right →
+    case 3: return tx / nx;                                             // Left ←
+    case 4: return ((ny - ty) + (nx - tx)) / (nx + ny);                 // Diagonal ↘
+    case 5: return (ty + (nx - tx)) / (nx + ny);                        // Diagonal ↗
+    default: return (ny - ty) / ny;
+  }
+};
+const tilePatFor = (tx, ty) => {
+  if (timing===1){
+    const off = rand(tx*5.71 + ty*3.13 + 0.17);
+    return Math.floor(((phase + off) % 1) * reroll);
+  }
+  if (timing===2){
+    const off = cascadeOff(tx, ty);
+    return Math.floor(((phase + off) % 1) * reroll);
+  }
+  return pat;                                                          // Sync and Burst: global tick
+};
+const effAmt = amt * burstScale;                                       // Burst tapers into and out of the impact
+const srcTx = new Int32Array(tw*th), srcTy = new Int32Array(tw*th), palRot = new Uint8Array(tw*th);
+for (let ty=0; ty<th; ty++){
+  for (let tx=0; tx<tw; tx++){
+    const idx = ty*tw + tx;
+    const p = tilePatFor(tx, ty);
+    const roll = rand(tx*3.7 + ty*2.13 + p*11.3);
+    if (roll >= effAmt){ srcTx[idx]=tx; srcTy[idx]=ty; continue; }
+    // Bank Shift: sample a wrong tile address (wraps around the tile grid)
+    const sx = Math.floor((rand(tx*5.3 + ty*1.7 + p*3.1) - 0.5) * tw * shift * 2);
+    const sy = Math.floor((rand(tx*7.9 + ty*3.7 + p*5.7) - 0.5) * th * shift);
+    srcTx[idx] = ((tx + sx) % tw + tw) % tw;
+    srcTy[idx] = ((ty + sy) % th + th) % th;
+    // Stuck Run: bus quit reporting mid-row → this tile freezes on its left neighbour's source
+    if (stuck>0 && tx>0){
+      const stickRoll = rand(tx*1.3 + ty*4.7 + p*7.1);
+      if (stickRoll < stuck){ srcTx[idx] = srcTx[idx-1]; srcTy[idx] = srcTy[idx-1]; }
+    }
+  }
+}
+// Attribute Blocks: whole regions of tiles share a palette rotation, like the NES attribute table.
+// Uses the top-left tile's clock so Async / Cascade also decorrelate the attribute flips.
+if (attr>0 && palette>0){
+  const rSize = attr===1 ? 2 : 4;
+  const rw = Math.ceil(tw/rSize), rh = Math.ceil(th/rSize);
+  for (let ry=0; ry<rh; ry++) for (let rx=0; rx<rw; rx++){
+    const p = tilePatFor(rx*rSize, ry*rSize);
+    const attrRoll = rand(rx*13.1 + ry*17.3 + p*3.7);
+    if (attrRoll >= palette * burstScale) continue;
+    const rot = 1 + Math.floor(rand(rx*7.1 + ry*11.9 + p*5.3)*3);
+    for (let ty=ry*rSize; ty<Math.min(th,(ry+1)*rSize); ty++)
+      for (let tx=rx*rSize; tx<Math.min(tw,(rx+1)*rSize); tx++)
+        palRot[ty*tw + tx] = rot;
+  }
+}
+for (let y=0; y<h; y++){
+  const ty = (y/tile)|0, oy = y - ty*tile;
+  for (let x=0; x<w; x++){
+    const tx = (x/tile)|0, ox = x - tx*tile;
+    const idx = ty*tw + tx;
+    const sy = srcTy[idx]*tile + oy, sx = srcTx[idx]*tile + ox;
+    const si = ((sy<h?sy:h-1)*w + (sx<w?sx:w-1))*4, di = (y*w+x)*4;
+    let r = s[si], g = s[si+1], b = s[si+2];
+    const rot = palRot[idx];
+    if (rot){                                                          // channel rotation = wrong palette lookup
+      if (rot===1){ const t=r; r=g; g=b; b=t; }
+      else if (rot===2){ const t=r; r=b; b=g; g=t; }
+      else { r=255-r; g=255-g; b=255-b; }                              // rot===3: inverted palette entry
+    }
+    d[di]=r; d[di+1]=g; d[di+2]=b; d[di+3]=255;
+  }
+}
+ctx.putImageData(out,0,0);
+}
+
 function applyIndexedGif(w,h,phase){
 // ---- Indexed / GIF: quantise to a cached global palette + dither, then palette-glitch ----
 const gf = state.gif;

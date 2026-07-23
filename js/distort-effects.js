@@ -33,6 +33,108 @@ if (lq.on && (lq.amount==null || lq.amount>0) && lq.amp>0){
 }
 }
 
+function applyMode7(w,h,phase){
+// ---- Mode 7: perspective plane projection, generalised beyond the SNES floor. Plane Layout
+//      picks which surface the picture is projected onto: Floor (ground plane), Ceiling
+//      (looking up at a mirrored ceiling), H Corridor (floor + ceiling meeting at the horizon —
+//      a hallway seen head-on), Left / Right Wall (perspective wall receding sideways), V
+//      Corridor (both walls receding to a central vanishing edge), or Tunnel (all four walls
+//      meeting at the frame centre — an infinite corridor). Real Mode 7 was a per-scanline
+//      affine background layer whose scale ramped linearly with the row; each of these Plane
+//      Layouts is the same math applied along a different axis (or several axes at once). Camera
+//      Height / Focal Length shape the perspective slope, Forward Pan rolls the plane toward the
+//      camera (seamless integer per loop), Plane Spin rotates the projected plane around the
+//      camera axis. Sky Fill (only shown for single-plane layouts) picks what fills the non-plane
+//      area: Black, Gradient, Source untouched, or Mirrored (the water-reflection trick).
+const m7 = state.mode7;
+if (!(m7.on && P('mode7','amount')>0)) return;
+const amt = P('mode7','amount');
+const plane = m7.plane|0;
+const horizonPos = +m7.horizon || 0.5;
+const H = 40 + (+m7.height || 0) * 260;
+const F = 80 + (+m7.fov || 0) * 320;
+const panSpeed = +m7.pan || 0, rotTurns = +m7.rot || 0;
+const sky = m7.sky|0;
+const panZ = phase * panSpeed * h;
+const rot = phase * rotTurns * Math.PI * 2;
+const cosR = Math.cos(rot), sinR = Math.sin(rot);
+const src = ctx.getImageData(0,0,w,h), s = src.data;
+const out = ctx.createImageData(w,h), d = out.data;
+const cx = w/2, cy = h/2;
+const horizonY = Math.max(1, Math.min(h-2, horizonPos * h));
+const horizonX = Math.max(1, Math.min(w-2, horizonPos * w));
+// Given a distance from the perspective vanishing line and a tangential offset (world-space
+// perpendicular), sample the source. `distDim` is w or h depending on which axis the plane
+// spans, but we always use `H` and `F` in the same units so scale is consistent across layouts.
+const sampleAt = (dist, tang) => {
+  const z = H * F / dist;
+  const gxs = tang * H / dist;
+  const rx = gxs*cosR - z*sinR;
+  const rz = gxs*sinR + z*cosR + panZ;
+  let sx = rx % w; if (sx<0) sx += w;
+  let sy = rz % h; if (sy<0) sy += h;
+  return ((sy|0)*w + (sx|0))*4;
+};
+// For each pixel decide: on plane (compute distance + tangential) or sky (leave for fill).
+for (let y=0; y<h; y++){
+  const yb = y - horizonY, yc = y - cy;
+  for (let x=0; x<w; x++){
+    const xb = x - horizonX, xc = x - cx;
+    const i = (y*w+x)*4;
+    let dist = -1, tang = 0;                                            // dist<0 → sky pixel
+    switch (plane){
+      case 0: if (yb > 0){ dist = yb; tang = xc; } break;               // Floor
+      case 1: if (yb < 0){ dist = -yb; tang = xc; } break;              // Ceiling
+      case 2:{ const d0 = Math.abs(yb);                                  // H Corridor — floor + mirrored ceiling
+        if (d0 > 0){ dist = d0; tang = xc; } break; }
+      case 3: if (xb > 0){ dist = xb; tang = yc; } break;               // Left Wall (plane recedes to the right)
+      case 4: if (xb < 0){ dist = -xb; tang = yc; } break;              // Right Wall
+      case 5:{ const d0 = Math.abs(xb);                                  // V Corridor — both walls
+        if (d0 > 0){ dist = d0; tang = yc; } break; }
+      case 6:{                                                            // Tunnel — 4 walls meeting at centre
+        const ax = Math.abs(xc), ay = Math.abs(yc);
+        const d0 = Math.max(ax, ay);
+        if (d0 > 0){ dist = d0; tang = ax > ay ? yc : xc; }
+        break;
+      }
+    }
+    if (dist > 0){
+      const si = sampleAt(dist, tang);
+      d[i]   = s[i]   + (s[si]   - s[i])   * amt;
+      d[i+1] = s[i+1] + (s[si+1] - s[i+1]) * amt;
+      d[i+2] = s[i+2] + (s[si+2] - s[i+2]) * amt;
+    } else {
+      // Sky area — only Floor / Ceiling / Wall single-plane layouts have one.
+      let sr, sg, sb;
+      if (sky===0){ sr=0; sg=0; sb=0; }
+      else if (sky===1){
+        // Sky gradient — deeper away from the horizon, warmer at the horizon.
+        const t = plane===0 ? 1 - y/horizonY
+                : plane===1 ? (y - horizonY)/(h - horizonY)
+                : plane===3 ? (horizonX - x)/horizonX
+                : (x - horizonX)/(w - horizonX);
+        sr = 20 + 40*t; sg = 30 + 90*t; sb = 60 + 140*t;
+      } else if (sky===2){ sr = s[i]; sg = s[i+1]; sb = s[i+2]; }
+      else {                                                              // Mirrored — reflect across the horizon
+        let mdist = 0, mtang = 0;
+        if (plane===0){ mdist = horizonY - y; mtang = xc; }
+        else if (plane===1){ mdist = y - horizonY; mtang = xc; }
+        else if (plane===3){ mdist = horizonX - x; mtang = yc; }
+        else if (plane===4){ mdist = x - horizonX; mtang = yc; }
+        if (mdist > 0){ const si = sampleAt(mdist, mtang);
+          sr = s[si]; sg = s[si+1]; sb = s[si+2];
+        } else { sr = 0; sg = 0; sb = 0; }
+      }
+      d[i]   = s[i]   + (sr - s[i])   * amt;
+      d[i+1] = s[i+1] + (sg - s[i+1]) * amt;
+      d[i+2] = s[i+2] + (sb - s[i+2]) * amt;
+    }
+    d[i+3] = 255;
+  }
+}
+ctx.putImageData(out,0,0);
+}
+
 function applyWarp(w,h,phase){
 // ---- warp: per-row horizontal displacement (selectable pattern, wraps at edges) ----
 const wp = state.warp;

@@ -17,6 +17,8 @@ const bacc = document.createElement('canvas');               // Stale Blocks: th
 const bax = bacc.getContext('2d');
 const sacc = document.createElement('canvas');               // Sync Tear: the torn frame assembled
 const sax = sacc.getContext('2d');
+const ssacc = document.createElement('canvas');              // Slit-Scan: per-strip moment composite
+const ssx = ssacc.getContext('2d', { willReadFrequently:true });
 const mshape = document.createElement('canvas');             // region-mask alpha shape
 const msx = mshape.getContext('2d');
 const mclean = document.createElement('canvas');             // region-mask clean plate (base, pre-glitch)
@@ -87,6 +89,8 @@ function drawFrame(phase){    // phase in [0,1)
 
   drawBaseFrame(w,h,phase,t,c,v,rl,fm,fseed);
 
+  applyMode7(w,h,phase);
+
   applyWarp(w,h,phase);
 
   const gl = applyRgbShift(w,h,t,v,false);          // VHS horizontal split remains a whole-frame signal effect
@@ -119,7 +123,11 @@ function drawFrame(phase){    // phase in [0,1)
 
   applyHalftone(w,h);
 
+  applyScreentone(w,h);
+
   applyEmboss(w,h);
+
+  applyWireframe(w,h,phase);
 
   applyPosterize(w,h);
 
@@ -129,7 +137,11 @@ function drawFrame(phase){    // phase in [0,1)
 
   applyGold(w,h,phase);
 
+  applyChromeReflect(w,h,phase);
+
   applyRainbow(w,h,phase);
+
+  applyDreamPalette(w,h,phase);
 
   applyPaper(w,h);
 
@@ -163,6 +175,8 @@ function drawFrame(phase){    // phase in [0,1)
   applyWrongFormat(w,h,phase);
   glitchGateEnd(w,h,'wrongfmt',glitchGate);
 
+  applyBankSwap(w,h,phase);
+
   applyRleDatabend(w,h,phase);
 
   applyDegauss(w,h,phase);
@@ -186,6 +200,8 @@ function drawFrame(phase){    // phase in [0,1)
   applyHerringbone(w,h,phase);
 
   applySignalSync(w,h,phase,fseed);
+
+  applyHeadSwitch(w,h,phase);
 
   applyIridescence(w,h,phase);
 
@@ -270,14 +286,15 @@ function timeFrame(fi, NF, drop){
 function draw(phase){
   const NF = Math.round(LOOP_MS/1000*30);
   const tm = state.time, il = state.interlace, st = state.stale;
-  const sy0 = state.synctear, cd = state.chroma, pb = state.playback;
+  const sy0 = state.synctear, cd = state.chroma, pb = state.playback, ss = state.slitscan;
   const timeOn  = (tm.on && (tm.hold>1 || tm.drop>0 || tm.trail>0)) || (pb.on && (pb.order|0)!==0);
   const ilOn    = il.on && il.amount>0;
   const staleOn = st.on && st.amount>0;
   const syncOn0 = sy0.on && sy0.amount>0;
   const chromaOn = cd.on && cd.amount>0;
+  const slitOn  = ss.on && ss.amount>0;
   // nothing temporal is on → keep the raw, unquantised phase rather than snapping to the frame grid
-  if (!timeOn && !ilOn && !staleOn && !syncOn0 && !chromaOn){ drawFrame(phase); return; }
+  if (!timeOn && !ilOn && !staleOn && !syncOn0 && !chromaOn && !slitOn){ drawFrame(phase); return; }
   // P() reads the ENV that drawFrame sets for the frame it is painting — the wrong one to ask here,
   // and for trails it belongs to a frame further back in time. Take the envelope for the moment
   // being shown instead. Clamped because motionMul peaks above 1: an unclamped Trails would weigh
@@ -436,24 +453,91 @@ function draw(phase){
     }
     ctx.globalAlpha = 1;
   };
-  if (!chromaOn){ assembled(fi); return; }
-  // ---- Chroma Persistence: the colour lags behind the picture ----
-  // Composite video carried brightness sharp but smeared the colour, so on a moving subject the
-  // colour trails the shape — it drips off moving edges. Take luma from now and the colour
-  // difference from a few frames back (Luma mode swaps them: colour now, brightness late, a woozier
-  // double exposure). A still area matches in both, so only what moved separates.
-  const camt = pv('chroma','amount',1), cdel = Math.max(1, state.chroma.delay|0), lumaLag = (state.chroma.mode|0)===1;
-  assembled(fi);        const now = ctx.getImageData(0,0,w,h), nd=now.data;
-  assembled(fi-cdel);   const pd = ctx.getImageData(0,0,w,h).data;
-  for (let i=0;i<nd.length;i+=4){
-    const Yn=0.299*nd[i]+0.587*nd[i+1]+0.114*nd[i+2], Yp=0.299*pd[i]+0.587*pd[i+1]+0.114*pd[i+2];
-    const Y  = lumaLag ? Yp : Yn;                                  // brightness from one moment
-    const Cb = lumaLag ? nd[i+2]-Yn : pd[i+2]-Yp;                  // colour difference from the other
-    const Cr = lumaLag ? nd[i]-Yn   : pd[i]-Yp;
-    const R=Y+Cr, B=Y+Cb, G=(Y-0.299*R-0.114*B)/0.587;
-    nd[i]  += (R-nd[i])  *camt;                                    // blend toward the recombined pixel
-    nd[i+1]+= (G-nd[i+1])*camt;
-    nd[i+2]+= (B-nd[i+2])*camt;
+  // The full displayed frame at any moment f: assembled + optional Chroma Persistence. Extracted
+  // so Slit-Scan can call it repeatedly for different moments and pick whole strips from each.
+  const camt = chromaOn ? pv('chroma','amount',1) : 0;
+  const cdel = Math.max(1, state.chroma.delay|0);
+  const lumaLag = (state.chroma.mode|0)===1;
+  const wholeFrame = (f)=>{
+    if (!chromaOn){ assembled(f); return; }
+    // ---- Chroma Persistence: the colour lags behind the picture ----
+    // Composite video carried brightness sharp but smeared the colour, so on a moving subject the
+    // colour trails the shape — it drips off moving edges. Take luma from now and the colour
+    // difference from a few frames back (Luma mode swaps them: colour now, brightness late).
+    assembled(f);            const now = ctx.getImageData(0,0,w,h), nd=now.data;
+    assembled(f-cdel);       const pd = ctx.getImageData(0,0,w,h).data;
+    for (let i=0;i<nd.length;i+=4){
+      const Yn=0.299*nd[i]+0.587*nd[i+1]+0.114*nd[i+2], Yp=0.299*pd[i]+0.587*pd[i+1]+0.114*pd[i+2];
+      const Y  = lumaLag ? Yp : Yn;
+      const Cb = lumaLag ? nd[i+2]-Yn : pd[i+2]-Yp;
+      const Cr = lumaLag ? nd[i]-Yn   : pd[i]-Yp;
+      const R=Y+Cr, B=Y+Cb, G=(Y-0.299*R-0.114*B)/0.587;
+      nd[i]  += (R-nd[i])  *camt;
+      nd[i+1]+= (G-nd[i+1])*camt;
+      nd[i+2]+= (B-nd[i+2])*camt;
+    }
+    ctx.putImageData(now,0,0);
+  };
+  if (!slitOn){ wholeFrame(fi); return; }
+  // ---- Slit-Scan: each strip reads a different moment, so time is spatialised into space.
+  //      Sync Tear shears bands horizontally within ONE moment; Slit-Scan takes N moments and
+  //      picks whole strips (or radial rings / diagonal bands / random tiles) from each, so
+  //      animated effects show DIFFERENT states in adjacent strips. Renders one wholeFrame call
+  //      per unique moment — expensive when Strips is high.
+  const stripCount = Math.max(2, ss.strips|0);
+  const spread = Math.max(1, Math.round((+ss.spread || .5) * NF * .5 * pv('slitscan','amount',1)));
+  const dir = ss.dir|0;
+  const reverse = ss.reverse|0;
+  // Precompute per-pixel strip index — fixed for the frame, so cost is a one-off O(N).
+  const stripIdx = new Uint8Array(w*h);
+  const cxS = w/2, cyS = h/2, maxR = Math.hypot(cxS, cyS) || 1;
+  if (dir===0){
+    for (let x=0;x<w;x++){ const k=Math.min(stripCount-1, (x/w*stripCount)|0);
+      for (let y=0;y<h;y++) stripIdx[y*w+x] = k; }
+  } else if (dir===1){
+    for (let y=0;y<h;y++){ const k=Math.min(stripCount-1, (y/h*stripCount)|0);
+      for (let x=0;x<w;x++) stripIdx[y*w+x] = k; }
+  } else if (dir===2){
+    const denom = (w+h-2) || 1;
+    for (let y=0;y<h;y++) for (let x=0;x<w;x++)
+      stripIdx[y*w+x] = Math.min(stripCount-1, ((x+y)/denom*stripCount)|0);
+  } else if (dir===3){
+    for (let y=0;y<h;y++) for (let x=0;x<w;x++){
+      const dx=x-cxS, dy=y-cyS, r=Math.sqrt(dx*dx+dy*dy)/maxR;
+      stripIdx[y*w+x] = Math.min(stripCount-1, (r*stripCount)|0);
+    }
+  } else {                                                            // random tiles
+    const tileSize = 24;
+    for (let y=0;y<h;y++) for (let x=0;x<w;x++){
+      const tx=(x/tileSize)|0, ty=(y/tileSize)|0;
+      stripIdx[y*w+x] = (rand(tx*7.71 + ty*3.13) * stripCount)|0;
+    }
   }
-  ctx.putImageData(now,0,0);
+  // Base moment (k=0 or k=stripCount-1 depending on reverse) → provides the initial pixels
+  wholeFrame(fi);
+  const finalData = ctx.getImageData(0,0,w,h);
+  const finalPixels = finalData.data;
+  // Group strips by moment so we only wholeFrame() each moment once even if several strips share it.
+  const byF = new Map();
+  for (let k=0; k<stripCount; k++){
+    const kEff = reverse ? (stripCount - 1 - k) : k;
+    const f = fi - Math.round(kEff * spread / Math.max(1, stripCount-1));
+    if (!byF.has(f)) byF.set(f, []);
+    byF.get(f).push(k);
+  }
+  for (const [f, kList] of byF){
+    if (f === fi) continue;                                           // base is already in finalData
+    wholeFrame(f);
+    const moPixels = ctx.getImageData(0,0,w,h).data;
+    const kSet = new Uint8Array(stripCount); for (const k of kList) kSet[k] = 1;
+    for (let p=0, i=0; p<w*h; p++, i+=4){
+      if (kSet[stripIdx[p]]){
+        finalPixels[i]   = moPixels[i];
+        finalPixels[i+1] = moPixels[i+1];
+        finalPixels[i+2] = moPixels[i+2];
+        finalPixels[i+3] = 255;
+      }
+    }
+  }
+  ctx.putImageData(finalData, 0, 0);
 }

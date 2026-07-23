@@ -159,6 +159,17 @@ const FX = [
     { k:'applyto',label:'Apply To', type:'select', def:0, options:[[0,'Whole'],[1,'Bright'],[2,'Dark'],[3,'Edges'],[4,'Saturated']] },
     { k:'coverage',label:'Coverage', min:0, max:1, step:.01, def:1 },
   ]},
+  { id:'bankswap', name:'Bank Swap', hint:'tile-grid hardware corruption — wrong-address tiles + attribute palette flips', on:false, open:false, params:[
+    { k:'amount',  label:'Amount', min:0, max:1, step:.01, def:.6, env:1, envd:1 },
+    { k:'tile',    label:'Tile Size', min:4, max:32, step:1, def:8 },
+    { k:'shift',   label:'Bank Shift', min:0, max:1, step:.01, def:.5 },
+    { k:'stuck',   label:'Stuck Run', min:0, max:1, step:.01, def:.3 },
+    { k:'palette', label:'Attribute Flip', min:0, max:1, step:.01, def:.4 },
+    { k:'attr',    label:'Attribute Block', type:'select', def:1, options:[[0,'Off'],[1,'2×2 tiles'],[2,'4×4 tiles']] },
+    { k:'timing',  label:'Timing', type:'select', def:1, options:[[0,'Sync (whole grid ticks together)'],[1,'Async (per-tile clocks)'],[2,'Cascade (sweep)'],[3,'Burst (sparse impacts)']] },
+    { k:'sweep',   label:'Sweep Direction', type:'select', def:0, options:[[0,'Down ↓'],[1,'Up ↑'],[2,'Right →'],[3,'Left ←'],[4,'Diagonal ↘'],[5,'Diagonal ↗']], show:s=> (s.timing|0)===2 },
+    { k:'reroll',  label:'Reroll Rate', min:1, max:30, step:1, def:6 },
+  ]},
   { id:'rle', name:'RLE Databend', hint:'real — genuine TGA-style RLE8 packet stream, corrupt the run headers → colour runs desync and smear', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1, envd:1 },
     { k:'colors', label:'Colours', min:2, max:128, step:1, def:48 },
@@ -253,6 +264,16 @@ const FX = [
     { k:'warpmode', label:'Pattern', type:'select', def:0,
       options:[[0,'Wave'],[1,'Pulse'],[2,'Jitter'],[3,'Step'],[4,'Drift'],[5,'Twist'],[6,'Beat'],[7,'Zigzag']] },
   ]},
+  { id:'mode7', name:'Mode 7', hint:'perspective plane projection — floor / ceiling / walls / tunnel', on:false, open:false, params:[
+    { k:'amount',  label:'Amount', min:0, max:1, step:.01, def:.85, env:1 },
+    { k:'plane',   label:'Plane Layout', type:'select', def:0, options:[[0,'Floor'],[1,'Ceiling'],[2,'H Corridor (floor + ceiling)'],[3,'Left Wall'],[4,'Right Wall'],[5,'V Corridor (both walls)'],[6,'Tunnel (4-wall)']] },
+    { k:'horizon', label:'Horizon Position', min:.1, max:.9, step:.01, def:.5 },
+    { k:'height',  label:'Camera Height', min:0, max:1, step:.01, def:.35 },
+    { k:'fov',     label:'Focal Length', min:0, max:1, step:.01, def:.5 },
+    { k:'pan',     label:'Forward Pan', min:-4, max:4, step:.25, def:1 },
+    { k:'rot',     label:'Plane Spin', min:-2, max:2, step:.05, def:0 },
+    { k:'sky',     label:'Sky Fill', type:'select', def:0, options:[[0,'Black'],[1,'Gradient'],[2,'Source (untouched)'],[3,'Mirrored']], show:s=> (s.plane|0)===0 || (s.plane|0)===1 || (s.plane|0)===3 || (s.plane|0)===4 },
+  ]},
   { id:'pixelate', name:'Pixelate', hint:'mosaic / retro blocks (Envelope can pulse block size)', on:false, open:false, params:[
     { k:'size', label:'Block Size', min:1, max:48, step:1, def:8, env:1 },
     { k:'shape', label:'Shape', type:'select', def:0, options:[[0,'Square'],[1,'Circle'],[2,'Triangle'],[3,'Hexagon'],[4,'Packed Round'],[5,'Packed Circle']] },
@@ -295,6 +316,23 @@ const FX = [
     { k:'speed',  label:'Shine Speed', min:1, max:6, step:1, def:1, show:s=> s.shine>0 },
     { k:'angle',  label:'Shine Angle', min:0, max:345, step:15, def:45, show:s=> s.shine>0 },
     { k:'tone',   label:'Tone', type:'select', def:0, options:[[0,'Gold'],[1,'Silver / Chrome'],[2,'Rainbow'],[3,'Rose'],[4,'Bronze']] },
+  ]},
+  { id:'chrome', name:'Chrome Reflect', hint:'proper env-map chrome — image as bump, reflects a fake sky/ground / rainbow env', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.75, env:1 },
+    { k:'bump',   label:'Bump Depth', min:0, max:1, step:.01, def:.55 },
+    { k:'env',    label:'Environment', type:'select', def:0, options:[[0,'Sky / Ground'],[1,'Neon'],[2,'Sunset'],[3,'Studio Grey'],[4,'Rainbow'],[5,'Chrome Ball']] },
+    { k:'spec',   label:'Specular', min:0, max:1, step:.01, def:.55, env:1 },
+    { k:'light',  label:'Light Angle', min:0, max:345, step:15, def:60 },
+    { k:'spin',   label:'Light Spin', min:0, max:6, step:1, def:0 },
+  ]},
+  { id:'dream', name:'Dream Palette', hint:'psychedelic hue rotation on the image itself — LSD dream drift', on:false, open:false, params:[
+    { k:'amount',   label:'Amount', min:0, max:1, step:.01, def:.7, env:1 },
+    { k:'speed',    label:'Hue Speed', min:0, max:8, step:1, def:1 },
+    { k:'pattern',  label:'Spatial Pattern', type:'select', def:0, options:[[0,'Uniform'],[1,'Vertical Bands'],[2,'Horizontal Bands'],[3,'Radial'],[4,'Region Grid'],[5,'Kaleido Wedges']] },
+    { k:'wave',     label:'Spatial Wave', min:0, max:1, step:.01, def:.35, show:s=> (s.pattern|0)!==0 },
+    { k:'saturate', label:'Saturation Boost', min:.5, max:3, step:.05, def:1.4 },
+    { k:'flat',     label:'Flat Shading', min:1, max:12, step:1, def:1 },
+    { k:'jitter',   label:'Hue Jitter', min:0, max:1, step:.01, def:0 },
   ]},
   { id:'rainbow', name:'Colour Sweep', hint:'colour overlay — static gradient, travelling wave, or holographic foil (luma-modulated diffraction)', on:false, open:false, params:[
     { k:'amount',  label:'Amount', min:0, max:1, step:.01, def:.6, env:1, envd:1 },
@@ -433,6 +471,15 @@ const FX = [
       options:[[0,'Even'],[1,'Right'],[2,'Left'],[3,'Bottom'],[4,'Top'],[5,'Bright areas'],[6,'Dark areas']] },
     { k:'cover', label:'Coverage', min:0, max:1, step:.01, def:.5, env:1, show:s=> s.fade!==0 },
   ]},
+  { id:'screentone', name:'Manga Screentone', hint:'variable-density dot / line / cross-hatch — manga shading', on:false, open:false, params:[
+    { k:'amount',   label:'Amount', min:0, max:1, step:.01, def:.9, env:1 },
+    { k:'pattern',  label:'Pattern', type:'select', def:0, options:[[0,'Dots (variable size)'],[1,'Lines (variable thickness)'],[2,'Cross-hatch'],[3,'Radial dots'],[4,'Gradient dots (soft)']] },
+    { k:'cell',     label:'Cell Size', min:2, max:16, step:1, def:5 },
+    { k:'angle',    label:'Screen Angle', min:-45, max:45, step:5, def:15 },
+    { k:'range',    label:'Tone Range', type:'select', def:1, options:[[0,'All tones'],[1,'Darks + Mids'],[2,'Darks only'],[3,'Mid-tones only'],[4,'Highlights only']] },
+    { k:'ink',      label:'Ink', type:'select', def:0, options:[[0,'Black on Paper'],[1,'White on Ink'],[2,'Coloured (keep source hue)']] },
+    { k:'contrast', label:'Tone Contrast', min:0, max:1, step:.01, def:.5 },
+  ]},
   { id:'crt', name:'CRT', hint:'tube curve · phosphor mask · scanlines · glow', on:false, open:false, params:[
     { k:'amount',   label:'Curvature',     min:0, max:1, step:.01, def:.3 },
     { k:'round',    label:'Screen Bulge',  min:0, max:1, step:.01, def:.2 },
@@ -445,10 +492,18 @@ const FX = [
     { k:'converge', label:'Convergence',   min:0, max:1, step:.01, def:.25, env:1 },
     { k:'glow',     label:'Phosphor Glow', min:0, max:1, step:.01, def:.3, env:1 },
   ]},
-  { id:'sync', name:'Signal / Sync', hint:'H-sync instability — skew / flagging / bad contact', on:false, open:false, params:[
+  { id:'sync', name:'Signal / Sync', hint:'H-sync instability — per-line skew · top-edge flagging · bad-contact bursts', on:false, open:false, params:[
     { k:'hsync',   label:'H-Sync',      min:-1, max:1, step:.01, def:0 },
     { k:'flag',    label:'Flagging',    min:0, max:1, step:.01, def:0, env:1 },
     { k:'contact', label:'Bad Contact', min:0, max:1, step:.01, def:0, env:1 },
+  ]},
+  { id:'headswitch', name:'Head Switching', hint:'VHS bottom-of-frame head-switch noise band + tear', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.75, env:1 },
+    { k:'height', label:'Band Height', min:.01, max:.15, step:.005, def:.05 },
+    { k:'noise',  label:'Noise', min:0, max:1, step:.01, def:.75 },
+    { k:'tear',   label:'Above-band Tear', min:0, max:1, step:.01, def:.35 },
+    { k:'stain',  label:'Colour Stain', min:0, max:1, step:.01, def:.25 },
+    { k:'drift',  label:'Vertical Drift', min:0, max:1, step:.01, def:0 },
   ]},
   { id:'ghost', name:'Ghosting', hint:'multipath echo — faint offset duplicate(s), can drift over the loop', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
@@ -513,6 +568,15 @@ const FX = [
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.7, env:1 },
     { k:'angle',  label:'Light angle', min:0, max:360, step:15, def:135 },
     { k:'mix',    label:'Keep colour', min:0, max:1, step:.01, def:0 },
+  ]},
+  { id:'wireframe', name:'Wireframe', hint:'SGI 3DCG-style — glowing edge lines + flat-shaded interior', on:false, open:false, params:[
+    { k:'amount',    label:'Amount', min:0, max:1, step:.01, def:.85, env:1 },
+    { k:'threshold', label:'Edge Threshold', min:0, max:1, step:.01, def:.25 },
+    { k:'thickness', label:'Line Thickness', min:0, max:1, step:.01, def:.25 },
+    { k:'glow',      label:'Line Glow', min:0, max:1, step:.01, def:.35, env:1 },
+    { k:'fill',      label:'Interior Fill', type:'select', def:0, options:[[0,'Black'],[1,'Flat Shade (posterised)'],[2,'Dim Source'],[3,'Chrome-lit posterise'],[4,'Transparent']] },
+    { k:'levels',    label:'Fill Levels', min:2, max:8, step:1, def:4, show:s=> [1,3].includes(s.fill|0) },
+    { k:'tone',      label:'Line Tone', type:'select', def:1, options:[[0,'White'],[1,'Cyan (SGI)'],[2,'Green (Tron)'],[3,'Amber (VT100)'],[4,'Rainbow (angular)'],[5,'RGB Per-channel']] },
   ]},
   { id:'posterize', name:'Posterize', hint:'reduce colours — banding / retro (optional dither)', on:false, open:false, params:[
     { k:'levels', label:'Levels', min:2, max:12, step:1, def:5 },
@@ -582,6 +646,13 @@ const FX = [
     { k:'delay',  label:'Lag (frames)', min:1, max:12, step:1, def:4 },
     { k:'mode',   label:'What Lags', type:'select', def:0, options:[[0,'Colour (crisp shape)'],[1,'Brightness (double exposure)']] },
   ]},
+  { id:'slitscan', name:'Slit-Scan', hint:'each strip reads a different moment — expensive: cost ∝ Strips × everything under it', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:1, env:1 },
+    { k:'strips', label:'Strips', min:2, max:12, step:1, def:5 },
+    { k:'spread', label:'Time Spread', min:.05, max:1, step:.01, def:.5 },
+    { k:'dir',    label:'Direction', type:'select', def:0, options:[[0,'Vertical strips'],[1,'Horizontal bands'],[2,'Diagonal ↘'],[3,'Radial (out)'],[4,'Random tiles']] },
+    { k:'reverse',label:'Reverse Time', type:'select', def:0, options:[[0,'Newest at start'],[1,'Newest at end']] },
+  ]},
   { id:'interlace', name:'Interlace', hint:'two fields scanned apart — combing on motion', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:1, env:1 },
     { k:'delay',  label:'Field Delay (frames)', min:1, max:12, step:1, def:2 },
@@ -599,13 +670,13 @@ const FX = [
 // effect cards are shown grouped by sub-genre (order here = display order)
 const FX_GROUPS = [
   ['File Corruption',       ['jpeg','png','webp','gifg','audio','sonify','byteshift','bitplane']],   // real encoded-byte damage + raw reinterpret
-  ['Digital Glitch',        ['glitch','rgbsplit','mosh','compress','dct','pixsort','databend','bmpmisread','wrongfmt','rle','gif','pixelate']],
-  ['Analog Signal',         ['vhs','sync','roll','noise','ghost','dotcrawl','hum','herring','degauss']],
-  ['Film / Display',        ['film','crt','hud','halftone']],
+  ['Digital Glitch',        ['glitch','rgbsplit','mosh','compress','dct','pixsort','databend','bmpmisread','wrongfmt','bankswap','rle','gif','pixelate']],
+  ['Analog Signal',         ['vhs','sync','headswitch','roll','noise','ghost','dotcrawl','hum','herring','degauss']],
+  ['Film / Display',        ['film','crt','hud','halftone','screentone']],
   ['Light / Optics',        ['bloom','leak','aura','sparkle','burst','prism','iris','starf','bokeh','edgeglow']],
-  ['Distortion / Geometry', ['warp','melt','extrude','feedback','kaleido','liquid']],
-  ['Colour / Material',     ['color','duotone','solarize','posterize','emboss','gold','rainbow','paper']],
-  ['Video',                 ['time','playback','stale','synctear','interlace','chroma']],        // acts on the footage, not any one frame
+  ['Distortion / Geometry', ['warp','mode7','melt','extrude','feedback','kaleido','liquid']],
+  ['Colour / Material',     ['color','duotone','solarize','posterize','emboss','wireframe','gold','chrome','rainbow','dream','paper']],
+  ['Video',                 ['time','playback','stale','synctear','interlace','chroma','slitscan']],        // acts on the footage, not any one frame
   ['Global',                ['zoom','mask','motion']],                                           // whole-frame settings → lives in its own panel
 ];
 

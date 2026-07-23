@@ -199,15 +199,9 @@ if (sg.on){
     }
     ctx.putImageData(out,0,0);
   }
-  if (flagV>0){                                    // head-switching noise strip at the bottom
-    const bandH=Math.max(3,Math.round(h*(0.03+0.02*flagV))), by=h-bandH;
-    const sh=Math.round((rand(fseed*0.9+3.1)-0.35)*w*0.3*flagV);
-    if (sh){ const band=ctx.getImageData(0,by,w,bandH); ctx.clearRect(0,by,w,bandH);
-      ctx.putImageData(band,sh,by); ctx.putImageData(band,sh>0?sh-w:sh+w,by); }
-    ctx.save(); ctx.globalAlpha=0.65*flagV;
-    for (let yy=0;yy<bandH;yy++){ if (rand(yy*2.3+fseed)>.35){ ctx.fillStyle=rand(yy+fseed*1.7)>.5?'#e8e8e8':'#111'; ctx.fillRect(0,by+yy,w,1);} }
-    ctx.restore();
-  }
+  // The bottom head-switching noise strip that used to live here has been moved into its own
+  // dedicated Head Switching effect — Signal / Sync's Flagging is now purely the top-of-frame
+  // bend (per-scanline exp-decay skew from the top edge, applied above).
   if (ctc>0){                                      // bad contact: intermittent tears + static bursts
     const nb=2+Math.round(ctc*4);
     for (let b=0;b<nb;b++){
@@ -225,4 +219,109 @@ if (sg.on){
     }
   }
 }
+}
+
+function applyHeadSwitch(w,h,phase){
+// ---- VHS Head Switching: the horizontal noise band that always sat at the very bottom of a VHS
+//      playback frame. During vertical retrace the tape recorder swapped between its two rotating
+//      video heads, and the swap-over overlapped a few scanlines of dead / degraded signal at a
+//      fixed position at the bottom of the frame. The interior is MOSTLY BLACK (raw signal
+//      absence) with irregular BRIGHT WHITE STREAKS (the rushing static look), CHROMA SPARKLIES
+//      at the edges of the band (colour phase misalignment spikes — red, cyan, magenta), and a
+//      SHARP HEAD-SWITCH LINE at the very top of the band (the exact scanline where head A
+//      handed off to head B). Above the band the picture SKEWS DIAGONALLY — the last few rows
+//      lean sideways because the second head was still settling into sync, so the shift ramps
+//      linearly across those rows (not a uniform horizontal shift). Vertical Drift walks the
+//      band up and down over the loop to mimic a poorly-tracked tape. Distinct from Signal /
+//      Sync (whole-frame skew) and Sync Tear (irregular horizontal bands) — this is a fixed
+//      thin band at the bottom with characteristic VHS head-switch content.
+const hs = state.headswitch;
+if (!(hs.on && P('headswitch','amount')>0)) return;
+const amt = P('headswitch','amount');
+const bandH = Math.max(2, Math.round(hs.height * h));
+const noise = +hs.noise || 0;
+const tear = +hs.tear || 0, stain = +hs.stain || 0, drift = +hs.drift || 0;
+const bandCenter = h - bandH*0.5 + Math.sin(phase*Math.PI*2)*drift*h*0.12;
+let bandY0 = Math.round(bandCenter - bandH*0.5);
+if (bandY0 < 0) bandY0 = 0;
+if (bandY0 + bandH > h) bandY0 = h - bandH;
+// Above-band tear: shift is MAX at the row just above the band (the head has JUST switched and
+// sync is at its worst there) and decays EXPONENTIALLY upward as the head settles. A linear ramp
+// looks like a straight diagonal cut; the exponential shape matches how a real head-switch
+// recovery leans hard right against the band and calms down within a handful of scanlines — same
+// shape Flagging uses at the top of the frame.
+if (tear > 0.01){
+  const tearH = Math.min(32, Math.round(bandH * 2.6));
+  const y0 = Math.max(0, bandY0 - tearH);
+  const th_ = bandY0 - y0;
+  if (th_ > 0){
+    const shiftMax = Math.round((0.3 + tear*0.7) * ((rand(phase*11.7)*2 - 1)) * w * 0.15);
+    if (shiftMax !== 0){
+      const above = ctx.getImageData(0, y0, w, th_);
+      const skew  = ctx.createImageData(w, th_);
+      const src = above.data, dst = skew.data;
+      const denom = Math.max(1, th_-1);
+      for (let dy=0; dy<th_; dy++){
+        // distUp: 0 at the row right above the band (max shift), 1 at the top of the tear zone.
+        const distUp = (th_ - 1 - dy) / denom;
+        const rowShift = Math.round(shiftMax * Math.exp(-distUp * 3.2));
+        for (let dx=0; dx<w; dx++){
+          const sX = ((dx - rowShift) % w + w) % w;
+          const sI = (dy*w + sX)*4, dI = (dy*w + dx)*4;
+          dst[dI]=src[sI]; dst[dI+1]=src[sI+1]; dst[dI+2]=src[sI+2]; dst[dI+3]=255;
+        }
+      }
+      ctx.putImageData(skew, 0, y0);
+    }
+  }
+}
+// The band itself — mostly black + irregular white streaks + chroma sparklies at the edges +
+// sharp head-switch line at the very top. Everything is seeded on x/y/phase so the loop closes.
+const band = ctx.getImageData(0, bandY0, w, bandH);
+const d = band.data;
+const streakBucket = Math.floor(phase * 12);                            // change streak layout ~12×/loop
+for (let y=0; y<bandH; y++){
+  const isTopEdge = y < 2;                                              // hard head-switch line
+  const isEdge = y < 2 || y > bandH - 3;                                // sparklies live here
+  // Pre-decide this row's white streak (if any) — sparse, irregular length.
+  const streakRoll = rand(y*3.71 + streakBucket*1.3);
+  const hasStreak = streakRoll > 0.62;
+  let sx0 = 0, sx1 = 0;
+  if (hasStreak){
+    sx0 = Math.floor(rand(y*1.31 + streakBucket*0.7) * w * 0.85);
+    sx1 = sx0 + Math.floor(rand(y*7.93 + streakBucket*0.31) * w * 0.55 + 6);
+    if (sx1 > w) sx1 = w;
+  }
+  for (let x=0; x<w; x++){
+    const i = (y*w + x)*4;
+    let R, G, B;
+    if (isTopEdge){
+      // Sharp head-switch line: pure black or pure white per pixel, no colour.
+      const v = rand(x*0.31 + y*17 + phase*4.1) > 0.5 ? 225 : 4;
+      R = G = B = v;
+    } else {
+      // Base is nearly-black with small rasterised static.
+      let ln = 4 + rand(x*0.31 + y*7.71 + streakBucket*13.7) * 14;
+      if (hasStreak && x >= sx0 && x <= sx1){
+        // Irregular bright streak — the "rushing" look.
+        ln = 130 + rand(x*0.13 + y*3.31 + streakBucket)*110;
+      }
+      R = G = B = ln;
+      // Chroma sparklies at edges — brief coloured pixel spikes at chroma phase mismatch.
+      if (stain > 0 && isEdge){
+        const sp = rand(x*0.71 + y*3.31 + phase*7.3);
+        if (sp > 0.82){
+          const c = hsv(rand(x*0.13 + y*5.77 + streakBucket)*360, 0.9, 0.55 + rand(x*1.31)*0.4);
+          const mix = stain * 0.9;
+          R += (c[0]-R)*mix; G += (c[1]-G)*mix; B += (c[2]-B)*mix;
+        }
+      }
+    }
+    const mixW = amt * noise;
+    d[i]   = d[i]   + (R - d[i])   * mixW;
+    d[i+1] = d[i+1] + (G - d[i+1]) * mixW;
+    d[i+2] = d[i+2] + (B - d[i+2]) * mixW;
+  }
+}
+ctx.putImageData(band, 0, bandY0);
 }

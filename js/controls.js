@@ -155,13 +155,19 @@ const RAND_PROB = { png:.12, jpeg:.15, warp:.18, halftone:.12, feedback:.12, mel
                     ghost:.14, dotcrawl:.1, hum:.12, herring:.08, sync:.14, zoom:0, leak:.12, bloom:.14,
                     compress:.14, pixsort:.14, databend:.12, degauss:.06, gif:.12, dct:.12,
                     sonify:.12, byteshift:.12, bitplane:.1, bmpmisread:.14, wrongfmt:.12, rle:.12, webp:.1, gifg:.1, audio:.08,
-                    extrude:.12, time:.1, playback:.1, interlace:.1, stale:.1, synctear:.1, chroma:.12,   // these re-render the frame — keep them rare
+                    // Video / temporal effects re-render the frame once (or many times for Slit-Scan);
+                    // keep them rare so Random doesn't stack them and murder the frame rate.
+                    extrude:.12, time:.1, playback:.1, interlace:.1, stale:.1, synctear:.1, chroma:.12,
+                    slitscan:.03,   // renders one full frame per unique moment — extremely heavy
                     // colour-mapping / stylise effects: keep them occasional, emboss rarest
                     duotone:.14, solarize:.14, posterize:.14, emboss:.04,
+                    wireframe:.05, chrome:.06, dream:.08, screentone:.06,   // loud full-frame recolours
                     gold:.08, rainbow:.07, sparkle:.1, burst:.05,   // loud hype effects — keep them occasional
                     prism:.09, iris:.08, starf:.08, kaleido:.05,   // dream / optics
-                    bokeh:.08, liquid:.08, paper:.08,
-                    edgeglow:.06 };   // gaming-PC hype — keep it occasional too
+                    bokeh:.08, liquid:.08, paper:.08, aura:.07,
+                    edgeglow:.06,   // gaming-PC hype — keep it occasional too
+                    // retro / hardware artifacts
+                    rgbsplit:.1, bankswap:.08, mode7:.05, headswitch:.12 };
 // three strength levels: prob = on-probability scale, str = how far params stray from their default.
 // str stays low at Normal so params sit near their (gentle) defaults instead of jumping to extremes.
 // seq/seqHeavy = chance a roll gives an effect a Sequencer pattern (heavy = higher, for destructive fx).
@@ -244,10 +250,25 @@ function randomizeFX(){
     state[drop].on = false; onTone = onTone.filter(id=>id!==drop);
     droppableTone = droppableTone.filter(id=>id!==drop);
   }
+  // Heavy temporal effects each re-render the frame (once or many times for Slit-Scan); stacking
+  // several of them multiplies the render cost. Cap how many are on together so Random can't grind
+  // playback to a halt.
+  const HEAVY_TEMPORAL = ['time','playback','stale','synctear','interlace','chroma','slitscan'];
+  const heavyCap = randLevelVal==='wild' ? 3 : randLevelVal==='strong' ? 2 : 1;
+  let onHeavy = HEAVY_TEMPORAL.filter(id=>state[id].on);
+  let droppableHeavy = onHeavy.filter(id=>!state[id]._locked);
+  while (onHeavy.length > heavyCap && droppableHeavy.length){
+    // Prefer to drop Slit-Scan first (it costs the most), otherwise random pick.
+    const preferred = droppableHeavy.includes('slitscan') ? 'slitscan'
+                    : droppableHeavy[Math.floor(Math.random()*droppableHeavy.length)];
+    state[preferred].on = false;
+    onHeavy = onHeavy.filter(id=>id!==preferred);
+    droppableHeavy = droppableHeavy.filter(id=>id!==preferred);
+  }
   // Envelope/Zoom/Mask render nothing on their own — and the Video effects only rework what another
   // effect already moved, so a roll of nothing-but-Video is a blank frame. Guarantee at least one
   // effect that actually puts something on screen, BEFORE the count clamp so the clamp can protect it.
-  const PASSIVE = ['motion','zoom','mask','time','playback','stale','synctear','interlace','chroma'];
+  const PASSIVE = ['motion','zoom','mask','time','playback','stale','synctear','interlace','chroma','slitscan'];
   const isDrawer = id => !PASSIVE.includes(id);
   if (!FX.some(f=> isDrawer(f.id) && state[f.id].on)){
     const candidates = ['vhs','glitch','noise','color'].filter(id=>!state[id]._locked);
