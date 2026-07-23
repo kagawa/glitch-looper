@@ -110,6 +110,7 @@ function drawFrame(phase){    // phase in [0,1)
   }
 
   applyPixelate(w,h);
+  applyPolygonFill(w,h,phase);
 
   applyFeedbackZoom(w,h,phase);
 

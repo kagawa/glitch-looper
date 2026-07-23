@@ -21,6 +21,13 @@
   .back{ font-size:13px; color:var(--muted) }
   .lead{ color:var(--muted); font-size:15px; margin:10px 0 22px }
   .lead .jp{ display:block; margin-top:4px }
+  html{ scroll-behavior:smooth; scroll-padding-top:18px }
+  .toc{ margin:18px 0 26px; padding:12px 14px; background:var(--panel); border:1px solid var(--line); border-radius:10px }
+  .toc-title{ color:var(--muted); font-size:11px; letter-spacing:.1em; text-transform:uppercase; font-weight:700; margin-bottom:7px }
+  .toc-links{ display:flex; flex-wrap:wrap; gap:5px 8px }
+  .toc a{ font-size:12px; padding:3px 8px; border:1px solid var(--line); border-radius:999px; background:var(--panel2) }
+  .toc a:hover{ border-color:var(--accent); text-decoration:none }
+  .cat,.fx{ scroll-margin-top:18px }
   .langbar{ margin-left:auto; display:flex; gap:6px; background:var(--panel2); padding:4px; border-radius:10px; border:1px solid var(--line) }
   .langbar button{ font:inherit; font-size:13px; color:var(--muted); background:none; border:0; padding:5px 12px; border-radius:7px; cursor:pointer }
   .langbar button.on{ background:var(--accent); color:#001018; font-weight:700 }
@@ -64,6 +71,11 @@
     <span class="en">Every effect turns a still image into a seamless looping video, entirely in your browser — nothing is uploaded. Effects stack; the <b>Envelope</b> makes them breathe over the loop, and the <b>Sequencer</b> can switch each effect on and off across the loop's 8 steps. Glitch effects are grouped by how they process the image — <b>binary</b> (bytes / bits / file format) vs <b>pixels</b>. Tag: <span class="tag real">real</span> genuinely corrupts encoded file bytes then re-decodes (unpredictable); <span class="tag sim">sim</span> is deterministic processing.</span>
     <span class="jp">各エフェクトは静止画をシームレスなループ動画に変換します。処理はすべてブラウザ内で完結し、画像はアップロードされません。効果は重ねがけでき、<b>Envelope</b> でループ内の抑揚を、<b>Sequencer</b> でループを8ステップに分けて各エフェクトのオン/オフを切り替えられます。グリッチ系は処理方法で分類 — <b>バイナリ</b>（バイト/ビット/ファイル形式）か <b>ピクセル</b> か。タグ: <span class="tag real">real</span>＝エンコード済みバイトを実際に破壊して再デコード（予測不能）、<span class="tag sim">sim</span>＝決定的な処理。</span>
   </p>
+
+  <nav class="toc" id="toc" aria-label="Effect sections">
+    <div class="toc-title">Jump to / 目次</div>
+    <div class="toc-links"></div>
+  </nav>
 
   <main id="doc"></main>
 
@@ -188,11 +200,15 @@ const REFS = [
 ];
 
 const doc = document.getElementById('doc');
+const tocLinks = document.querySelector('#toc .toc-links');
+const slug = (s,i) => `${String(s).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}-${i}`;
 for (const [group, items] of GROUPS){
-  const sec = document.createElement('section'); sec.className='cat';
+  const gi=GROUPS.indexOf(GROUPS.find(g=>g[0]===group));
+  const sec = document.createElement('section'); sec.className='cat'; sec.id=slug(group,gi);
   sec.innerHTML = `<h2>${group}</h2>`;
+  const catLink=document.createElement('a'); catLink.href=`#${sec.id}`; catLink.textContent=group; tocLinks.appendChild(catLink);
   for (const [name, tag, en, jp, params] of items){
-    const el = document.createElement('div'); el.className='fx';
+    const el = document.createElement('div'); el.className='fx'; el.id=slug(name,gi+'-'+items.indexOf(items.find(x=>x[0]===name)));
     el.innerHTML = `<h3>${name}<span class="tag ${tag}">${tag}</span></h3>`+
       `<div class="en">${en}</div><div class="jp">${jp}</div>`+
       `<div class="params"><b>Params:</b> ${params}</div>`;

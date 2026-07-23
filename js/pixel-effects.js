@@ -97,6 +97,242 @@ if (px2.on && px2.size>1){
 }
 }
 
+function applyPolygonFill(w,h,phase){
+// ---- Polygon Fill: reshape one tessellation into another by POURING pixels linearly. Both From
+//      and To are laid down as REAL space-filling tessellations of equal-area (s²) cells; shapes
+//      supported are Square, equilateral Triangle, regular Hexagon, 60° Rhombus, and Rectangle
+//      (with aspect ratio param). For each To cell we enumerate its interior pixels in row-major
+//      order → target stream; for the corresponding From cell (whose centroid is nearest the To
+//      centroid in the unrotated tessellation frame) we enumerate its pixels the same way →
+//      source stream. Pixel k in the target reads pixel k in the source (even-resampled when
+//      discrete counts drift due to integer discretisation of s²). Grid Angle rotates the whole
+//      tessellation around the canvas centre — cells rotate together with their content, so
+//      identity (same From/To/size) stays identity at any angle.
+const fx = state.polymorph;
+if (!(fx && fx.on && P('polymorph','amount')>0)) return;
+const amount = P('polymorph','amount');
+const s = Math.max(4, Math.round(P('polymorph','size')));
+const fromShape = fx.from|0, toShape = fx.shape|0;
+const aspect = Math.max(0.1, +fx.aspect || 1);                          // only used by Rectangle
+const angleRad = P('polymorph','angle') * Math.PI / 180;
+const cosA = Math.cos(angleRad), sinA = Math.sin(angleRad);
+const cxC = w/2, cyC = h/2;
+// Cell metric per shape — everything derives from equal-area s².
+const rectW = s * Math.sqrt(aspect), rectH = s / Math.sqrt(aspect);
+const triSide = 2*s/Math.pow(3,0.25), triH = triSide*Math.sqrt(3)/2;
+const hexHr = s*Math.sqrt(2/(3*Math.sqrt(3))), hexDX = hexHr*Math.sqrt(3), hexDY = hexHr*1.5;
+const rhomL = s*Math.pow(2/Math.sqrt(3), 0.5);                          // 60°-rhombus side
+const rhomD1 = rhomL, rhomD2 = rhomL*Math.sqrt(3);                      // short / long diagonals
+const rhomDX = rhomD1, rhomDY = rhomD2/2;                               // tessellation stride
+// Build row-major pixel-offset list for a shape/orient (0=up, 1=down; orient only matters for
+// triangle). Offsets are relative to the cell centroid, discretised at integer pixel centres.
+const buildPixels = (shape, orient) => {
+  const px = [];
+  if (shape===0){
+    const half = s/2;
+    const y0 = -Math.round(half), y1 = y0 + s;
+    const x0 = -Math.round(half), x1 = x0 + s;
+    for (let dy=y0; dy<y1; dy++) for (let dx=x0; dx<x1; dx++) px.push(dx, dy);
+    return px;
+  }
+  if (shape===1){
+    const yTop = orient===0 ? -Math.round(2*triH/3) : -Math.round(triH/3);
+    const yBot = orient===0 ?  Math.round(triH/3)   :  Math.round(2*triH/3);
+    const span = Math.max(1, yBot - yTop);
+    for (let dy=yTop; dy<=yBot; dy++){
+      const yFrac = orient===0 ? (dy - yTop)/span : (yBot - dy)/span;
+      const halfW = yFrac * triSide / 2;
+      const xEx = Math.floor(halfW);
+      for (let dx=-xEx; dx<=xEx; dx++) px.push(dx, dy);
+    }
+    return px;
+  }
+  if (shape===2){
+    const halfW = hexHr*Math.sqrt(3)/2;
+    const yTop = -Math.round(hexHr), yBot = Math.round(hexHr);
+    for (let dy=yTop; dy<=yBot; dy++){
+      const widthAtY = Math.abs(dy) <= hexHr/2 ? halfW*2 : (hexHr - Math.abs(dy))*Math.sqrt(3)*2;
+      const xEx = Math.floor(widthAtY/2);
+      for (let dx=-xEx; dx<=xEx; dx++) px.push(dx, dy);
+    }
+    return px;
+  }
+  if (shape===3){                                                       // 60° Rhombus (diamond)
+    const halfD1 = rhomD1/2, halfD2 = rhomD2/2;
+    const yTop = -Math.round(halfD2), yBot = Math.round(halfD2);
+    for (let dy=yTop; dy<=yBot; dy++){
+      // Interior of diamond: |dx|/halfD1 + |dy|/halfD2 <= 1
+      const halfW = halfD1 * (1 - Math.abs(dy)/halfD2);
+      const xEx = Math.floor(halfW);
+      for (let dx=-xEx; dx<=xEx; dx++) px.push(dx, dy);
+    }
+    return px;
+  }
+  // 4: Rectangle
+  const halfW = rectW/2, halfH = rectH/2;
+  const y0 = -Math.round(halfH), y1 = y0 + Math.round(rectH);
+  const x0 = -Math.round(halfW), x1 = x0 + Math.round(rectW);
+  for (let dy=y0; dy<y1; dy++) for (let dx=x0; dx<x1; dx++) px.push(dx, dy);
+  return px;
+};
+const toPix   = toShape===1   ? [buildPixels(1,0), buildPixels(1,1)] : [buildPixels(toShape,0)];
+const fromPix = fromShape===1 ? [buildPixels(1,0), buildPixels(1,1)] : [buildPixels(fromShape,0)];
+// Enumerate cell centroids of a tessellation in UNROTATED space. We cover a rectangle centred on
+// the canvas centre whose half-extent is the canvas diagonal — this guarantees that after
+// rotation by any angle in [-45°, 45°] the covered area still spans the whole canvas.
+const halfDiag = Math.hypot(w, h)/2 + Math.max(s, rectW, rectH, triSide, hexDX, rhomDX);
+const boxX0 = cxC - halfDiag, boxX1 = cxC + halfDiag;
+const boxY0 = cyC - halfDiag, boxY1 = cyC + halfDiag;
+const enumerateCells = (shape) => {
+  const cells = [];
+  if (shape===0){
+    const half = s/2;
+    const cy0 = Math.floor((boxY0 - half)/s)*s + half;
+    const cx0 = Math.floor((boxX0 - half)/s)*s + half;
+    for (let cy=cy0; cy<boxY1; cy+=s) for (let cx=cx0; cx<boxX1; cx+=s)
+      cells.push(cx, cy, 0);
+    return cells;
+  }
+  if (shape===1){
+    const rowStart = Math.floor(boxY0/triH) - 1, rowEnd = Math.ceil(boxY1/triH) + 1;
+    const colStart = Math.floor(boxX0/triSide) - 1, colEnd = Math.ceil(boxX1/triSide) + 1;
+    for (let row=rowStart; row<rowEnd; row++){
+      const shift = ((row%2+2)%2) * triSide/2;
+      for (let col=colStart; col<colEnd; col++){
+        cells.push((col+0.5)*triSide + shift, row*triH + triH/3, 1);
+        cells.push((col+1)*triSide + shift, row*triH + 2*triH/3, 0);
+      }
+    }
+    return cells;
+  }
+  if (shape===2){
+    const rowStart = Math.floor(boxY0/hexDY) - 1, rowEnd = Math.ceil(boxY1/hexDY) + 1;
+    const colStart = Math.floor(boxX0/hexDX) - 1, colEnd = Math.ceil(boxX1/hexDX) + 1;
+    for (let row=rowStart; row<rowEnd; row++){
+      const shift = ((row%2+2)%2) * hexDX/2;
+      for (let col=colStart; col<colEnd; col++) cells.push(col*hexDX + shift, row*hexDY, 0);
+    }
+    return cells;
+  }
+  if (shape===3){                                                       // Rhombus: hex-like offset lattice
+    const rowStart = Math.floor(boxY0/rhomDY) - 1, rowEnd = Math.ceil(boxY1/rhomDY) + 1;
+    const colStart = Math.floor(boxX0/rhomDX) - 1, colEnd = Math.ceil(boxX1/rhomDX) + 1;
+    for (let row=rowStart; row<rowEnd; row++){
+      const shift = ((row%2+2)%2) * rhomDX/2;
+      for (let col=colStart; col<colEnd; col++) cells.push(col*rhomDX + shift, row*rhomDY, 0);
+    }
+    return cells;
+  }
+  // 4: Rectangle
+  const halfW = rectW/2, halfH = rectH/2;
+  const cy0 = Math.floor((boxY0 - halfH)/rectH)*rectH + halfH;
+  const cx0 = Math.floor((boxX0 - halfW)/rectW)*rectW + halfW;
+  for (let cy=cy0; cy<boxY1; cy+=rectH) for (let cx=cx0; cx<boxX1; cx+=rectW)
+    cells.push(cx, cy, 0);
+  return cells;
+};
+// Nearest From centroid (unrotated) + orientation for a given unrotated canvas point.
+const nearestFrom = (x, y) => {
+  if (fromShape===0){
+    return { cx:(Math.floor(x/s)+0.5)*s, cy:(Math.floor(y/s)+0.5)*s, orient:0 };
+  }
+  if (fromShape===1){
+    const row0 = Math.floor(y/triH);
+    let bx=0, by=0, bo=0, bd=Infinity;
+    for (let dr=-1; dr<=1; dr++){
+      const row = row0+dr;
+      const shift = ((row%2+2)%2) * triSide/2;
+      const col0 = Math.floor((x-shift)/triSide);
+      for (let dc=-1; dc<=1; dc++){
+        const col = col0+dc;
+        const dcx = (col+0.5)*triSide + shift, dcy = row*triH + triH/3;
+        const dd = (x-dcx)*(x-dcx) + (y-dcy)*(y-dcy);
+        if (dd<bd){ bd=dd; bx=dcx; by=dcy; bo=1; }
+        const ucx = (col+1)*triSide + shift, ucy = row*triH + 2*triH/3;
+        const du = (x-ucx)*(x-ucx) + (y-ucy)*(y-ucy);
+        if (du<bd){ bd=du; bx=ucx; by=ucy; bo=0; }
+      }
+    }
+    return { cx:bx, cy:by, orient:bo };
+  }
+  if (fromShape===2){
+    const row0 = Math.floor(y/hexDY);
+    let bx=0, by=0, bd=Infinity;
+    for (let dr=-1; dr<=1; dr++){
+      const row = row0+dr;
+      const shift = ((row%2+2)%2) * hexDX/2;
+      const col0 = Math.floor((x-shift)/hexDX);
+      for (let dc=-1; dc<=1; dc++){
+        const col = col0+dc;
+        const cx = col*hexDX + shift, cy = row*hexDY;
+        const d = (x-cx)*(x-cx) + (y-cy)*(y-cy);
+        if (d<bd){ bd=d; bx=cx; by=cy; }
+      }
+    }
+    return { cx:bx, cy:by, orient:0 };
+  }
+  if (fromShape===3){
+    const row0 = Math.floor(y/rhomDY);
+    let bx=0, by=0, bd=Infinity;
+    for (let dr=-1; dr<=1; dr++){
+      const row = row0+dr;
+      const shift = ((row%2+2)%2) * rhomDX/2;
+      const col0 = Math.floor((x-shift)/rhomDX);
+      for (let dc=-1; dc<=1; dc++){
+        const col = col0+dc;
+        const cx = col*rhomDX + shift, cy = row*rhomDY;
+        const d = (x-cx)*(x-cx) + (y-cy)*(y-cy);
+        if (d<bd){ bd=d; bx=cx; by=cy; }
+      }
+    }
+    return { cx:bx, cy:by, orient:0 };
+  }
+  // 4: Rectangle
+  return { cx:(Math.floor(x/rectW)+0.5)*rectW, cy:(Math.floor(y/rectH)+0.5)*rectH, orient:0 };
+};
+const src = ctx.getImageData(0,0,w,h), sd = src.data;
+const out = ctx.createImageData(w,h), od = out.data;
+od.set(sd);                                                              // uncovered pixels stay = source
+const cells = enumerateCells(toShape);
+for (let i=0; i<cells.length; i+=3){
+  const Tcx0 = cells[i], Tcy0 = cells[i+1], toOrient = cells[i+2];
+  const toList = toPix[toOrient];
+  const N_to = toList.length / 2;
+  if (N_to === 0) continue;
+  const from = nearestFrom(Tcx0, Tcy0);
+  const fromList = fromPix[from.orient];
+  const N_from = fromList.length / 2;
+  if (N_from === 0) continue;
+  const ratio = N_from / N_to;
+  // Rotate centroids into canvas space (around canvas centre).
+  const Tcx = cxC + (Tcx0 - cxC)*cosA - (Tcy0 - cyC)*sinA;
+  const Tcy = cyC + (Tcx0 - cxC)*sinA + (Tcy0 - cyC)*cosA;
+  const Fcx = cxC + (from.cx - cxC)*cosA - (from.cy - cyC)*sinA;
+  const Fcy = cyC + (from.cx - cxC)*sinA + (from.cy - cyC)*cosA;
+  for (let k=0; k<N_to; k++){
+    const tdx = toList[k*2], tdy = toList[k*2+1];
+    // Rotate the cell-local offset by the same angle so cell shape rotates with the tessellation.
+    const rtdx = cosA*tdx - sinA*tdy, rtdy = sinA*tdx + cosA*tdy;
+    const dxi = Math.round(Tcx + rtdx), dyi = Math.round(Tcy + rtdy);
+    if (dxi<0 || dxi>=w || dyi<0 || dyi>=h) continue;
+    let sk = Math.floor((k + 0.5) * ratio);
+    if (sk >= N_from) sk = N_from - 1;
+    const fdx = fromList[sk*2], fdy = fromList[sk*2+1];
+    const rfdx = cosA*fdx - sinA*fdy, rfdy = sinA*fdx + cosA*fdy;
+    let sx = Fcx + rfdx, sy = Fcy + rfdy;
+    sx = sx<0 ? 0 : sx>=w ? w-1 : sx|0;
+    sy = sy<0 ? 0 : sy>=h ? h-1 : sy|0;
+    const si = (sy*w + sx)*4;
+    const di = (dyi*w + dxi)*4;
+    od[di]   = sd[di]   + (sd[si]   - sd[di])   * amount;
+    od[di+1] = sd[di+1] + (sd[si+1] - sd[di+1]) * amount;
+    od[di+2] = sd[di+2] + (sd[si+2] - sd[di+2]) * amount;
+    od[di+3] = 255;
+  }
+}
+ctx.putImageData(out, 0, 0);
+}
+
 function applyHalftone(w,h){
 // ---- halftone: rotatable dot/shape/line matrix with LED, print, CRT-phosphor, blueprint and
 //      sepia presets. Grid Angle rotates the LATTICE, not the canvas — sample and dot share the

@@ -297,6 +297,14 @@ const FX = [
       options:[[0,'Even'],[1,'Right'],[2,'Left'],[3,'Bottom'],[4,'Top'],[5,'Bright areas'],[6,'Dark areas']] },
     { k:'cover', label:'Coverage', min:0, max:1, step:.01, def:.5, env:1, show:s=> s.fade!==0 },
   ]},
+  { id:'polymorph', name:'Polygon Fill', hint:'equal-area cells poured between tessellations — square / triangle / hexagon / rhombus / rectangle', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:1, env:1 },
+    { k:'size',   label:'Source Cell', min:2, max:48, step:1, def:8, env:1 },
+    { k:'from',   label:'From Shape', type:'select', def:0, options:[[0,'Square'],[1,'Triangle'],[2,'Hexagon'],[3,'Rhombus (60°)'],[4,'Rectangle']] },
+    { k:'shape',  label:'To Shape',   type:'select', def:1, options:[[0,'Square'],[1,'Triangle'],[2,'Hexagon'],[3,'Rhombus (60°)'],[4,'Rectangle']] },
+    { k:'angle',  label:'Grid Angle', min:-45, max:45, step:1, def:0, env:1 },
+    { k:'aspect', label:'Rectangle Aspect', min:.25, max:4, step:.05, def:1.5, show:s=> (s.from|0)===4 || (s.shape|0)===4 },
+  ]},
   { id:'hud', name:'HUD / Text', hint:'5 text slots · tokens {date} {time} {ctr} {rec} {n}', on:false, open:false, params:[
     { k:'layout',  label:'Preset', type:'select', def:3,
       options:[[0,'REC ●'],[1,'▶ PLAY'],[2,'Timestamp'],[3,'Camcorder'],[4,'Security Cam'],
@@ -684,7 +692,7 @@ const FX = [
 // effect cards are shown grouped by sub-genre (order here = display order)
 const FX_GROUPS = [
   ['File Corruption',       ['jpeg','png','webp','gifg','audio','sonify','byteshift','bitplane']],   // real encoded-byte damage + raw reinterpret
-  ['Digital Glitch',        ['glitch','rgbsplit','mosh','compress','dct','pixsort','databend','bmpmisread','wrongfmt','weirdfmt','progressive','bankswap','rle','gif','pixelate']],
+  ['Digital Glitch',        ['glitch','rgbsplit','mosh','compress','dct','pixsort','databend','bmpmisread','wrongfmt','weirdfmt','progressive','bankswap','rle','gif','pixelate','polymorph']],
   ['Analog Signal',         ['vhs','sync','headswitch','roll','noise','ghost','dotcrawl','hum','herring','degauss']],
   ['Film / Display',        ['film','crt','hud','halftone','screentone']],
   ['Light / Optics',        ['bloom','leak','aura','sparkle','burst','prism','iris','starf','bokeh','edgeglow']],

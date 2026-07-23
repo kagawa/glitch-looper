@@ -34,6 +34,13 @@
   .en{ } .jp{ color:#c9c9d6 }
   li .jp{ display:block; margin-top:2px }
   body.lang-en .jp{ display:none } body.lang-jp .en{ display:none }
+  html{ scroll-behavior:smooth; scroll-padding-top:18px }
+  .toc{ margin:18px 0 26px; padding:12px 14px; background:var(--panel); border:1px solid var(--line); border-radius:10px }
+  .toc-title{ color:var(--muted); font-size:11px; letter-spacing:.1em; text-transform:uppercase; font-weight:700; margin-bottom:7px }
+  .toc-links{ display:flex; flex-wrap:wrap; gap:5px 8px }
+  .toc a{ font-size:12px; padding:3px 8px; border:1px solid var(--line); border-radius:999px; background:var(--panel2) }
+  .toc a:hover{ border-color:var(--accent); text-decoration:none }
+  .step{ scroll-margin-top:18px }
   b, strong{ color:var(--fg); font-weight:600 }
   .k{ font-size:12px; font-weight:700; background:var(--panel2); border:1px solid var(--line);
       border-radius:6px; padding:1px 7px; color:var(--fg) }
@@ -61,6 +68,11 @@
     <span class="en">GLITCH LOOPER turns any image into a seamless 3-second looping glitch video, entirely in your browser — nothing is uploaded. Here is the whole workflow, from dropping an image to saving the loop.</span>
     <span class="jp">GLITCH LOOPER は任意の画像を、3秒でシームレスにループするグリッチ動画に変換します。処理はすべてブラウザ内で完結し、画像はアップロードされません。以下は画像を入れてからループを保存するまでの一連の流れです。</span>
   </p>
+
+  <nav class="toc" id="toc" aria-label="Guide sections">
+    <div class="toc-title">Jump to / 目次</div>
+    <div class="toc-links"></div>
+  </nav>
 
   <main id="doc"></main>
 
@@ -149,9 +161,12 @@ const TIPS = [
 ];
 
 const doc = document.getElementById('doc');
+const tocLinks = document.querySelector('#toc .toc-links');
+const slug = (s,i) => `${String(s).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}-${i}`;
 STEPS.forEach(([en, jp, items], i)=>{
-  const sec = document.createElement('section'); sec.className='step';
+  const sec = document.createElement('section'); sec.className='step'; sec.id=slug(en,i);
   sec.innerHTML = `<h2><span class="n">${i+1}</span><span class="en">${en}</span><span class="jp">${jp}</span></h2>`;
+  const a=document.createElement('a'); a.href=`#${sec.id}`; a.innerHTML=`<span class="en">${en}</span><span class="jp">${jp}</span>`; tocLinks.appendChild(a);
   const ul = document.createElement('ul'); ul.className='items';
   for (const [e,j] of items){
     const li = document.createElement('li');
@@ -164,7 +179,9 @@ STEPS.forEach(([en, jp, items], i)=>{
 
 // shortcuts section
 const ks = document.createElement('section'); ks.className='step';
+ks.id='shortcuts';
 ks.innerHTML = `<h2><span class="n">⌨</span><span class="en">Keyboard &amp; shortcuts</span><span class="jp">キーボード・ショートカット</span></h2>`;
+{ const a=document.createElement('a'); a.href='#shortcuts'; a.innerHTML='<span class="en">Keyboard &amp; shortcuts</span><span class="jp">キーボード・ショートカット</span>'; tocLinks.appendChild(a); }
 const tbl = document.createElement('table'); tbl.className='keys';
 tbl.innerHTML = KEYS.map(([k,e,j])=>
   `<tr><td><span class="k">${k}</span></td><td><span class="en">${e}</span><span class="jp">${j}</span></td></tr>`).join('');
@@ -172,7 +189,9 @@ ks.appendChild(tbl); doc.appendChild(ks);
 
 // tips
 const tp = document.createElement('section'); tp.className='step';
+tp.id='tips';
 tp.innerHTML = `<h2><span class="n">★</span><span class="en">Tips</span><span class="jp">コツ</span></h2>`;
+{ const a=document.createElement('a'); a.href='#tips'; a.innerHTML='<span class="en">Tips</span><span class="jp">コツ</span>'; tocLinks.appendChild(a); }
 const box = document.createElement('div'); box.className='tip';
 const tul = document.createElement('ul');
 tul.innerHTML = TIPS.map(([e,j])=>`<li><span class="en">${e}</span><span class="jp">${j}</span></li>`).join('');
