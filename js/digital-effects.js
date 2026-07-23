@@ -378,7 +378,63 @@ if (mode===0){                                     // Planar (triple-ghost): Y /
     d[di+2]=s[bp*4+2]; d[di+3]=255;
   }
 }
-ctx.putImageData(out,0,0);
+
+}
+
+function applyWeirdFormat(w,h,phase){
+  const wf=state.weirdfmt;
+  if (!(wf && wf.on && wf.amount>0)) return;
+  const src=ctx.getImageData(0,0,w,h), sd=src.data, out=ctx.createImageData(w,h), od=out.data;
+  const tile=Math.max(2,wf.tile|0), mode=wf.mode|0, amount=P('weirdfmt','amount'), stride=P('weirdfmt','stride'), pal=P('weirdfmt','palette');
+  const cols=Math.ceil(w/tile), rows=Math.ceil(h/tile), frame=Math.floor(phase*8);
+  const sample=(x,y,ch)=>{ x=Math.max(0,Math.min(w-1,x|0)); y=Math.max(0,Math.min(h-1,y|0)); return sd[(y*w+x)*4+ch]; };
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    const tx=Math.floor(x/tile), ty=Math.floor(y/tile), lx=x%tile, ly=y%tile;
+    let sx=x, sy=y;
+    if(mode===0){ sx=((tx*tile + ly + frame*tile*stride)|0); sy=((ty*tile + lx - frame*tile*stride)|0); }
+    else if(mode===1){ const fx=(tx+((ty+frame)%3))*tile; sx=fx+(tile-1-lx); sy=((ty*tile+ly)+(tx%3)*tile)|0; }
+    else if(mode===2){ sx=x+Math.round(Math.sin((ty+frame)*.8)*tile*stride); sy=y; }
+    else { sx=x+Math.round((ly-lx)*stride*tile); sy=y+Math.round((lx+ly)*stride*tile*.35); }
+    let R=sample(sx,sy,0), G=sample(sx+tile,sy,1), B=sample(sx,sy+tile,2);
+    if(mode===2){ R=(R&0xf0)|((G>>4)&15); G=(G&0xf0)|((B>>4)&15); B=(B&0xf0)|((R>>4)&15); }
+    const shift=Math.round((rand(tx*13.7+ty*31.1+frame)*2-1)*pal*80);
+    R=Math.max(0,Math.min(255,R+shift)); G=Math.max(0,Math.min(255,G-shift*.6)); B=Math.max(0,Math.min(255,B+shift*.8));
+    const i=(y*w+x)*4; od[i]=sd[i]+(R-sd[i])*amount; od[i+1]=sd[i+1]+(G-sd[i+1])*amount; od[i+2]=sd[i+2]+(B-sd[i+2])*amount; od[i+3]=255;
+  }
+  ctx.putImageData(out,0,0);
+}
+
+function applyProgressiveLoad(w,h,phase){
+  const fx=state.progressive;
+  if (!(fx && fx.on && P('progressive','amount')>0)) return;
+  const amount=P('progressive','amount'), block=Math.max(2,fx.block|0), speed=Math.max(.1,P('progressive','speed')), mode=fx.mode|0, dither=P('progressive','dither');
+  const src=ctx.getImageData(0,0,w,h), s=src.data, out=ctx.createImageData(w,h), d=out.data;
+  const p=Math.min(1,(phase*speed)%1), sample=(x,y,c)=>{ x=Math.max(0,Math.min(w-1,x|0)); y=Math.max(0,Math.min(h-1,y|0)); return s[(y*w+x)*4+c]; };
+  const smooth=v=>v<=0?0:v>=1?1:v*v*(3-2*v);
+  const adam7=[[0,0,8,8],[4,0,8,8],[0,4,4,8],[2,0,4,4],[0,2,2,4],[1,0,2,2],[0,1,1,2]];
+  const adamPass=(x,y)=>{ for(let k=0;k<adam7.length;k++){ const a=adam7[k]; if(x>=a[0]&&y>=a[1]&&((x-a[0])%a[2])===0&&((y-a[1])%a[3])===0) return k; } return 6; };
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    const bx=Math.floor(x/block), by=Math.floor(y/block), i=(y*w+x)*4; let cx=bx*block+Math.floor(block*.5), cy=by*block+Math.floor(block*.5);
+    let reveal;
+    if(mode===1){ const field=(y&1)?0.18:0; reveal=smooth((p-field)*1.25); }
+    else if(mode===2){ reveal=smooth(p*1.25); }
+    else if(mode===3){
+      const pass=adamPass(x,y), stage=p*7, level=Math.min(6,Math.floor(stage));
+      // Adam7 pass progression is presented as a resolution ladder: each pass doubles
+      // horizontal and vertical detail, so the visible mosaic area becomes ~1/4.
+      const coarse=Math.max(1,Math.ceil(block/Math.pow(2,level)));
+      reveal=pass<stage ? 1 : smooth(stage-pass);
+      const mx=Math.floor(x/coarse)*coarse+Math.floor(coarse*.5);
+      const my=Math.floor(y/coarse)*coarse+Math.floor(coarse*.5);
+      cx=mx; cy=my;
+    }
+    else reveal=smooth((p*h-y)/(Math.max(1,block)*1.35));
+    if(p>.97) reveal=1;
+    if(dither>0 && reveal>0 && rand(bx*37.1+by*11.9+Math.floor(p*80))<dither*(1-reveal)) reveal=0;
+    for(let c=0;c<3;c++){ const mosaic=sample(cx,cy,c), v=mosaic+(sample(x,y,c)-mosaic)*reveal; d[i+c]=s[i+c]+(v-s[i+c])*amount; }
+    d[i+3]=255;
+  }
+  ctx.putImageData(out,0,0);
 }
 
 function applyBankSwap(w,h,phase){

@@ -159,6 +159,20 @@ const FX = [
     { k:'applyto',label:'Apply To', type:'select', def:0, options:[[0,'Whole'],[1,'Bright'],[2,'Dark'],[3,'Edges'],[4,'Saturated']] },
     { k:'coverage',label:'Coverage', min:0, max:1, step:.01, def:1 },
   ]},
+  { id:'weirdfmt', name:'Weird Format', hint:'experimental virtual codec — impossible tiles / planes / palette / stride', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.7, env:1 },
+    { k:'mode', label:'Fake Format', type:'select', def:0, options:[[0,'Diagonal Planar'],[1,'Folded Tiles'],[2,'Nibble Palette'],[3,'Interleaved Chaos']] },
+    { k:'tile', label:'Tile Size', min:2, max:32, step:1, def:8 },
+    { k:'stride', label:'Stride Error', min:-1, max:1, step:.01, def:.25, env:1 },
+    { k:'palette', label:'Palette Drift', min:0, max:1, step:.01, def:.35, env:1 },
+  ]},
+  { id:'progressive', name:'Progressive Load', hint:'slow-web image loading — coarse mosaic resolves through blocks / scanlines / packets', on:false, open:false, params:[
+    { k:'amount', label:'Amount', min:0, max:1, step:.01, def:1, env:1 },
+    { k:'block', label:'Mosaic Block Size', min:2, max:96, step:2, def:24 },
+    { k:'speed', label:'Scan Speed', min:.1, max:3, step:.1, def:1, env:1 },
+    { k:'mode', label:'Scan Pattern', type:'select', def:0, options:[[0,'Top → Bottom'],[1,'Interlaced'],[2,'JPEG DC → Detail'],[3,'PNG Adam7']] },
+    { k:'dither', label:'Decode Dither', min:0, max:1, step:.01, def:.15 },
+  ]},
   { id:'bankswap', name:'Bank Swap', hint:'tile-grid hardware corruption — wrong-address tiles + attribute palette flips', on:false, open:false, params:[
     { k:'amount',  label:'Amount', min:0, max:1, step:.01, def:.6, env:1, envd:1 },
     { k:'tile',    label:'Tile Size', min:4, max:32, step:1, def:8 },
@@ -670,7 +684,7 @@ const FX = [
 // effect cards are shown grouped by sub-genre (order here = display order)
 const FX_GROUPS = [
   ['File Corruption',       ['jpeg','png','webp','gifg','audio','sonify','byteshift','bitplane']],   // real encoded-byte damage + raw reinterpret
-  ['Digital Glitch',        ['glitch','rgbsplit','mosh','compress','dct','pixsort','databend','bmpmisread','wrongfmt','bankswap','rle','gif','pixelate']],
+  ['Digital Glitch',        ['glitch','rgbsplit','mosh','compress','dct','pixsort','databend','bmpmisread','wrongfmt','weirdfmt','progressive','bankswap','rle','gif','pixelate']],
   ['Analog Signal',         ['vhs','sync','headswitch','roll','noise','ghost','dotcrawl','hum','herring','degauss']],
   ['Film / Display',        ['film','crt','hud','halftone','screentone']],
   ['Light / Optics',        ['bloom','leak','aura','sparkle','burst','prism','iris','starf','bokeh','edgeglow']],

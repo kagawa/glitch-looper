@@ -174,6 +174,8 @@ function drawFrame(phase){    // phase in [0,1)
   glitchGate = glitchGateBegin(w,h,'wrongfmt');
   applyWrongFormat(w,h,phase);
   glitchGateEnd(w,h,'wrongfmt',glitchGate);
+  applyWeirdFormat(w,h,phase);
+  applyProgressiveLoad(w,h,phase);
 
   applyBankSwap(w,h,phase);
 
