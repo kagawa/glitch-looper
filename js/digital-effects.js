@@ -279,23 +279,27 @@ if (db.on){
     const TAU=Math.PI*2, nsp=Math.round(db.speed);
     const chunk=Math.max(1,db.chunk|0);
     const stepPhase = Math.floor(phase*Math.max(1,db.speed)*4);
-    const wrap = xx => { let m=xx%w; if(m<0)m+=w; return m|0; };
+    const dir=db.dir|0;
     const src = ctx.getImageData(0,0,w,h), out=ctx.createImageData(w,h), sd=src.data, od=out.data;
-    for (let y=0;y<h;y++){
-      const cy=Math.floor(y/chunk)*chunk;
-      let sh = amt*w*( db.skew*0.05*(cy/h) + 0.007*Math.sin(cy*0.04 + phase*TAU*nsp) );
-      let chroma=0;
-      if (db.scramble>0 && rand(cy*0.7+stepPhase) < db.scramble*0.25){
-        sh += (rand(cy*1.9+stepPhase)-0.5)*w*0.033*amt;  // packet break (scaled by amount)
-        chroma = (rand(cy*2.3+stepPhase)-0.5)*amt*4;     // misread colour → rainbow
+    if (dir===0){
+      const wrap = xx => { let m=xx%w; if(m<0)m+=w; return m|0; };
+      for (let y=0;y<h;y++){
+        const cy=Math.floor(y/chunk)*chunk;
+        let sh = amt*w*( db.skew*0.05*(cy/h) + 0.007*Math.sin(cy*0.04 + phase*TAU*nsp) );
+        let chroma=0;
+        if (db.scramble>0 && rand(cy*0.7+stepPhase) < db.scramble*0.25){ sh += (rand(cy*1.9+stepPhase)-0.5)*w*0.033*amt; chroma=(rand(cy*2.3+stepPhase)-0.5)*amt*4; }
+        const shR=sh+chroma, shG=sh, shB=sh-chroma, row=y*w;
+        for (let x=0;x<w;x++){ const di=(row+x)*4; od[di]=sd[(row+wrap(x-shR))*4]; od[di+1]=sd[(row+wrap(x-shG))*4+1]; od[di+2]=sd[(row+wrap(x-shB))*4+2]; od[di+3]=255; }
       }
-      const shR=sh+chroma, shG=sh, shB=sh-chroma, row=y*w;
+    } else {
+      const wrap = yy => { let m=yy%h; if(m<0)m+=h; return m|0; };
       for (let x=0;x<w;x++){
-        const di=(row+x)*4;
-        od[di]   = sd[(row+wrap(x-shR))*4];
-        od[di+1] = sd[(row+wrap(x-shG))*4+1];
-        od[di+2] = sd[(row+wrap(x-shB))*4+2];
-        od[di+3] = 255;
+        const cx=Math.floor(x/chunk)*chunk;
+        let sh = amt*h*( db.skew*0.05*(cx/w) + 0.007*Math.sin(cx*0.04 + phase*TAU*nsp) );
+        let chroma=0;
+        if (db.scramble>0 && rand(cx*0.7+stepPhase) < db.scramble*0.25){ sh += (rand(cx*1.9+stepPhase)-0.5)*h*0.033*amt; chroma=(rand(cx*2.3+stepPhase)-0.5)*amt*4; }
+        const shR=sh+chroma, shG=sh, shB=sh-chroma;
+        for (let y=0;y<h;y++){ const di=(y*w+x)*4; od[di]=sd[(wrap(y-shR)*w+x)*4]; od[di+1]=sd[(wrap(y-shG)*w+x)*4+1]; od[di+2]=sd[(wrap(y-shB)*w+x)*4+2]; od[di+3]=255; }
       }
     }
     ctx.putImageData(out,0,0);
@@ -721,20 +725,22 @@ if (so.on){
 }
 
 function applyByteShift(w,h){
-// ---- Byte Shift: raw reinterpret — per-row horizontal wrap (diagonal skew) + RGB channel roll ----
+// ---- Byte Shift: raw reinterpret — selectable row/column wrap + RGB channel roll ----
 const bsf = state.byteshift;
 if (bsf.on){
   const amt=P('byteshift','amount');
   if (amt>0){
     const roll=bsf.roll|0, r0=roll%3, r1=(roll+1)%3, r2=(roll+2)%3;
-    const px=Math.round(amt*w*0.6);
+    const dir=bsf.dir|0, px=Math.round(amt*(dir===1?h:w)*0.6);
     const src=ctx.getImageData(0,0,w,h), out=ctx.createImageData(w,h), sd=src.data, od=out.data;
-    for (let y=0;y<h;y++){
-      const cy=Math.floor(y/Math.max(1,bsf.chunk|0))*Math.max(1,bsf.chunk|0);
-      const rowShift=px+Math.round(cy*bsf.skew*1.5), row=y*w;
-      for (let x=0;x<w;x++){
-        const i=(row+x)*4, sx=((x+rowShift)%w+w)%w, si=(row+sx)*4;
-        od[i]=sd[si+r0]; od[i+1]=sd[si+r1]; od[i+2]=sd[si+r2]; od[i+3]=255;
+    const chunk=Math.max(1,bsf.chunk|0);
+    if (dir===0){
+      for (let y=0;y<h;y++){ const cy=Math.floor(y/chunk)*chunk, rowShift=px+Math.round(cy*bsf.skew*1.5), row=y*w;
+        for (let x=0;x<w;x++){ const i=(row+x)*4, sx=((x+rowShift)%w+w)%w, si=(row+sx)*4; od[i]=sd[si+r0]; od[i+1]=sd[si+r1]; od[i+2]=sd[si+r2]; od[i+3]=255; }
+      }
+    } else {
+      for (let x=0;x<w;x++){ const cx=Math.floor(x/chunk)*chunk, colShift=px+Math.round(cx*bsf.skew*1.5);
+        for (let y=0;y<h;y++){ const i=(y*w+x)*4, sy=((y+colShift)%h+h)%h, si=(sy*w+x)*4; od[i]=sd[si+r0]; od[i+1]=sd[si+r1]; od[i+2]=sd[si+r2]; od[i+3]=255; }
       }
     }
     ctx.putImageData(out,0,0);

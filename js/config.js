@@ -134,11 +134,12 @@ const FX = [
     { k:'angle',  label:'Angle', min:0, max:179, step:1, def:45, show:s=> s.dir===3 },
     { k:'len',    label:'Max Length', min:0, max:1, step:.01, def:.6, show:s=> s.ivl!==4 },
   ]},
-  { id:'databend', name:'Data Shear', hint:'raw-byte / stride error — diagonal shear + rainbow', on:false, open:false, params:[
+  { id:'databend', name:'Data Shear', hint:'raw-byte / stride error — diagonal shear + rainbow (H or V)', on:false, open:false, params:[
     { k:'amount',   label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
+    { k:'dir',      label:'Direction', type:'select', def:0, options:[[0,'Horizontal (per row)'],[1,'Vertical (per column)']] },
     { k:'skew',     label:'Skew', min:0, max:1, step:.01, def:.4 },
     { k:'scramble', label:'Scramble', min:0, max:1, step:.01, def:.4 },
-    { k:'chunk',    label:'Chunk Size (rows)', min:1, max:64, step:1, def:1 },
+    { k:'chunk',    label:'Chunk Size', min:1, max:64, step:1, def:1 },
     { k:'speed',    label:'Speed', min:0, max:8, step:1, def:2 },
     { k:'applyto',  label:'Apply To', type:'select', def:0, options:[[0,'Whole'],[1,'Bright'],[2,'Dark'],[3,'Edges'],[4,'Saturated']] },
     { k:'coverage', label:'Coverage', min:0, max:1, step:.01, def:1 },
@@ -201,11 +202,12 @@ const FX = [
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
     { k:'delay',  label:'Delay / Rate', min:1, max:100, step:1, def:30, env:1 },
   ]},
-  { id:'byteshift', name:'Byte Shift', hint:'raw reinterpret — channel roll + diagonal shear', on:false, open:false, params:[
+  { id:'byteshift', name:'Byte Shift', hint:'raw reinterpret — channel roll + diagonal shear (H or V)', on:false, open:false, params:[
     { k:'amount', label:'Shift', min:0, max:1, step:.01, def:.4, env:1 },
     { k:'roll',   label:'Channel Roll', type:'select', def:1, options:[[0,'RGB'],[1,'GBR'],[2,'BRG']] },
+    { k:'dir',    label:'Direction', type:'select', def:0, options:[[0,'Horizontal (per row)'],[1,'Vertical (per column)']] },
     { k:'skew',   label:'Skew', min:0, max:1, step:.01, def:.3 },
-    { k:'chunk',  label:'Chunk Size (rows)', min:1, max:64, step:1, def:1 },
+    { k:'chunk',  label:'Chunk Size', min:1, max:64, step:1, def:1 },
     { k:'applyto',label:'Apply To', type:'select', def:0, options:[[0,'Whole'],[1,'Bright'],[2,'Dark'],[3,'Edges'],[4,'Saturated']] },
     { k:'coverage',label:'Coverage', min:0, max:1, step:.01, def:1 },
   ]},
@@ -269,7 +271,7 @@ const FX = [
       options:[[0,'Constant (never settles)'],[1,'Peak (settles)'],[2,'Pulse'],[3,'Build → Drop'],[4,'Stutter'],[5,'Swell'],[6,'Drop → Build'],[7,'Bounce'],[8,'Wander']] },
     { k:'rate',   label:'Rate', min:1, max:8, step:1, def:2, show:s=> [2,4,7,8].includes(s.curve|0) },
   ]},
-  { id:'warp', name:'Warp', hint:'horizontal displacement — heat-haze / underwater / shear', on:false, open:false, params:[
+  { id:'warp', name:'Warp', hint:'directional displacement — heat-haze / underwater / shear (any angle)', on:false, open:false, params:[
     { k:'amp',   label:'Amplitude', min:0, max:10, step:.25, def:5, env:1 },
     // Jitter/Step have no spatial wave to set a frequency on, and Twist shears the whole frame;
     // Pulse swells in place, so it never reads a speed
@@ -277,6 +279,7 @@ const FX = [
     { k:'speed', label:'Speed', min:0, max:6, step:1, def:2, show:s=> (s.warpmode|0)!==1 },
     { k:'warpmode', label:'Pattern', type:'select', def:0,
       options:[[0,'Wave'],[1,'Pulse'],[2,'Jitter'],[3,'Step'],[4,'Drift'],[5,'Twist'],[6,'Beat'],[7,'Zigzag']] },
+    { k:'angle', label:'Direction Angle', min:0, max:345, step:15, def:0, env:1 },
   ]},
   { id:'mode7', name:'Mode 7', hint:'perspective plane projection — floor / ceiling / walls / tunnel', on:false, open:false, params:[
     { k:'amount',  label:'Amount', min:0, max:1, step:.01, def:.85, env:1 },
@@ -527,9 +530,10 @@ const FX = [
     { k:'stain',  label:'Colour Stain', min:0, max:1, step:.01, def:.25 },
     { k:'drift',  label:'Vertical Drift', min:0, max:1, step:.01, def:0 },
   ]},
-  { id:'ghost', name:'Ghosting', hint:'multipath echo — faint offset duplicate(s), can drift over the loop', on:false, open:false, params:[
+  { id:'ghost', name:'Ghosting', hint:'multipath echo — faint offset duplicate(s), any direction', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.5, env:1 },
     { k:'offset', label:'Offset', min:2, max:80, step:1, def:22 },
+    { k:'angle',  label:'Echo Angle', min:0, max:345, step:15, def:0, env:1 },
     { k:'echoes', label:'Echoes', min:1, max:3, step:1, def:2 },
     { k:'pre',    label:'Pre-echo', min:0, max:1, step:.01, def:.3 },
     { k:'drift',  label:'Drift', min:0, max:1, step:.01, def:0 },
@@ -577,9 +581,10 @@ const FX = [
     { k:'bmode',  label:'Side Blend', type:'select', def:0, options:[[0,'Replace'],[1,'Screen'],[2,'Multiply'],[3,'Add'],[4,'Overlay']] },
     { k:'opacity',label:'Side Opacity', min:0, max:1, step:.01, def:1 },
   ]},
-  { id:'melt', name:'Melt', hint:'pixel drip — Drip or vertical Wrap', on:false, open:false, params:[
+  { id:'melt', name:'Melt', hint:'pixel drip — Drip or Wrap, any direction', on:false, open:false, params:[
     { k:'amount', label:'Amount', min:0, max:1, step:.01, def:.4, env:1 },
     { k:'mode',   label:'Mode', type:'select', def:0, options:[[0,'Drip'],[1,'Wrap']] },
+    { k:'dir',    label:'Direction', type:'select', def:0, options:[[0,'Down ↓'],[1,'Up ↑'],[2,'Right →'],[3,'Left ←']] },
     { k:'width',  label:'Drip Width', min:1, max:16, step:1, def:1 },
     { k:'spread', label:'Spread', min:0, max:1, step:.01, def:.5 },
     { k:'curve',  label:'Curve', type:'select', def:1,

@@ -71,9 +71,10 @@ if (gh.on){
   if (gA>0){
     sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h); sctx.drawImage(canvas,0,0);
     const ech = gh.echoes|0;
+    const echoAngle = (P('ghost','angle')||0)*Math.PI/180, echoX=Math.cos(echoAngle), echoY=Math.sin(echoAngle);
     const drawGhost = (off, aMul)=>{                // one ghost = its trailing echoes (+ pre-echo)
-      for (let i=1;i<=ech;i++){ ctx.globalAlpha = gA*0.7*(1-(i-1)/(ech+0.5))*aMul; ctx.drawImage(sc, off*i, 0); }
-      if (gh.pre>0){ ctx.globalAlpha = gA*0.4*gh.pre*aMul; ctx.drawImage(sc, -off*0.7, 0); }
+      for (let i=1;i<=ech;i++){ ctx.globalAlpha = gA*0.7*(1-(i-1)/(ech+0.5))*aMul; ctx.drawImage(sc, off*i*echoX, off*i*echoY); }
+      if (gh.pre>0){ ctx.globalAlpha = gA*0.4*gh.pre*aMul; ctx.drawImage(sc, -off*0.7*echoX, -off*0.7*echoY); }
     };
     ctx.save();
     if (gh.drift<=0){

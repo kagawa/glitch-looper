@@ -136,34 +136,60 @@ ctx.putImageData(out,0,0);
 }
 
 function applyWarp(w,h,phase){
-// ---- warp: per-row horizontal displacement (selectable pattern, wraps at edges) ----
+// ---- warp: directional displacement (selectable pattern + arbitrary angle, wraps at edges).
+//      Angle 0 keeps the fast per-row drawImage path (identical to the classic horizontal warp);
+//      any non-zero angle rotates the whole displacement field — waves now run perpendicular to
+//      the chosen direction, with the pixel offset applied along that direction.
 const wp = state.warp;
 if (wp.on && wp.amp>0){
   const amp = P('warp','amp'), fq = wp.freq*0.05, TAU=Math.PI*2, sp = phase*TAU*wp.speed;
   const mode = wp.warpmode|0;
-  const pEnv = Math.abs(Math.sin(phase*Math.PI*3));            // Pulse: swell then settle (0 at ends)
-  const tri = p => { const f=p-Math.floor(p); return 2*Math.abs(2*f-1)-1; };  // triangle wave
-  const stepP = Math.floor(phase*Math.max(1,wp.speed)*3);      // Step/Jitter animation index
+  const pEnv = Math.abs(Math.sin(phase*Math.PI*3));
+  const tri = p => { const f=p-Math.floor(p); return 2*Math.abs(2*f-1)-1; };
+  const stepP = Math.floor(phase*Math.max(1,wp.speed)*3);
   const dxAt = y => {
     switch (mode){
-      case 1: return Math.sin(y*fq)*amp*pEnv;                                   // Pulse
-      case 2: return (rand(Math.floor(y/3) + stepP*7)*2-1)*amp;                 // Jitter (per-row shake)
-      case 3: { const b=Math.floor((y/h)*10); return (rand(b*3.7 + stepP)*2-1)*amp; }  // Step (banded)
-      case 4: return amp*(0.6*Math.sin(y*fq*0.5 + sp) + 0.4*Math.sin(y*fq*1.3 - sp*2)); // Drift
-      case 5: return amp*((y/h)-0.5)*2*Math.sin(sp);                            // Twist (shear leans)
-      case 6: return amp*0.5*(Math.sin(y*fq + sp) + Math.sin(y*fq*1.15 - sp));   // Beat (interference)
-      case 7: return tri((y*fq + sp)/TAU)*amp;                                  // Zigzag (triangle)
-      default: return Math.sin(y*fq + sp)*amp;                                  // Wave
+      case 1: return Math.sin(y*fq)*amp*pEnv;
+      case 2: return (rand(Math.floor(y/3) + stepP*7)*2-1)*amp;
+      case 3: { const b=Math.floor((y/h)*10); return (rand(b*3.7 + stepP)*2-1)*amp; }
+      case 4: return amp*(0.6*Math.sin(y*fq*0.5 + sp) + 0.4*Math.sin(y*fq*1.3 - sp*2));
+      case 5: return amp*((y/h)-0.5)*2*Math.sin(sp);
+      case 6: return amp*0.5*(Math.sin(y*fq + sp) + Math.sin(y*fq*1.15 - sp));
+      case 7: return tri((y*fq + sp)/TAU)*amp;
+      default: return Math.sin(y*fq + sp)*amp;
     }
   };
-  sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h); sctx.drawImage(canvas,0,0);
-  ctx.clearRect(0,0,w,h);
-  for (let y=0;y<h;y++){
-    const dx = dxAt(y);
-    ctx.drawImage(sc, 0,y,w,1, dx-w,y,w,1);
-    ctx.drawImage(sc, 0,y,w,1, dx,  y,w,1);
-    ctx.drawImage(sc, 0,y,w,1, dx+w,y,w,1);
+  const angleDeg = P('warp','angle') % 360;
+  if (Math.abs(angleDeg) < 0.5){                                        // Fast axis-aligned path
+    sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h); sctx.drawImage(canvas,0,0);
+    ctx.clearRect(0,0,w,h);
+    for (let y=0;y<h;y++){
+      const dx = dxAt(y);
+      ctx.drawImage(sc, 0,y,w,1, dx-w,y,w,1);
+      ctx.drawImage(sc, 0,y,w,1, dx,  y,w,1);
+      ctx.drawImage(sc, 0,y,w,1, dx+w,y,w,1);
+    }
+    return;
   }
+  // Rotated warp: displacement direction is (cosA, sinA); the "row index" of the pattern is the
+  // perpendicular coordinate (−sinA·x + cosA·y). Sample the source at (x, y) MINUS the offset
+  // along the displacement direction, with mod-wrap on both axes so it tiles like the fast path.
+  const angleRad = angleDeg * Math.PI/180;
+  const cosA = Math.cos(angleRad), sinA = Math.sin(angleRad);
+  const cxC = w*0.5, cyC = h*0.5;
+  const src = ctx.getImageData(0,0,w,h), sd = src.data;
+  const out = ctx.createImageData(w,h), od = out.data;
+  for (let y=0; y<h; y++){
+    for (let x=0; x<w; x++){
+      const v = -sinA*(x-cxC) + cosA*(y-cyC) + cyC;                     // perpendicular "row" coord
+      const d = dxAt(v);
+      let sx = x - d*cosA, sy = y - d*sinA;
+      sx = ((sx % w) + w) % w; sy = ((sy % h) + h) % h;
+      const si = ((sy|0)*w + (sx|0))*4, di = (y*w + x)*4;
+      od[di]=sd[si]; od[di+1]=sd[si+1]; od[di+2]=sd[si+2]; od[di+3]=255;
+    }
+  }
+  ctx.putImageData(out, 0, 0);
 }
 }
 
@@ -546,50 +572,64 @@ ctx.putImageData(im,0,0);
 }
 
 // ---- melt: pixel drip, breathes 0→max→0 over the loop (seamless) ----
-//      Drip = pixels smear down (top stretches)
-//      Wrap = drips off the bottom and re-enters the top, so a column can travel a full height
+//      Drip = pixels smear toward Direction (top stretches away from that edge)
+//      Wrap = drips off the far edge and re-enters the near edge, so a column can travel the
+//      full span. Direction picks which edge pixels flow toward: Down/Up run along columns
+//      (the classic axis), Right/Left run along rows — meltBands always works "down columns" of
+//      its own w×h, so Left/Right transpose the read/write indices instead of duplicating logic.
 function applyMelt(w,h,phase){
 const ml = state.melt;
 if (ml.on && ml.amount>0){
   const amt=P('melt','amount'), wrap=(ml.mode|0)===1;
-  const breathe = Math.max(0, envCurve(phase, ml.curve|0, ml.rate));   // Curve: how the melt evolves over the loop
-  const span = amt*h*(wrap?1.0:0.6)*breathe;                   // Wrap can travel a full height and loop back
-  const sexp = 0.3 + ml.spread*3;  // Spread: how the drip amount varies per band (low = uniform, high = a few long drips)
+  const dir = ml.dir|0;                                          // 0 Down · 1 Up · 2 Right · 3 Left
+  const horizontal = dir===2 || dir===3;
+  const reverse = dir===1 || dir===3;                             // Up / Left: flip the flow direction
+  const breathe = Math.max(0, envCurve(phase, ml.curve|0, ml.rate));
+  const span_h = horizontal ? w : h;                              // span along the flow axis
+  const span = amt*span_h*(wrap?1.0:0.6)*breathe;
+  const sexp = 0.3 + ml.spread*3;
   const bwAvg = Math.max(1, ml.width|0);
   const src=ctx.getImageData(0,0,w,h), out=ctx.createImageData(w,h), sd=src.data, od=out.data;
-  meltBands(w,h,span,sexp,bwAvg,wrap,sd,od);
+  meltBands(w,h,span,sexp,bwAvg,wrap,horizontal,reverse,sd,od);
   ctx.putImageData(out,0,0);
 }
 }
 // Every column of a band is displaced downward by one amount, so the drip front is a smooth hump.
 // Bands stay narrow (max 16px) — past that the hump reads as a shape rather than as liquid.
-function meltBands(w,h,span,sexp,bwAvg,wrap,sd,od){
-  // map each column to a band + its distance from that band's peak. Band widths and peak
-  // positions vary, otherwise the humps line up into a comb. Width 1 = one band per column
-  // (bandE 0 → taper 1.0 → identical to the original per-column drip).
-  const bandOf = new Int32Array(w), bandE = new Float32Array(w);
-  if (bwAvg===1){ for (let x=0;x<w;x++){ bandOf[x]=x; bandE[x]=0; } }
+// horizontal swaps which axis is "band" (perpendicular, unchanged) vs "flow" (displaced);
+// reverse flips which edge the flow drains toward (Up/Left instead of Down/Right).
+function meltBands(w,h,span,sexp,bwAvg,wrap,horizontal,reverse,sd,od){
+  const bandN = horizontal ? h : w;                               // count of bands = perpendicular extent
+  const flowN = horizontal ? w : h;                                // length each band flows along
+  // map each band-perpendicular coordinate to a band + its distance from that band's peak. Band
+  // widths and peak positions vary, otherwise the humps line up into a comb. Width 1 = one band
+  // per pixel line (bandE 0 → taper 1.0 → identical to the original per-column drip).
+  const bandOf = new Int32Array(bandN), bandE = new Float32Array(bandN);
+  if (bwAvg===1){ for (let p=0;p<bandN;p++){ bandOf[p]=p; bandE[p]=0; } }
   else {
-    for (let bi=0, x0=0; x0<w; bi++){
-      const bw = Math.max(1, Math.round(bwAvg*(0.5+rand(bi*2.7))));   // 0.5x–1.5x → averages bwAvg
-      const x1 = Math.min(w, x0+bw);
-      const c = 0.5 + (rand(bi*4.1)-0.5)*0.5;                          // peak sits off-centre
-      for (let x=x0;x<x1;x++){
-        bandOf[x]=bi;
-        const t=(x-x0+0.5)/(x1-x0);
-        bandE[x]=(t-c)/Math.max(c,1-c);                                // -1..1, 0 at the peak
+    for (let bi=0, p0=0; p0<bandN; bi++){
+      const bw = Math.max(1, Math.round(bwAvg*(0.5+rand(bi*2.7))));
+      const p1 = Math.min(bandN, p0+bw);
+      const c = 0.5 + (rand(bi*4.1)-0.5)*0.5;
+      for (let p=p0;p<p1;p++){
+        bandOf[p]=bi;
+        const t=(p-p0+0.5)/(p1-p0);
+        bandE[p]=(t-c)/Math.max(c,1-c);
       }
-      x0=x1;
+      p0=p1;
     }
   }
-  for (let x=0;x<w;x++){
-    // surface tension: the peak of a band runs furthest, the edges lag
-    const e=bandE[x], bulge=1-e*e;
-    const off=Math.floor(Math.pow(rand(bandOf[x]*0.13), sexp)*span*(0.55+0.45*bulge));
-    for (let y=0;y<h;y++){
-      let sy = y - off;
-      sy = wrap ? ((sy%h)+h)%h : (sy>=0?sy:0);                 // Wrap: mod h  ·  Drip: clamp to top
-      const si=(sy*w+x)*4, di=(y*w+x)*4;
+  for (let p=0; p<bandN; p++){
+    const e=bandE[p], bulge=1-e*e;
+    const off=Math.floor(Math.pow(rand(bandOf[p]*0.13), sexp)*span*(0.55+0.45*bulge));
+    for (let f=0; f<flowN; f++){
+      // f is the position along the flow axis; the source reads BACKWARD along the flow
+      // direction, wrapping or clamping at the source (start) edge as before.
+      let sf = reverse ? f + off : f - off;
+      sf = wrap ? ((sf%flowN)+flowN)%flowN : (reverse ? Math.min(flowN-1, sf) : (sf>=0?sf:0));
+      let sx, sy, dx, dy;
+      if (horizontal){ sx=sf; sy=p; dx=f; dy=p; } else { sx=p; sy=sf; dx=p; dy=f; }
+      const si=(sy*w+sx)*4, di=(dy*w+dx)*4;
       od[di]=sd[si]; od[di+1]=sd[si+1]; od[di+2]=sd[si+2]; od[di+3]=255;
     }
   }
