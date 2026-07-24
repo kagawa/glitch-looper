@@ -496,7 +496,9 @@ if (ht.on){
           const x=cxC + u*cos - v*sin, y=cyC + u*sin + v*cos;
           if (x>=-cell&&x<=w+cell&&y>=-cell&&y<=h+cell){
             const s=sampleAvg(x, y, triR*0.6);
-            paint(x, y, litRad(s.r,s.g,s.b,triR), s.r, s.g, s.b, 2, angle + Math.PI);
+            // maxR bumped by +1 so full-bright neighbours overlap 1px and hide the subpixel
+            // seams that otherwise show as thin lines between packed triangles.
+            paint(x, y, litRad(s.r,s.g,s.b,triR+1), s.r, s.g, s.b, 2, angle + Math.PI);
           }
         }
         // Up-pointing triangle: vertices (cell, 0)-((.5)cell, triH)-((1.5)cell, triH).
@@ -506,7 +508,7 @@ if (ht.on){
           const x=cxC + u*cos - v*sin, y=cyC + u*sin + v*cos;
           if (x>=-cell&&x<=w+cell&&y>=-cell&&y<=h+cell){
             const s=sampleAvg(x, y, triR*0.6);
-            paint(x, y, litRad(s.r,s.g,s.b,triR), s.r, s.g, s.b, 2, angle);
+            paint(x, y, litRad(s.r,s.g,s.b,triR+1), s.r, s.g, s.b, 2, angle);
           }
         }
       }
@@ -524,7 +526,8 @@ if (ht.on){
         const x=cxC + u*cos - v*sin, y=cyC + u*sin + v*cos;
         if (x<-cell||x>w+cell||y<-cell||y>h+cell) continue;
         const s=sampleAvg(x, y, hr*0.6);
-        paint(x, y, litRad(s.r,s.g,s.b,hr), s.r, s.g, s.b, 3, angle);
+        // maxR bumped by +1 so full-bright neighbouring hexagons overlap 1px and hide seams.
+        paint(x, y, litRad(s.r,s.g,s.b,hr+1), s.r, s.g, s.b, 3, angle);
       }
     }
   } else if (shape===7){
@@ -543,7 +546,10 @@ if (ht.on){
     // Adjacent bars in the same row butt against each other so a smoothly-varying brightness
     // reads as one continuous line; Grid Angle rotates the whole screen.
     const nHalf = Math.ceil(halfDiag/cell) + 1;
-    const halfW = cell*0.5;                             // along the line — full cell so bars meet
+    // +0.5 on both axes overpaints subpixel seams: along-line so adjacent bars in the same
+    // row overlap where they butt end-to-end, across-line so full-bright bars in adjacent
+    // rows touch cleanly instead of leaving a hairline gap between them.
+    const halfW = cell*0.5 + 0.5;                       // along the line — full cell + overpaint
     const ax = cos*halfW, ay = sin*halfW;               // along-line half-extent (fixed)
     for (let iy=-nHalf; iy<=nHalf; iy++){
       for (let ix=-nHalf; ix<=nHalf; ix++){
@@ -551,7 +557,7 @@ if (ht.on){
         const x=cxC + u*cos - v*sin, y=cyC + u*sin + v*cos;
         if (x<-cell||x>w+cell||y<-cell||y>h+cell) continue;
         const s=sampleAvg(x, y, cell*0.5);
-        const half = litRad(s.r,s.g,s.b, cell*0.5);      // across-line half-thickness
+        const half = litRad(s.r,s.g,s.b, cell*0.5 + 0.5); // across-line half-thickness (+ overpaint)
         if (half<0.35) continue;
         const bx = -sin*half, by = cos*half;              // across-line direction (variable)
         sctx.fillStyle = inkFor(s.r, s.g, s.b);

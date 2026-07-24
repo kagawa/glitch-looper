@@ -4,6 +4,7 @@ wrangler.jsonc
 .git
 .agents
 .claude
+CLAUDE.md
 .codex
 node_modules
 tmp
