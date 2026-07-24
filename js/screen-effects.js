@@ -558,14 +558,15 @@ if (bs.on && bs.amount>0){
       sctx.strokeStyle=g; sctx.lineWidth=beamW; sctx.beginPath(); sctx.moveTo(ox,oy); sctx.lineTo(ex,ey); sctx.stroke();
     }
     sctx.restore();
-    // Match Speed Lines semantics: higher Reach lets beams approach the hub, so the
-    // central cut-out shrinks. Keep the laser cut-out gentler than the filled wedges.
-    const reach=bs.reach==null?0.7:bs.reach, hole=Math.min(.28,(1-reach)*.28)*R;
-    if (hole>0){
+    // Reach cut-out — SIZED IN HALF-DIAGONAL PIXELS (not fractions of R), so it stays the right
+    // size no matter how far past the corners R extends the beams for coverage.
+    const reach=bs.reach==null?0.7:bs.reach;
+    const dz=Math.hypot(w,h)*0.5, holeAbs=(1-reach)*0.28*dz;
+    if (holeAbs>0){
       const mask=sctx.createRadialGradient(cx,cy,0,cx,cy,R);
       mask.addColorStop(0,'rgba(0,0,0,0)');
-      mask.addColorStop(Math.min(.98,hole/R),'rgba(0,0,0,0)');
-      mask.addColorStop(Math.min(1,hole/R+.12),'rgba(0,0,0,1)');
+      mask.addColorStop(Math.min(.98, holeAbs/R),'rgba(0,0,0,0)');
+      mask.addColorStop(Math.min(1,   (holeAbs + 0.12*dz)/R),'rgba(0,0,0,1)');
       mask.addColorStop(1,'rgba(0,0,0,1)');
       sctx.globalCompositeOperation='destination-in'; sctx.fillStyle=mask; sctx.fillRect(0,0,w,h); sctx.globalCompositeOperation='source-over';
     }
@@ -594,7 +595,11 @@ if (bs.on && bs.amount>0){
     sctx.restore();
     // Reach controls how far in from the rim the lines run: low = a thin ring near the edge (clear
     // middle), high = all the way to the centre. Lines always fade to nothing at the very centre.
-    const reach = bs.reach==null?0.7:bs.reach, s0=Math.min(0.28,(1-reach)*0.28), s1=Math.min(0.98,s0+0.12);
+    // SIZED IN HALF-DIAGONAL PIXELS so R (which was expanded to 1.5·fullDiag for corner coverage)
+    // doesn't leak into the clear-zone size — otherwise Speed Lines would look truncated / thin.
+    const reach = bs.reach==null?0.7:bs.reach;
+    const dz = Math.hypot(w,h)*0.5, holeAbs = (1-reach)*0.28*dz;
+    const s0 = holeAbs / R, s1 = Math.min(0.98, (holeAbs + 0.12*dz) / R);
     const rg=sctx.createRadialGradient(cx,cy,0, cx,cy,R);
     rg.addColorStop(0,'rgba(0,0,0,0)');
     if (s0>0.001) rg.addColorStop(s0,'rgba(0,0,0,0)');

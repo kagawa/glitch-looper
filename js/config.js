@@ -64,7 +64,7 @@ const FX = [
   { id:'mosh', name:'Datamosh', hint:'block corruption — smear / freeze / duplicate / accumulate', on:false, open:false, params:[
     { k:'intensity', label:'Intensity',   min:0, max:1, step:.01, def:.5, env:1, envd:1 },
     { k:'push',      label:'Push Direction', type:'select', def:0, options:[[0,'Flow'],[1,'Down'],[2,'Up'],[3,'Left'],[4,'Right'],[5,'Radial']] },
-    { k:'mode',      label:'Block Mode', type:'select', def:0, options:[[0,'Smear'],[1,'Freeze'],[2,'Duplicate'],[3,'Random Paste'],[4,'Accumulate']] },
+    { k:'mode',      label:'Block Mode', type:'select', def:0, options:[[0,'Smear'],[1,'Freeze'],[2,'Duplicate'],[3,'Random Paste'],[4,'Accumulate'],[5,'Solid Black'],[6,'Solid White'],[7,'Invert'],[8,'Channel Roll'],[9,'Noise Fill']] },
     { k:'reset',     label:'Reset Count / 3 sec', min:1, max:12, step:1, def:1, show:s=> (s.mode|0)===4 },
     { k:'blocks',    label:'Blocks', min:0, max:1, step:.01, def:.5 },
     { k:'bloom',     label:'Bloom (max repeat)', min:1, max:4, step:1, def:1 },

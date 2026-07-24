@@ -862,6 +862,12 @@ function applyMosh(w,h,fseed,em=1,phase=0){
       const dyo = Math.round(fvy*h*intensity*(push===0?0.4*m.vert:0.55));   // Flow keeps the legacy Vertical Drift; explicit directions own both axes.
       const reps = Math.round(1 + rand(seed*7.3+k)*(maxReps-1));
       const first=blockMode===2?reps:1;                   // Duplicate jumps once; Smear leaves every intermediate copy
+      // Modes 5..9 are "content overrides" — they still ride the flow displacement + Bloom trail
+      // logic like Smear, but replace the block's pixels with a fixed / synthesised value instead
+      // of the source underneath. So a Solid Black block leaves a trail of black rectangles along
+      // the flow, an Inverted block leaves colour-negative echoes, etc.
+      const noiseCh = blockMode===9 ? Math.floor(rand(seed*4.7+k)*3) : 0;
+      const rollShift = blockMode===8 ? 1 + Math.floor(rand(seed*3.9+k)*2) : 0;   // rotate RGB by 1 or 2
       for (let p=first;p<=reps;p++){
         const offx = dxo*p, offy = dyo*p;
         let readX=sx, readY=sy;
@@ -879,7 +885,23 @@ function applyMosh(w,h,fseed,em=1,phase=0){
             const tx = sx+x+offx;
             if (tx<0||tx>=w) continue;
             const si=((readY+y)*w+readX+x)*4, ti=(ty*w+tx)*4;
-            d[ti]=src[si]; d[ti+1]=src[si+1]; d[ti+2]=src[si+2];
+            if (blockMode===5){ d[ti]=0; d[ti+1]=0; d[ti+2]=0; }
+            else if (blockMode===6){ d[ti]=255; d[ti+1]=255; d[ti+2]=255; }
+            else if (blockMode===7){                       // Invert source colours
+              d[ti]=255-src[si]; d[ti+1]=255-src[si+1]; d[ti+2]=255-src[si+2];
+            } else if (blockMode===8){                     // Channel Roll — RGB rotated 1 or 2 places
+              const r=src[si], g=src[si+1], b=src[si+2];
+              if (rollShift===1){ d[ti]=g; d[ti+1]=b; d[ti+2]=r; }
+              else               { d[ti]=b; d[ti+1]=r; d[ti+2]=g; }
+            } else if (blockMode===9){                     // Noise Fill — mono noise, per-frame seeded
+              const n = 255*rand(seed*2.1 + k*5.7 + (sy+y)*0.13 + (sx+x)*0.07 + p*3.1);
+              const other = 255*rand(seed*7.9 + k*1.3 + (sy+y)*0.31 + (sx+x)*0.19);
+              if (noiseCh===0){ d[ti]=n; d[ti+1]=n; d[ti+2]=n; }                     // luma noise
+              else if (noiseCh===1){ d[ti]=n; d[ti+1]=other; d[ti+2]=255*rand(seed+k+y+x); } // chroma noise
+              else { d[ti]=(n>128)?255:0; d[ti+1]=d[ti]; d[ti+2]=d[ti]; }              // salt & pepper
+            } else {                                        // 0 Smear, 1 Freeze, 2 Duplicate, 3 Random Paste
+              d[ti]=src[si]; d[ti+1]=src[si+1]; d[ti+2]=src[si+2];
+            }
           }
         }
       }
