@@ -770,8 +770,8 @@ function applyWireframe(w,h,phase){
 const wf = state.wireframe;
 if (!(wf.on && P('wireframe','amount')>0)) return;
 const amt = P('wireframe','amount');
-const threshold = 0.03 + wf.threshold*0.35;                            // 0.03..0.38 edge cutoff
-const thick = Math.max(0, Math.round(wf.thickness*4));                 // 0..4 dilation radius
+const threshold = 0.03 + P('wireframe','threshold')*0.35;              // 0.03..0.38 edge cutoff
+const thick = Math.max(0, Math.round(P('wireframe','thickness')*4));    // 0..4 dilation radius
 const glow = P('wireframe','glow');
 const fill = wf.fill|0, tone = wf.tone|0, levels = Math.max(2, wf.levels|0);
 const TONES = [

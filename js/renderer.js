@@ -100,6 +100,7 @@ function drawFrame(phase){    // phase in [0,1)
   applySliceGlitch(w,h,phase,gl);
   glitchGateEnd(w,h,'glitch',glitchGate);
   applyStandaloneRgbSplit(w,h,phase);
+  applyPopupCascade(w,h,phase);
 
   // ---- datamosh: modern per-frame corruption ----
   if (state.mosh.on && state.mosh.intensity>0){
@@ -160,9 +161,9 @@ function drawFrame(phase){    // phase in [0,1)
 
   applyCompression(w,h);
 
-  applyDctGlitch(w,h);
+  applyDctGlitch(w,h,phase);
 
-  applyPixelSort(w,h);
+  applyPixelSort(w,h,phase);
 
   glitchGate = glitchGateBegin(w,h,'databend');
   applyDatabendShift(w,h,phase);

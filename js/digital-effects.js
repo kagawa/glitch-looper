@@ -47,10 +47,10 @@ function dctMat(N){
     for (let x=0;x<N;x++) M[u*N+x]=a*Math.cos((2*x+1)*u*Math.PI/(2*N)); }
   return DCT_MATS[N]=M;
 }
-function applyDctGlitch(w,h){
+function applyDctGlitch(w,h,phase=0){
 const dg = state.dct;
 if (dg.on && dg.amount>0){
-  const amt=P('dct','amount'), N=(dg.block|0)||8, mode=dg.mode|0, chroma=dg.chroma, NN=N*N, M=dctMat(N);
+  const amt=P('dct','amount'), N=(dg.block|0)||8, mode=dg.mode|0, chroma=P('dct','chroma'), NN=N*N, M=dctMat(N);
   const id=ctx.getImageData(0,0,w,h), d=id.data, np=w*h, orig=d.slice(), mix=P('dct','mix');
   const Y=new Float32Array(np), Cb=new Float32Array(np), Cr=new Float32Array(np);
   for (let p=0,i=0;i<d.length;i+=4,p++){ const r=d[i],g=d[i+1],b=d[i+2];
@@ -65,7 +65,7 @@ if (dg.on && dg.amount>0){
       // forward: rowT[y][v]=Σx blk[y][x]M[v][x] ; co[u][v]=Σy M[u][y]rowT[y][v]
       for (let y=0;y<N;y++) for (let v=0;v<N;v++){ let a=0; for (let x=0;x<N;x++) a+=blk[y*N+x]*M[v*N+x]; tmp[y*N+v]=a; }
       for (let u=0;u<N;u++) for (let v=0;v<N;v++){ let a=0; for (let y=0;y<N;y++) a+=M[u*N+y]*tmp[y*N+v]; co[u*N+v]=a; }
-      const seed=bx*13.1+by*7.7;
+      const seed=bx*13.1+by*7.7+Math.floor(phase*8)*101.3;
       if (mode===0){ for (let u=0;u<N;u++) for (let v=0;v<N;v++) if (u+v>=keep) co[u*N+v]=0; }
       else if (mode===1){ for (let k=0;k<NN;k++) co[k]=Math.round(co[k]/q)*q; }
       else if (mode===2){ co[0]+=(rand(seed)-0.5)*s*420; }
@@ -104,7 +104,7 @@ if (cp.on){
   }
   const amt = P('compress','amount');
   if (amt>0){
-    const chb = cp.chroma, ring = P('compress','ring'), sub = cp.sub|0;
+    const chb = P('compress','chroma'), ring = P('compress','ring'), sub = cp.sub|0;
     const qstep = 2 + amt*30;                       // luma quantisation → banding
     const im = ctx.getImageData(0,0,w,h), d = im.data;
     // Real chroma subsampling happens BEFORE block quantisation in an actual encoder: colour is
@@ -163,7 +163,7 @@ if (cp.on){
 }
 }
 
-function applyPixelSort(w,h){
+function applyPixelSort(w,h,phase=0){
 // ---- Pixel Sort: reorder runs of pixels along rows / columns ----
 //      Two independent axes, the way the glitch-art lineage treats it: Sort By picks what the run
 //      is ordered on (Hue gives rainbow bands, nothing like Lightness), and Interval picks where
@@ -173,8 +173,9 @@ if (ps.on){
   const amt = P('pixsort','amount');
   if (amt>0){
     const im = ctx.getImageData(0,0,w,h), d=im.data;
-    const lo = ps.thresh*255;
-    const maxLen = Math.max(4, Math.round((ps.dir===3?Math.hypot(w,h):ps.dir===1?h:w)*(0.05+ps.len*0.95)));
+    const threshold=P('pixsort','thresh'), chanceValue=P('pixsort','chance'), lengthValue=P('pixsort','len');
+    const lo = threshold*255;
+    const maxLen = Math.max(4, Math.round((ps.dir===3?Math.hypot(w,h):ps.dir===1?h:w)*(0.05+lengthValue*0.95)));
     const lum = i => d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114;
     const key = ps.key|0, ivl = ps.ivl|0;
     const sortVal =
@@ -193,8 +194,9 @@ if (ps.on){
     // Whole line tile the line end to end and start out sorting every last pixel of it, so there
     // the knob is squared to push the usable range up into the middle of the travel.
     // 1 = sort every run, either way.
-    const chance = (ivl===0||ivl===2) ? ps.chance : ps.chance*ps.chance;
-    const take = (lineSeed,j)=> chance>=1 || rand(lineSeed*0.73+j*5.9+0.5) < chance;
+    const sortTick=Math.floor(phase*8);                         // eight stable but changing glitch poses per loop
+    const chance = (ivl===0||ivl===2) ? chanceValue : chanceValue*chanceValue;
+    const take = (lineSeed,j)=> chance>=1 || rand(lineSeed*0.73+j*5.9+sortTick*97.1+0.5) < chance;
     const sortSpan = (idx,s,e)=>{
       const arr=[];
       for (let k=s;k<e;k++){ const i=idx(k); arr.push([d[i],d[i+1],d[i+2],sortVal(i)]); }
@@ -207,7 +209,7 @@ if (ps.on){
         case 1: {                                  // Random — runs of scattered length
           let s=0, j=0;
           while (s<count){
-            const L = Math.max(2, Math.round(maxLen*(0.25+1.5*rand(lineSeed*1.7+j*3.1))));
+            const L = Math.max(2, Math.round(maxLen*(0.25+1.5*rand(lineSeed*1.7+j*3.1+sortTick*13.7))));
             const e = Math.min(count, s+L);
             if (take(lineSeed,j)) sortSpan(idx,s,e);
             s=e; j++;
@@ -215,7 +217,7 @@ if (ps.on){
           break;
         }
         case 2: {                                  // Edges — runs break where the picture does, so
-          const th = 6 + ps.thresh*90;             // the subject's outline survives
+          const th = 6 + threshold*90;             // the subject's outline survives
           let s=0, j=0;
           for (let k=1;k<=count;k++){
             if (k===count || Math.abs(lum(idx(k))-lum(idx(k-1)))>th || (k-s)>=maxLen){

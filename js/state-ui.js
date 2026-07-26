@@ -1,7 +1,24 @@
 // ---------- state ----------
-const state = {};
-FX.forEach(f => { state[f.id] = { on:f.on, _locked:false, _seq:null };   // _seq: per-step on/off, null = always
-  f.params.forEach(p => { state[f.id][p.k] = p.def; if (p.env) state[f.id][p.k+'_env'] = !!p.envd; }); });
+// Every continuous numeric control can participate in the shared Envelope. Selects/text inputs
+// stay categorical and are intentionally excluded. The proxy makes the rule apply even to older
+// effects that read state.foo directly instead of going through P(). P() reads the raw values, so
+// effects that already use it are never envelope-multiplied twice.
+const RAW_STATE = {}, state = {};
+let ENV = 1;
+FX.forEach(f => {
+  f.params.forEach(p => { if (!p.type) { p.env = 1; if (p.envd==null) p.envd=false; } });
+  const raw = { on:f.on, _locked:false, _seq:null };
+  f.params.forEach(p => { raw[p.k] = p.def; if (p.env) raw[p.k+'_env'] = !!p.envd; });
+  const numericKeys = new Set(f.params.filter(p=>!p.type).map(p=>p.k));
+  RAW_STATE[f.id] = raw;
+  state[f.id] = new Proxy(raw, {
+    get(target,key){
+      const value = target[key];
+      if (typeof key==='string' && numericKeys.has(key) && target[key+'_env'] && typeof value==='number' && f.id!=='motion') return value * ENV;
+      return value;
+    }
+  });
+});
 
 const LOOP_MS = 3000;   // 1 loop period
 const SEQ_STEPS = 8;    // the loop is split into this many on/off steps for the Sequencer
@@ -138,7 +155,7 @@ function buildUI(){
     g.className = 'grp' + (f.open ? ' open':'');
     g.innerHTML = `
       <div class="head">
-        <input type="checkbox" ${state[f.id].on?'checked':''} data-fx="${f.id}" class="fxtoggle">
+        <input type="checkbox" ${state[f.id].on?'checked':''} ${f.id==='motion'?'disabled':''} data-fx="${f.id}" class="fxtoggle">
         <span class="name">${f.name}<small>${f.hint}</small></span>
         <button type="button" class="fxlock${state[f.id]._locked?' active':''}" data-fx="${f.id}" title="Protect from Random and Drift" aria-label="Protect ${f.name} from Random and Drift">${state[f.id]._locked?'🔒':'🔓'}</button>
         <span class="caret">▶</span>
@@ -335,7 +352,7 @@ function applyPreset(name){
   const p = PRESETS[name];
   FX.forEach(f=>{
     const pp = p[f.id] || {};
-    state[f.id].on = !!pp.on;
+    state[f.id].on = f.id==='motion' ? true : !!pp.on;
     state[f.id]._seq = (pp._seq && pp._seq.length) ? pp._seq.map(v=>!!v) : null;   // a preset may bake in a sequencer pattern
     // Anything the preset doesn't name goes back to the effect's default rather than keeping
     // whatever the user last had — otherwise a preset renders differently depending on what was
@@ -349,6 +366,7 @@ function applyPreset(name){
   syncUI();
 }
 function syncUI(){
+  state.motion.on = true;                 // Envelope is the shared timing source; individual ⓔ boxes control participation.
   if ((state.mask.source|0)===0 && (state.mask.mode|0)===1) state.mask.source=6;
   controls.querySelectorAll('.fxtoggle').forEach(c=> c.checked = state[c.dataset.fx].on);
   controls.querySelectorAll('input[type=range]').forEach(r=>{
@@ -404,7 +422,7 @@ function envCurve(phase, mode, rate){
     default: return hump(phase);
   }
 }
-// per-parameter envelope: only params whose ⓔ checkbox is on get modulated
-let ENV = 1;
-function envF(fx,k){ return (state.motion.on && state[fx][k+'_env']) ? ENV : 1; }
-function P(fx,k){ return state[fx][k] * envF(fx,k); }
+// per-parameter envelope: only params whose ⓔ checkbox is on get modulated. Read raw state because
+// direct state access is already envelope-aware through the proxy above.
+function envF(fx,k){ return (state.motion.on && RAW_STATE[fx][k+'_env']) ? ENV : 1; }
+function P(fx,k){ return RAW_STATE[fx][k] * envF(fx,k); }

@@ -168,7 +168,7 @@ function applyBokeh(w,h,phase){
 // ---- Bokeh Bloom: soft light discs grown from the picture's own highlights, breathing over the loop ----
 const bk = state.bokeh;
 if (bk.on && bk.amount>0){
-  const amt=P('bokeh','amount'), N=Math.round(10+bk.density*80), thr=bk.thresh, base=5+P('bokeh','size')*48, shape=bk.shape|0, from=bk.from|0;
+  const amt=P('bokeh','amount'), N=Math.round(10+P('bokeh','density')*80), thr=P('bokeh','thresh'), base=5+P('bokeh','size')*48, shape=bk.shape|0, from=bk.from|0;
   const id=ctx.getImageData(0,0,w,h), d=id.data;
   ctx.save(); ctx.globalCompositeOperation='screen';
   for (let i=0;i<N;i++){
@@ -228,7 +228,7 @@ function applySparkle(w,h,phase){
 //      one twinkle period and integer twinkles/loop returns to the same start at phase 1. ----
 const sp = state.sparkle;
 if (sp.on && sp.amount>0){
-  const a=P('sparkle','amount'), N=Math.round(8+sp.density*90), base=2+sp.size*11, tone=sp.tone|0, spd=sp.speed|0||1, shape=sp.shape|0;
+  const a=P('sparkle','amount'), N=Math.round(8+P('sparkle','density')*90), base=2+P('sparkle','size')*11, tone=sp.tone|0, spd=sp.speed|0||1, shape=sp.shape|0;
   const motion=sp.motion|0, life=sp.life|0, dist=+(sp.dist||0), driftAng=(sp.angle||0)*Math.PI/180;
   const D=Math.hypot(w,h), cx=w*0.5, cy=h*0.5;
   // Precompute per-life travel vector for directional motions (Fall/Rise/Drift)
@@ -697,40 +697,199 @@ function drawHUD(w,h,phase){
   const cs=Math.floor(now.getTime()/1000)%36000;           // VCR tape counter — H:MM:SS
   const ctr=`${Math.floor(cs/3600)}:${p2(Math.floor(cs/60)%60)}:${p2(cs%60)}`;
   const sub = s => String(s).replace(/\{date\}/g,date).replace(/\{time\}/g,time).replace(/\{ctr\}/g,ctr);
+  // ---- Glitch Mode transforms. Only letters and digits are corrupted; every symbol, dash,
+  //      slash, colon, decorative block/arrow/dot and whitespace is preserved so the surrounding
+  //      layout / punctuation / {rec} dot / ▶ / ● icons stay put. Block Redact draws a fill
+  //      rectangle at the ORIGINAL glyph's width so the layout can't shift. Chromatic Split is
+  //      handled after render (see below).
+  const gMode = hd.glitch|0, gAmt = P('hud','corrupt'), gRate = Math.max(1, hd.gspeed|0);
+  const gTime = hd.gtiming|0;
+  // Timing shapes how gStep advances across the loop. Steady = uniform. Burst = 4 clusters of
+  // rapid change with long holds between. Stutter = 8 short high-rate flurries separated by
+  // freezes. All modes stay periodic on [0,1) so the loop is seamless.
+  // Timing controls both WHEN corruption is visible and how fast the substitution ticks. Outside
+  // the active window `gate` = 0, so the text reverts to the original — the effect looks like
+  // "バババっと置き換わる → 元の文字に戻る" instead of a constant scramble. Cascade Reveal is a
+  // monotonic timeline effect so timing gating is skipped for it (mode 3 always uses gate=1).
+  let gStep, gate;
+  if (gTime===1){                                                            // Burst — 4 clusters
+    const K=4, cIdx=Math.floor(phase*K), local=phase*K-cIdx;
+    const winW = 0.18;
+    if (local < winW){
+      gStep = cIdx*(gRate*2+1) + Math.floor(local/winW * gRate*2);
+      gate = 1;
+    } else { gStep = cIdx*(gRate*2+1) + gRate*2; gate = 0; }
+  } else if (gTime===2){                                                     // Stutter — 8 flurries
+    const K = 8, local = (phase*K)%1, idx = Math.floor(phase*K);
+    if (local < 0.30){ gStep = idx*7 + Math.floor(local*gRate*3.5); gate = 1; }
+    else { gStep = idx*7; gate = 0; }
+  } else { gStep = Math.floor(phase*gRate); gate = 1; }
+  const activeAmt = gMode===3 ? gAmt : gAmt * gate;                          // Cascade ignores gate
+  // Real SJIS↔UTF-8 misdecoding artefacts — the char blocks that show up whenever bytes get
+  // interpreted with the wrong codepage. Mix of UTF-8-bytes-as-CJK (縺繧蟶蜈…), CJK-bytes-as-
+  // Latin-1 (Ã Â ¢ £ ¥ …), replacement char, and half-width kana pieces.
+  const MOJI = '縺繧蟶蜈蜿譁蟄蟀蟒蟠蟯蟶蟹螟螢隰髀髄髑髻鬮髴鬢鬲齬齪蠎蠎蜘蜩蜥蜩蟇蟖蟠繹繼繾繫繺'
+             + 'ÃãÂâÀÁáÄäÅåÇçÐð€¢£¥¦§¨©ª«¬®¯°±²³´µ¶·¸¹º»¼½¾¿‚„…†‡‰Š‹ŒŽ‘’“”'
+             + 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎ﾿ﾆｯﾞﾟ〓〜※？！　'
+             + '����╱╲┃─┳┻┫┣';
+  const MOJI_ARR = [...MOJI];
+  // Char is "glitchable" only if it's a Unicode letter or number — anything else (whitespace,
+  // punctuation like -:/., decorative symbols like ▶●■○, and the {rec} token separator '{}')
+  // is preserved so the layout / clock separators / status icons stay recognisable.
+  const isGlitchable = c => /[\p{L}\p{N}]/u.test(c);
+  const revealCharAt = i => {
+    // Random printable ASCII (33..126) for Cascade "unresolved" state.
+    const r = Math.floor(rand(i*4.7 + gStep*13.7)*94);
+    return String.fromCharCode(33 + r);
+  };
+  // Non-Block glitch modes: build the corrupted string. Block Redact keeps original chars in the
+  // string and marks WHICH indices should be drawn as rectangles instead of glyphs, so the
+  // rectangle can match the glyph's measured width exactly.
+  const buildString = (raw) => {
+    if (!raw || gMode===0 || gMode===4 || activeAmt<=0) return { text:raw, mask:null };
+    const chars = [...raw];
+    const out = new Array(chars.length);
+    const mask = gMode===1 ? new Uint8Array(chars.length) : null;
+    for (let i=0; i<chars.length; i++){
+      const c = chars[i];
+      if (!isGlitchable(c)){ out[i]=c; continue; }
+      const roll = rand(i*3.7 + gStep*11.3 + raw.length*0.13);
+      if (gMode===1){                                                        // Block Redact
+        if (roll < activeAmt){ mask[i] = 1; out[i] = c; }
+        else out[i] = c;
+      } else if (gMode===2){                                                 // Mojibake
+        out[i] = roll < activeAmt ? MOJI_ARR[(rand(i*5.3+gStep*2.9)*MOJI_ARR.length)|0] : c;
+      } else {                                                               // Cascade Reveal
+        const revealAt = rand(i*7.9 + raw.length*1.13);
+        const unresolved = revealAt > (phase / Math.max(0.0001, activeAmt));
+        out[i] = unresolved ? revealCharAt(i) : c;
+      }
+    }
+    return { text: out.join(''), mask };
+  };
+  // Substitute {tokens} then split into chunks the renderer can walk directly:
+  //   {rec:true} — red rec dot
+  //   {br:true}  — line break (was {n})
+  //   {text, mask?} — text run; mask (Uint8Array) marks Block-Redact chars.
+  const subGlitch = s => {
+    const parts = sub(s).split(/(\{rec\}|\{n\})/).filter(seg=>seg!=='');
+    const chunks = [];
+    for (const seg of parts){
+      if (seg==='{rec}') chunks.push({rec:true});
+      else if (seg==='{n}') chunks.push({br:true});
+      else chunks.push(buildString(seg));
+    }
+    return chunks;
+  };
   const lh=Math.round(base*1.28);
+  // `cur` is the render target — normally the main canvas, but temporarily redirected to a scratch
+  // canvas for Chromatic Split so it can be composited back with per-channel offsets.
+  let cur = ctx;
   ctx.save();
   ctx.globalAlpha=hd.opacity;
   ctx.font=`${base}px ui-monospace, Menlo, monospace`;
   ctx.textBaseline='top';
   ctx.shadowColor='rgba(0,0,0,.85)'; ctx.shadowBlur=3; ctx.shadowOffsetY=1;
-  // draw one line (which may contain {rec} dots) at anchor ax with the given horizontal alignment
-  const drawLine=(line, ax, ay, align)=>{
-    const segs = line.split(/(\{rec\})/).filter(s=>s!=='');
-    const parts = segs.map(s=> s==='{rec}' ? {dot:true, w:base*0.95} : {t:s, w:ctx.measureText(s).width});
-    const total = parts.reduce((a,p)=>a+p.w, 0);
+  // Measure a text-chunk's total width, using per-char widths when we need them for Block Redact.
+  const measureChunk = (chunk) => {
+    if (chunk.rec) return base*0.95;
+    if (chunk.br) return 0;
+    if (!chunk.mask) return cur.measureText(chunk.text).width;
+    // With a mask we need per-char widths to draw rectangles precisely — sum them.
+    let w=0; for (const c of chunk.text) w += cur.measureText(c).width;
+    chunk._cw = null; // lazy
+    return w;
+  };
+  // Draw one chunk-array line at anchor ax with the given horizontal alignment. Writes to `cur`.
+  const drawLine=(chunks, ax, ay, align)=>{
+    const widths = chunks.map(measureChunk);
+    const total = widths.reduce((a,b)=>a+b,0);
     let x = align==='right' ? ax-total : align==='center' ? ax-total/2 : ax;
-    for (const p of parts){
-      if (p.dot){ if(recOn){ ctx.fillStyle='#ff3b30'; ctx.beginPath(); ctx.arc(x+base*0.4,ay+base*0.52,base*0.32,0,7); ctx.fill(); } ctx.fillStyle=col; }
-      else { ctx.textAlign='left'; ctx.fillStyle=col; ctx.fillText(p.t, x, ay); }
-      x += p.w;
+    for (let i=0; i<chunks.length; i++){
+      const p = chunks[i], pw = widths[i];
+      if (p.rec){
+        if (recOn){ cur.fillStyle='#ff3b30'; cur.beginPath(); cur.arc(x+base*0.4,ay+base*0.52,base*0.32,0,7); cur.fill(); }
+        cur.fillStyle=col;
+      } else if (p.br){
+        // no-op — line-split already handled by caller
+      } else if (!p.mask){
+        cur.textAlign='left'; cur.fillStyle=col; cur.fillText(p.text, x, ay);
+      } else {
+        // Block Redact: walk chars, draw either the glyph or a fill rectangle sized to that
+        // glyph's measured width so the surrounding layout can't shift by even a pixel.
+        cur.textAlign='left'; cur.fillStyle=col;
+        let cx = x, j = 0;
+        for (const c of p.text){
+          const cw = cur.measureText(c).width;
+          if (p.mask[j]) cur.fillRect(cx, ay+base*0.15, cw, base*0.7);
+          else cur.fillText(c, cx, ay);
+          cx += cw; j++;
+        }
+      }
+      x += pw;
     }
   };
-  // a slot: token-substitute, split into lines on {n}, then stack from the anchor (top slots grow
-  // down, bottom slots grow up, centre grows around the middle) so multi-line text stays in frame
+  // A slot: token-substitute + glitch, split on {br} chunks into lines, stack from the anchor
+  // (top slots grow down, bottom grow up, centre grows around middle) so multi-line stays framed.
   const slot=(raw, ax, ay, align, vert)=>{
     if (!raw) return;
-    const lines = sub(raw).split('{n}');
+    const chunks = subGlitch(raw);
+    const lines = [[]];
+    for (const c of chunks){ if (c.br) lines.push([]); else lines[lines.length-1].push(c); }
     for (let i=0;i<lines.length;i++){
       const y = vert==='down' ? ay + i*lh
               : vert==='up'   ? ay - (lines.length-1-i)*lh
-              :                 ay + (i - (lines.length-1)/2)*lh;   // centre
+              :                 ay + (i - (lines.length-1)/2)*lh;
       drawLine(lines[i], ax, y, align);
     }
   };
-  slot(hd.tl, pad,   pad,        'left',   'down');
-  slot(hd.tr, w-pad, pad,        'right',  'down');
-  slot(hd.c,  w/2,   h/2-base/2, 'center', 'mid');
-  slot(hd.bl, pad,   h-pad-base, 'left',   'up');
-  slot(hd.br, w-pad, h-pad-base, 'right',  'up');
+  const drawSlots = () => {
+    slot(hd.tl, pad,   pad,        'left',   'down');
+    slot(hd.tr, w-pad, pad,        'right',  'down');
+    slot(hd.c,  w/2,   h/2-base/2, 'center', 'mid');
+    slot(hd.bl, pad,   h-pad-base, 'left',   'up');
+    slot(hd.br, w-pad, h-pad-base, 'right',  'up');
+  };
+  // Chromatic Split: render the HUD text once onto a scratch canvas, then composite it back three
+  // times — red shifted right, green centred, blue shifted left — with 'lighter' so overlapping
+  // regions add back to white. Non-overlap edges show red/green/blue fringes.
+  if (gMode===4 && gAmt>0){
+    sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h);
+    // Mirror the caller's text-drawing state onto the scratch context so measureText / shadows
+    // match the on-canvas render exactly.
+    sctx.save();
+    sctx.globalAlpha = 1;                                         // scratch is straight-alpha; the outer save() carries hd.opacity
+    sctx.font = ctx.font;
+    sctx.textBaseline = ctx.textBaseline;
+    sctx.shadowColor = ctx.shadowColor;
+    sctx.shadowBlur = ctx.shadowBlur;
+    sctx.shadowOffsetY = ctx.shadowOffsetY;
+    cur = sctx;
+    drawSlots();
+    cur = ctx;
+    sctx.restore();
+    const shift = Math.round(gAmt * base * 0.4 + 1);
+    tmp.width = w; tmp.height = h;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';                     // channel adds combine back to white
+    ctx.globalAlpha = hd.opacity;
+    // For each channel: paint scratch (which holds the fully-coloured text) into tmp, then use
+    // 'source-in' with a per-channel fill to isolate that channel's colour, then draw shifted.
+    const drawChannel = (offX, r,g,b) => {
+      tctx.clearRect(0,0,w,h);
+      tctx.drawImage(sc, 0, 0);
+      tctx.globalCompositeOperation = 'source-in';
+      tctx.fillStyle = `rgb(${r},${g},${b})`;
+      tctx.fillRect(0,0,w,h);
+      tctx.globalCompositeOperation = 'source-over';
+      ctx.drawImage(tmp, offX, 0);
+    };
+    drawChannel( shift, 255,   0,   0);
+    drawChannel(     0,   0, 255,   0);
+    drawChannel(-shift,   0,   0, 255);
+    ctx.restore();
+  } else {
+    drawSlots();
+  }
   ctx.restore();
 }

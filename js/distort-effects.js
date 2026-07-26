@@ -50,10 +50,10 @@ const m7 = state.mode7;
 if (!(m7.on && P('mode7','amount')>0)) return;
 const amt = P('mode7','amount');
 const plane = m7.plane|0;
-const horizonPos = +m7.horizon || 0.5;
+const horizonPos = P('mode7','horizon');
 const H = 40 + (+m7.height || 0) * 260;
 const F = 80 + (+m7.fov || 0) * 320;
-const panSpeed = +m7.pan || 0, rotTurns = +m7.rot || 0;
+const panSpeed = P('mode7','pan'), rotTurns = P('mode7','rot');
 const sky = m7.sky|0;
 const panZ = phase * panSpeed * h;
 const rot = phase * rotTurns * Math.PI * 2;
@@ -214,27 +214,41 @@ function applySliceGlitch(w,h,phase,gl){
 // ---- glitch: directional slice displacement / duplication / replacement ----
 if (gl.on && gl.amount>0){
   const slices = gl.slices, edge = gl.edge|0, ew = Math.max(1, gl.edgew|0), direction=gl.direction|0, fill=gl.fill|0;
-  const step = Math.floor(phase*slices*2);             // changes over loop, wraps
+  // Speed 4 is the legacy rate: with Snap it reproduces the original step cadence and offsets.
+  // Lower values slow the cadence; higher values make the slice poses change faster.
+  const cycles = Math.max(.05, P('glitch','speed')*.25);
+  const poseCount = Math.max(1, Math.round(slices*2*cycles));
+  const poseFloat = phase*poseCount, step = Math.floor(poseFloat), nextStep=(step+1)%poseCount;
+  let moveT = poseFloat-step;
+  const moveMode = gl.move|0;
+  if (moveMode===0) moveT=0;                              // Snap
+  else if (moveMode===2) moveT=moveT*moveT*(3-2*moveT);   // Ease / smoothstep
   const amt = Math.min(1, P('glitch','amount')), maxOff = P('glitch','shift');
-  const jit = gl.jitter;                               // uneven slice heights
+  const jit = P('glitch','jitter');                    // uneven slice heights
   // The original Horizontal + Shift + Hard path is retained by the same operations below. A single
   // snapshot is also the clean source for Duplicate/Freeze, so later slices never feed on earlier ones.
   sc.width=w; sc.height=h; sctx.clearRect(0,0,w,h); sctx.drawImage(canvas,0,0);
-  const bounds=(length,seed)=>{
+  const bounds=(length,seed,pose)=>{
     const out=[0];
     for(let i=1;i<slices;i++){
       let p=length*i/slices;
-      if(jit>0) p+=(rand(i*4.7+step*1.3+seed)-.5)*(length/slices)*jit*.9;
+      if(jit>0) p+=(rand(i*4.7+pose*1.3+seed)-.5)*(length/slices)*jit*.9;
       out.push(Math.max(1,Math.min(length-1,Math.round(p))));
     }
     out.push(length); out.sort((a,b)=>a-b); return out;
   };
-  const ys=bounds(h,0), xs=bounds(w,91.7);
+  const ys=bounds(h,0,step), xs=bounds(w,91.7,step);
+  const ysNext=bounds(h,0,nextStep), xsNext=bounds(w,91.7,nextStep);
   for (let i=0;i<slices;i++){
     if (rand(i*7.1 + step) <= 1-amt) continue;
     const vertical = direction===1 || (direction===2 && rand(i*11.9+step+2.7)>.5);
-    const bb=vertical?xs:ys, pos=bb[i], thick=bb[i+1]-pos; if(thick<=0) continue;
-    const off=(rand(i*3.3+step)-0.5)*2*maxOff;
+    const bb=vertical?xs:ys, bbNext=vertical?xsNext:ysNext;
+    const pos=Math.round(bb[i]+(bbNext[i]-bb[i])*moveT);
+    const end=Math.round(bb[i+1]+(bbNext[i+1]-bb[i+1])*moveT), thick=end-pos; if(thick<=0) continue;
+    const off0=(rand(i*3.3+step)-0.5)*2*maxOff;
+    const off1=(rand(i*3.3+nextStep)-0.5)*2*maxOff;
+    let off=off0+(off1-off0)*moveT;
+    if(moveMode===3) off += Math.sin(moveT*Math.PI*2)*((rand(i*5.1+step*2.7)-.5)*maxOff*.28); // Jitter
     if(fill>=3){
       if(fill===4 || fill===5){ ctx.fillStyle=fill===4?'#000':'#fff'; vertical?ctx.fillRect(pos,0,thick,h):ctx.fillRect(0,pos,w,thick); }
       else { const im=vertical?ctx.getImageData(pos,0,thick,h):ctx.getImageData(0,pos,w,thick), d=im.data;
@@ -665,7 +679,13 @@ function applyStandaloneRgbSplit(w,h,phase){
   const base=ctx.getImageData(0,0,w,h), bd=base.data, out=ctx.createImageData(w,h), od=out.data;
   let dx=P('rgbsplit','x'), dy=P('rgbsplit','y');
   const amt=P('rgbsplit','amount'), mode=s.mode|0;
-  if (mode===3||mode===4){ const a=P('rgbsplit','spin')*Math.PI*2*phase, c=Math.cos(a), q=Math.sin(a); [dx,dy]=[dx*c-dy*q,dx*q+dy*c]; }
+  if (mode===3||mode===4){
+    const a=P('rgbsplit','spin')*Math.PI*2*phase, c=Math.cos(a), q=Math.sin(a);
+    // Let the separation breathe as well as rotate. A fixed chromatic offset reads like a lens
+    // correction; a changing offset reads like a live signal losing alignment.
+    const spread=.55+.45*(.5+.5*Math.sin(a+Math.PI/2));
+    [dx,dy]=[(dx*c-dy*q)*spread,(dx*q+dy*c)*spread];
+  }
   dx=Math.round(dx); dy=Math.round(dy);
   for(let y=0;y<h;y++) for(let x=0;x<w;x++){
     const i=(y*w+x)*4, rx=Math.max(0,Math.min(w-1,x+dx)), bx=Math.max(0,Math.min(w-1,x-dx)), ry=Math.max(0,Math.min(h-1,y+dy)), by=Math.max(0,Math.min(h-1,y-dy));
@@ -694,4 +714,108 @@ function applyStandaloneRgbSplit(w,h,phase){
     od[i]=bd[i]+(R-bd[i])*gain; od[i+1]=bd[i+1]+(G-bd[i+1])*gain; od[i+2]=bd[i+2]+(B-bd[i+2])*gain; od[i+3]=255;
   }
   ctx.putImageData(out,0,0);
+}
+
+// Popup Cascade — a browser-crash / runaway-window feeling made entirely from image copies.
+// The source is frozen for this pass so copies never recursively copy one another.  Edges are
+// deliberately image treatments (shadow, bevel, chroma, ghost), not HTML window chrome.
+function applyPopupCascade(w,h,phase){
+  const s=state.popup;
+  if (!(s && s.on && P('popup','amount')>0)) return;
+
+  sc.width=w; sc.height=h;
+  sctx.setTransform(1,0,0,1,0,0);
+  sctx.globalAlpha=1; sctx.globalCompositeOperation='source-over'; sctx.filter='none';
+  sctx.clearRect(0,0,w,h); sctx.drawImage(canvas,0,0);
+
+  const amount=P('popup','amount');
+  const pattern=s.pattern|0, n=Math.max(1,Math.round(P('popup','count')));
+  const size=Math.max(.08,P('popup','size')), spacing=P('popup','spacing');
+  const speed=P('popup','speed'), randomness=P('popup','randomness');
+  const scale=P('popup','scale'), opacity=P('popup','opacity');
+  const edge=s.edge|0, edgeAmount=P('popup','edgeAmount'), boundary=s.wrap|0;
+  const minSide=Math.min(w,h), baseW=Math.max(10,Math.round(minSide*size));
+  const baseH=Math.max(10,Math.round(baseW*h/Math.max(1,w)));
+  const flow=phase*speed*Math.max(w,h);
+  const wrap=(v,m)=>((v%m)+m)%m;
+  const bounce=(v,m)=>{ if(m<=0) return 0; const q=wrap(v,m*2); return q<=m?q:2*m-q; };
+  const clamp=(v,m)=>Math.max(0,Math.min(m,v));
+  const place=(v,m)=>boundary===0?wrap(v,m):boundary===1?bounce(v,m):clamp(v,m);
+  const dir=s.direction|0;
+
+  function drawCopy(sx,sy,dw,dh,x,y,a){
+    const dx=Math.round(x), dy=Math.round(y), ww=Math.max(2,Math.round(dw)), hh=Math.max(2,Math.round(dh));
+    const ox=Math.max(1,Math.round(edgeAmount*7)), oy=Math.max(1,Math.round(edgeAmount*7));
+    ctx.save();
+    if(edge===1){
+      ctx.globalAlpha=a*(.18+.32*edgeAmount); ctx.filter=`brightness(0) blur(${Math.max(1,edgeAmount*5)}px)`;
+      ctx.drawImage(sc,sx,sy,dw,dh,dx+ox,dy+oy,ww,hh);
+      ctx.filter='none';
+    } else if(edge===3){
+      ctx.globalAlpha=a*.22*edgeAmount;
+      ctx.drawImage(sc,sx,sy,dw,dh,dx-ox,dy,ww,hh);
+      ctx.drawImage(sc,sx,sy,dw,dh,dx+ox,dy,ww,hh);
+    } else if(edge===4){
+      ctx.globalAlpha=a*.18*edgeAmount;
+      ctx.drawImage(sc,sx,sy,dw,dh,dx+ox*2,dy-oy,ww,hh);
+    }
+    ctx.globalAlpha=a;
+    ctx.drawImage(sc,sx,sy,dw,dh,dx,dy,ww,hh);
+    if(edge===2){
+      const lw=Math.max(1,Math.round(edgeAmount*2));
+      ctx.lineWidth=lw; ctx.globalAlpha=a*(.25+.45*edgeAmount);
+      ctx.strokeStyle='rgba(255,255,255,.8)'; ctx.strokeRect(dx+.5,dy+.5,ww-lw,hh-lw);
+      ctx.strokeStyle='rgba(0,0,0,.8)'; ctx.strokeRect(dx+lw+.5,dy+lw+.5,ww-lw*2,hh-lw*2);
+    }
+    ctx.restore();
+  }
+
+  for(let i=0;i<n;i++){
+    const r1=rand(7201+i*31), r2=rand(8803+i*47), r3=rand(10427+i*59);
+    let dw=baseW*Math.pow(scale, i*.18), dh=baseH*Math.pow(scale, i*.18);
+    let x=0, y=0;
+    if(pattern===0){ // Spawn stack: old copies stay put while a new copy is added down-right.
+      const spawned=speed<=0?0:Math.min(n-1,Math.floor((phase*speed%1)*n));
+      if(i>spawned) continue;
+      let d=dir===4?(r1<.5?0:1):dir;
+      let vx=d===1||d===3?-1:1, vy=d>=2?-1:1;
+      const step=Math.max(4,Math.min(w,h)*spacing*.42);
+      x=(w-dw)*.5 + vx*i*step;
+      y=(h-dh)*.5 + vy*i*step;
+      x=place(x,w-dw); y=place(y,h-dh);
+      x+=(r2-.5)*randomness*baseW; y+=(r3-.5)*randomness*baseH;
+    } else if(pattern===1){ // Moving cascade: the whole trail advances and re-enters at the top.
+      let d=dir===4?(r1<.5?0:1):dir;
+      let vx=d===1||d===3?-1:1, vy=d>=2?-1:1;
+      const step=Math.max(4,Math.min(w,h)*spacing*.42);
+      x=(w-dw)*.5 + vx*(i*step-flow);
+      y=(h-dh)*.5 + vy*(i*step-flow);
+      x=place(x,w-dw); y=place(y,h-dh);
+      x+= (r2-.5)*randomness*baseW; y+=(r3-.5)*randomness*baseH;
+    } else if(pattern===2){ // Flood: stable random windows drift around the entire screen.
+      x=r1*Math.max(1,w-dw)+(Math.sin(phase*6.283+i)*randomness*baseW)-flow*(.2+r2*.8);
+      y=r2*Math.max(1,h-dh)+(Math.cos(phase*6.283*1.3+i)*randomness*baseH)+flow*(.15+r3*.5);
+      x=place(x,w-dw); y=place(y,h-dh);
+    } else if(pattern===3){ // Desktop-like grid, with rows flowing back to the top.
+      const cols=Math.max(1,Math.ceil(Math.sqrt(n*w/Math.max(1,h))));
+      const col=i%cols, row=Math.floor(i/cols), rows=Math.ceil(n/cols);
+      x=place(col*(w-dw)/Math.max(1,cols-1)-dw*.35, w-dw);
+      y=place(row*(h-dh)/Math.max(1,rows-1)-flow, h-dh);
+      x+=(r1-.5)*randomness*baseW; y+=(r2-.5)*randomness*baseH;
+    } else { // Recursive echo: copies shrink toward / away from a central source.
+      const ang=r1*Math.PI*2 + phase*Math.PI*2*speed*.15;
+      const radius=(i+1)*spacing*Math.min(w,h)*.16-flow*.25;
+      x=(w-dw)*.5+Math.cos(ang)*radius+(r2-.5)*randomness*baseW;
+      y=(h-dh)*.5+Math.sin(ang)*radius+(r3-.5)*randomness*baseH;
+      x=place(x,w-dw); y=place(y,h-dh);
+    }
+
+    let sx=(w-baseW)*.5, sy=(h-baseH)*.5;
+    const source=s.source|0;
+    if(source===1){ sx=r1*Math.max(0,w-baseW); sy=r2*Math.max(0,h-baseH); }
+    else if(source===2){ const q=(i/(Math.max(1,n-1))+.17*phase)%1; sx=q*Math.max(0,w-baseW); sy=(1-q)*Math.max(0,h-baseH); }
+    const a=Math.max(0,Math.min(1,amount*opacity*(1-i/n*.35)));
+    drawCopy(sx,sy,baseW,baseH,x,y,a);
+  }
+  ctx.globalAlpha=1; ctx.filter='none';
 }
