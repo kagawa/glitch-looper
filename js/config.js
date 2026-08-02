@@ -656,14 +656,31 @@ const FX = [
   { id:'popup', name:'Popup Cascade', hint:'image copies multiply — cascade / flood / grid / echo', on:false, open:false, params:[
     { k:'amount',    label:'Amount', min:0, max:1, step:.01, def:.75, env:1 },
     { k:'pattern',   label:'Pattern', type:'select', def:0, options:[[0,'Spawn Stack'],[1,'Moving Cascade'],[2,'Popup Flood'],[3,'Desktop Grid'],[4,'Recursive Echo']] },
-    { k:'count',     label:'Copies', min:1, max:32, step:1, def:10 },
-    { k:'size',      label:'Window Size', min:.08, max:.8, step:.01, def:.28 },
+    // env:0 on structural params — count / size / spacing / scale / speed changing per frame
+    // reshuffles every copy's position seed and jumps them around the frame.
+    { k:'count',     label:'Copies', min:1, max:32, step:1, def:8, env:0 },
+    { k:'size',      label:'Window Size', min:.08, max:.8, step:.01, def:.32, env:0 },
     { k:'source',    label:'Source', type:'select', def:0, options:[[0,'Center'],[1,'Random'],[2,'Diagonal']] },
+    // Pixel filter — cuts the source down to just the pixels matching the criterion so each copy
+    // becomes a see-through cutout of the "bright bits" / "the red parts" / etc., not a full crop.
+    { k:'filter',    label:'Pixel Filter', type:'select', def:0,
+      options:[[0,'None (whole crop)'],[1,'Bright'],[2,'Dark'],[3,'Saturated'],[4,'Muted'],[5,'By Hue']] },
+    { k:'fthresh',   label:'Filter Threshold', min:0, max:1, step:.01, def:.5, env:1, show:s=> (s.filter|0)!==0 && (s.filter|0)!==5 },
+    { k:'fhue',      label:'Target Hue', min:0, max:360, step:1, def:0, env:1, show:s=> (s.filter|0)===5 },
+    { k:'fhuetol',   label:'Hue Range', min:.02, max:1, step:.01, def:.2, env:1, show:s=> (s.filter|0)===5 },
+    { k:'ffeather',  label:'Edge Softness', min:0, max:1, step:.01, def:.15, env:1, show:s=> (s.filter|0)!==0 },
+    { k:'start',     label:'Start Position', type:'select', def:0, options:[[0,'Center'],[1,'Random'],[2,'Custom XY']], show:s=> (s.pattern|0)===0 },
+    { k:'startX',    label:'Start X', min:0, max:1, step:.01, def:.5, env:0, show:s=> (s.pattern|0)===0 && (s.start|0)===2 },
+    { k:'startY',    label:'Start Y', min:0, max:1, step:.01, def:.5, env:0, show:s=> (s.pattern|0)===0 && (s.start|0)===2 },
     { k:'direction', label:'Direction', type:'select', def:0, options:[[0,'Down-right'],[1,'Down-left'],[2,'Up-right'],[3,'Up-left'],[4,'Random']] },
-    { k:'spacing',   label:'Spacing', min:.1, max:1, step:.01, def:.58, env:1 },
-    { k:'speed',     label:'Flow Speed', min:0, max:4, step:.05, def:1, env:1 },
+    { k:'spacing',   label:'Spacing', min:.1, max:1, step:.01, def:.58, env:0 },
+    // Flow Speed is now "laps per loop" — integer, so animation wraps cleanly at the loop seam.
+    // For Spawn Stack this is "spawn cycles per loop" — 1 means: start with 1 copy, add one at a
+    // time over the loop, reach n at the seam, then loop restarts. For flow patterns it's laps.
+    { k:'speed',     label:'Flow / Spawn Rate (per loop)', min:0, max:6, step:1, def:1, env:0 },
     { k:'randomness',label:'Randomness', min:0, max:1, step:.01, def:.22, env:1 },
-    { k:'scale',     label:'Scale Drift', min:.4, max:1.2, step:.01, def:.86, env:1 },
+    { k:'scale',     label:'Scale Drift', min:.4, max:1.2, step:.01, def:.86, env:0 },
+    { k:'rotate',    label:'Tilt (deg)', min:0, max:20, step:1, def:0, env:1 },
     { k:'opacity',   label:'Copy Opacity', min:0, max:1, step:.01, def:.72, env:1 },
     { k:'edge',      label:'Image Edge', type:'select', def:1, options:[[0,'None'],[1,'Shadow'],[2,'Bevel'],[3,'RGB Edge'],[4,'Ghost']] },
     { k:'edgeAmount',label:'Edge Amount', min:0, max:1, step:.01, def:.4, env:1 },
@@ -736,7 +753,7 @@ const PRESETS = {
   'Classic Glitch': { vhs:{on:0}, glitch:{on:1,amount:.55,amount_env:0,direction:0,fill:0,slices:24,jitter:.18,shift:24,shift_env:0,edge:0,rgb:0,rgb_env:0,applyto:0,coverage:.9}, noise:{on:0}, color:{on:0} },
   'RGB Split':     { rgbsplit:{on:1,amount:.9,amount_env:0,x:14,x_env:1,y:0,y_env:0,mode:0,apply:0,fall:0,radial:.05,radial_env:0}, color:{on:0} },
   'Pixel Sort':    { pixsort:{on:1,amount:.78,key:0,ivl:0,chance:.88,thresh:.48,dir:0,angle:45,len:.58}, rgbsplit:{on:1,amount:.2,x:4,y:0,mode:3,spin:.22,apply:0,fall:1,radial:0}, color:{on:1,saturate:1.2,contrast:1.1,bright:1,hue:0,tint:0,vignette:.18} },
-  'Popup Cascade': { popup:{on:1,amount:.78,pattern:0,count:10,size:.28,source:0,direction:0,spacing:.58,speed:1,randomness:.18,scale:.86,opacity:.72,edge:1,edgeAmount:.4,wrap:0} },
+  'Popup Cascade': { popup:{on:1,amount:.78,pattern:0,count:10,size:.28,source:0,start:0,startX:.5,startY:.5,direction:0,spacing:.58,speed:1,randomness:.18,scale:.86,opacity:.72,edge:1,edgeAmount:.4,wrap:0} },
   'Real JPEG Bend':{ jpeg:{on:1,amount:.38,mix:1,density:.7,burst:2,spread:.8,mutation:1,where:4,window:.3,target:0,tablepart:0,safety:1,quality:.28,frames:8}, noise:{on:1,grain:.04,size:0,type:0,flicker:.05} },
   'Real PNG Bend': { png:{on:1,amount:.38,noise:.2,mix:1,density:.7,burst:2,spread:.8,mutation:1,where:4,window:.3,dir:0,pattern:0,band:16,frames:8} },
   'Broken Signal': { vhs:{on:1,aberration:9,scanline:.18,bleed:4,tracking:.7,wobble:7,wobmode:1}, glitch:{on:1,amount:.28,direction:0,fill:0,slices:16,jitter:.25,shift:24,edge:0,rgb:7,applyto:0,coverage:.8}, noise:{on:1,grain:.3,size:.15,smooth:0,type:1,flicker:.3}, sync:{on:1,hsync:0,flag:.35,contact:.35}, crt:{on:1,amount:.3,round:.4,corner:.5,frame:.06,mask:1,phosphor:.4,scan:.35,converge:.35,glow:.25} },

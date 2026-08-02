@@ -6,7 +6,9 @@
 const RAW_STATE = {}, state = {};
 let ENV = 1;
 FX.forEach(f => {
-  f.params.forEach(p => { if (!p.type) { p.env = 1; if (p.envd==null) p.envd=false; } });
+  // Auto-tag continuous numerics as envelope-modulatable, but respect explicit `env:0` opt-outs
+  // in the config (e.g. count-integer params that would pop visibly if breathed).
+  f.params.forEach(p => { if (!p.type && p.env==null) { p.env = 1; if (p.envd==null) p.envd=false; } });
   const raw = { on:f.on, _locked:false, _seq:null };
   f.params.forEach(p => { raw[p.k] = p.def; if (p.env) raw[p.k+'_env'] = !!p.envd; });
   const numericKeys = new Set(f.params.filter(p=>!p.type).map(p=>p.k));

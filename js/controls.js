@@ -167,7 +167,7 @@ const RAND_PROB = { png:.12, jpeg:.15, warp:.18, halftone:.12, feedback:.12, mel
                     bokeh:.08, liquid:.08, paper:.08, aura:.07,
                     edgeglow:.06,   // gaming-PC hype — keep it occasional too
                     // retro / hardware artifacts
-                    rgbsplit:.1, bankswap:.08, mode7:.05, headswitch:.12 };
+                    rgbsplit:.1, bankswap:.08, mode7:.05, headswitch:.12, popup:.06 };
 // three strength levels: prob = on-probability scale, str = how far params stray from their default.
 // str stays low at Normal so params sit near their (gentle) defaults instead of jumping to extremes.
 // seq/seqHeavy = chance a roll gives an effect a Sequencer pattern (heavy = higher, for destructive fx).
@@ -227,6 +227,15 @@ function randomizeFX(){
       }
       else if (f.id==='melt' && p.k==='width'){    // the fine per-column drip is the good default; wide blobs are the exception
         state[f.id][p.k] = Math.random()<0.7 ? 1 : (2 + Math.floor(Math.random()*15));         // 70% 1px, else 2–16
+      }
+      else if (f.id==='popup' && p.k==='count'){
+        // Moving patterns (Cascade / Flood / Echo) read best with 1–4 copies — a swarm of moving
+        // things is noise, one flying popup is a joke. Static patterns (Spawn Stack pile-up /
+        // Desktop Grid) need enough copies to fill the frame or the layout looks empty.
+        const patt = state.popup.pattern|0;
+        const isMoving = patt===1 || patt===2 || patt===4;
+        state[f.id][p.k] = isMoving ? (1 + Math.floor(Math.random()*4))
+                                     : (5 + Math.floor(Math.random()*10));
       }
       else {
         const rnd = p.min + Math.random()*(p.max-p.min);

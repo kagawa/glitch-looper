@@ -728,40 +728,115 @@ function applyPopupCascade(w,h,phase){
   sctx.globalAlpha=1; sctx.globalCompositeOperation='source-over'; sctx.filter='none';
   sctx.clearRect(0,0,w,h); sctx.drawImage(canvas,0,0);
 
+  // Optional pixel filter — zero the alpha of pixels that DON'T match the criterion so every copy
+  // becomes a see-through cutout (only the "bright bits" / "red parts" / etc. get multiplied).
+  // ffeather softens the pass/fail cutoff so the cutout has a smooth edge instead of a hard mask.
+  const filterMode = s.filter|0;
+  if (filterMode !== 0){
+    const fthresh = P('popup','fthresh'), fhue = P('popup','fhue'), fhuetol = P('popup','fhuetol');
+    const feather = P('popup','ffeather');
+    const img = sctx.getImageData(0,0,w,h), d = img.data;
+    // soft returns 0..1 based on how far `v` is from cut, faded over `feather` * scale.
+    const soft = (v, cut, above, scale) => {
+      const f = Math.max(1e-4, feather * scale);
+      const d = above ? (v - cut) / f : (cut - v) / f;
+      return d >= 1 ? 1 : d <= 0 ? 0 : d;
+    };
+    for (let i=0; i<d.length; i+=4){
+      const r=d[i], g=d[i+1], b=d[i+2];
+      let pass = 1;
+      if (filterMode===1){                                                // Bright — luma
+        const y = (0.2126*r + 0.7152*g + 0.0722*b)/255;
+        pass = soft(y, fthresh, true, 1);
+      } else if (filterMode===2){                                         // Dark
+        const y = (0.2126*r + 0.7152*g + 0.0722*b)/255;
+        pass = soft(y, 1-fthresh, false, 1);
+      } else if (filterMode===3 || filterMode===4){                       // Saturated / Muted
+        const mx = Math.max(r,g,b), mn = Math.min(r,g,b);
+        const sat = mx===0 ? 0 : (mx-mn)/mx;
+        pass = filterMode===3 ? soft(sat, fthresh, true, 1) : soft(sat, 1-fthresh, false, 1);
+      } else if (filterMode===5){                                         // By Hue
+        const mx = Math.max(r,g,b), mn = Math.min(r,g,b), c = mx-mn;
+        if (c === 0){ pass = 0; }
+        else {
+          let hDeg;
+          if (mx===r) hDeg = 60*(((g-b)/c) % 6);
+          else if (mx===g) hDeg = 60*((b-r)/c + 2);
+          else hDeg = 60*((r-g)/c + 4);
+          if (hDeg<0) hDeg += 360;
+          let diff = Math.abs(hDeg - fhue); if (diff>180) diff = 360-diff;
+          const tolDeg = fhuetol * 180;                                   // fhuetol=1 → whole wheel
+          pass = soft(tolDeg - diff, 0, true, 60);                        // feather scaled to ~degrees
+        }
+      }
+      d[i+3] = Math.round(d[i+3] * pass);
+    }
+    sctx.putImageData(img, 0, 0);
+  }
+
   const amount=P('popup','amount');
   const pattern=s.pattern|0, n=Math.max(1,Math.round(P('popup','count')));
   const size=Math.max(.08,P('popup','size')), spacing=P('popup','spacing');
-  const speed=P('popup','speed'), randomness=P('popup','randomness');
+  // Flow Speed is an integer number of laps per loop so any phase-driven translation returns to
+  // its starting value at the seam (phase=0 and phase=1 render identical frames).
+  const laps=Math.max(0,Math.round(P('popup','speed')));
+  const randomness=P('popup','randomness');
   const scale=P('popup','scale'), opacity=P('popup','opacity');
+  const rotDeg=P('popup','rotate');                                     // per-copy tilt max (deg)
   const edge=s.edge|0, edgeAmount=P('popup','edgeAmount'), boundary=s.wrap|0;
   const minSide=Math.min(w,h), baseW=Math.max(10,Math.round(minSide*size));
   const baseH=Math.max(10,Math.round(baseW*h/Math.max(1,w)));
-  const flow=phase*speed*Math.max(w,h);
   const wrap=(v,m)=>((v%m)+m)%m;
   const bounce=(v,m)=>{ if(m<=0) return 0; const q=wrap(v,m*2); return q<=m?q:2*m-q; };
   const clamp=(v,m)=>Math.max(0,Math.min(m,v));
-  const place=(v,m)=>boundary===0?wrap(v,m):boundary===1?bounce(v,m):clamp(v,m);
+  const place=(v,m)=>{ if(m<=0) return 0; return boundary===0?wrap(v,m):boundary===1?bounce(v,m):clamp(v,m); };
   const dir=s.direction|0;
+  const start=s.start|0;
+  const originX=start===1?rand(5511)*Math.max(0,w-baseW):start===2?P('popup','startX')*Math.max(0,w-baseW):(w-baseW)*.5;
+  const originY=start===1?rand(5512)*Math.max(0,h-baseH):start===2?P('popup','startY')*Math.max(0,h-baseH):(h-baseH)*.5;
 
-  function drawCopy(sx,sy,dw,dh,x,y,a){
-    const dx=Math.round(x), dy=Math.round(y), ww=Math.max(2,Math.round(dw)), hh=Math.max(2,Math.round(dh));
+  // Real per-channel colour split for edge===3 (RGB Edge). Uses `tmp` at full frame size so we
+  // don't leave `tmp` shrunk (drawBaseFrame + other stages assume tmp is w×h and won't resize it).
+  // The per-channel scratch is written to the top-left `ww×hh` corner and drawn from there.
+  const drawRGBSplit = (sx,sy,dw,dh,dx,dy,ww,hh,a) => {
+    const off = Math.max(1, Math.round(edgeAmount*7));
+    if (tmp.width !== w || tmp.height !== h){ tmp.width = w; tmp.height = h; }
+    const chans = [[ off, 0, 255,0,0], [0,0, 0,255,0], [-off,0, 0,0,255]];
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = a * (0.55 + 0.35*edgeAmount);
+    for (const [ox,oy,r,g,b] of chans){
+      tctx.setTransform(1,0,0,1,0,0);
+      tctx.globalCompositeOperation='source-over'; tctx.globalAlpha=1;
+      tctx.clearRect(0,0,ww,hh);
+      tctx.drawImage(sc, sx,sy,dw,dh, 0,0,ww,hh);
+      tctx.globalCompositeOperation = 'source-in';
+      tctx.fillStyle = `rgb(${r},${g},${b})`;
+      tctx.fillRect(0,0,ww,hh);
+      ctx.drawImage(tmp, 0,0,ww,hh, dx+ox,dy+oy,ww,hh);
+    }
+    ctx.restore();
+  };
+
+  function drawCopy(sx,sy,dw,dh,cx,cy,ang,a){
+    const ww=Math.max(2,Math.round(dw)), hh=Math.max(2,Math.round(dh));
+    const dx=Math.round(cx-ww/2), dy=Math.round(cy-hh/2);
     const ox=Math.max(1,Math.round(edgeAmount*7)), oy=Math.max(1,Math.round(edgeAmount*7));
     ctx.save();
-    if(edge===1){
+    if (ang!==0){ ctx.translate(cx,cy); ctx.rotate(ang); ctx.translate(-cx,-cy); }
+    if(edge===1){                                                       // Shadow
       ctx.globalAlpha=a*(.18+.32*edgeAmount); ctx.filter=`brightness(0) blur(${Math.max(1,edgeAmount*5)}px)`;
       ctx.drawImage(sc,sx,sy,dw,dh,dx+ox,dy+oy,ww,hh);
       ctx.filter='none';
-    } else if(edge===3){
-      ctx.globalAlpha=a*.22*edgeAmount;
-      ctx.drawImage(sc,sx,sy,dw,dh,dx-ox,dy,ww,hh);
-      ctx.drawImage(sc,sx,sy,dw,dh,dx+ox,dy,ww,hh);
-    } else if(edge===4){
+    } else if(edge===3){                                                // RGB Edge — real split
+      drawRGBSplit(sx,sy,dw,dh,dx,dy,ww,hh,a);
+    } else if(edge===4){                                                // Ghost
       ctx.globalAlpha=a*.18*edgeAmount;
       ctx.drawImage(sc,sx,sy,dw,dh,dx+ox*2,dy-oy,ww,hh);
     }
     ctx.globalAlpha=a;
     ctx.drawImage(sc,sx,sy,dw,dh,dx,dy,ww,hh);
-    if(edge===2){
+    if(edge===2){                                                       // Bevel
       const lw=Math.max(1,Math.round(edgeAmount*2));
       ctx.lineWidth=lw; ctx.globalAlpha=a*(.25+.45*edgeAmount);
       ctx.strokeStyle='rgba(255,255,255,.8)'; ctx.strokeRect(dx+.5,dy+.5,ww-lw,hh-lw);
@@ -770,52 +845,79 @@ function applyPopupCascade(w,h,phase){
     ctx.restore();
   }
 
+  // Modular "offset within a cycle" driven by integer laps. modOffset(cycleLen) returns a value
+  // in [0, cycleLen) that returns to 0 at phase=1 → seamless. cycleLen==0 disables motion.
+  const modOffset = (cycleLen) => cycleLen>0 && laps>0 ? wrap(phase*laps*cycleLen, cycleLen) : 0;
+
   for(let i=0;i<n;i++){
-    const r1=rand(7201+i*31), r2=rand(8803+i*47), r3=rand(10427+i*59);
+    const r1=rand(7201+i*31), r2=rand(8803+i*47), r3=rand(10427+i*59), r4=rand(11923+i*17);
     let dw=baseW*Math.pow(scale, i*.18), dh=baseH*Math.pow(scale, i*.18);
-    let x=0, y=0;
-    if(pattern===0){ // Spawn stack: old copies stay put while a new copy is added down-right.
-      const spawned=speed<=0?0:Math.min(n-1,Math.floor((phase*speed%1)*n));
-      if(i>spawned) continue;
+    let cx=0, cy=0;
+
+    if(pattern===0){                                                    // Spawn Stack — sequential spawn
+      // Browser-crasher feel — 1 popup at seam, another slot fills every 1/n of the loop, all n
+      // shown just before the seam, then the loop restart re-triggers from 1. `laps` cycles the
+      // spawn count that many times per loop; laps=0 shows every copy at once (static stack).
+      const cyclesPerLoop = Math.max(0, laps);
+      const t = cyclesPerLoop>0 ? (phase*cyclesPerLoop) % 1 : 1;        // 0..1 within the current spawn cycle
+      const spawned = cyclesPerLoop>0 ? Math.max(1, Math.ceil(t*n)) : n;
+      if (i >= spawned) continue;
       let d=dir===4?(r1<.5?0:1):dir;
       let vx=d===1||d===3?-1:1, vy=d>=2?-1:1;
       const step=Math.max(4,Math.min(w,h)*spacing*.42);
-      x=(w-dw)*.5 + vx*i*step;
-      y=(h-dh)*.5 + vy*i*step;
-      x=place(x,w-dw); y=place(y,h-dh);
-      x+=(r2-.5)*randomness*baseW; y+=(r3-.5)*randomness*baseH;
-    } else if(pattern===1){ // Moving cascade: the whole trail advances and re-enters at the top.
+      let x = originX + vx*i*step;
+      let y = originY + vy*i*step;
+      x = place(x, w-dw); y = place(y, h-dh);
+      x += (r2-.5)*randomness*baseW; y += (r3-.5)*randomness*baseH;
+      cx = x+dw/2; cy = y+dh/2;
+    } else if(pattern===1){                                             // Moving Cascade — trail rotates through
       let d=dir===4?(r1<.5?0:1):dir;
       let vx=d===1||d===3?-1:1, vy=d>=2?-1:1;
       const step=Math.max(4,Math.min(w,h)*spacing*.42);
-      x=(w-dw)*.5 + vx*(i*step-flow);
-      y=(h-dh)*.5 + vy*(i*step-flow);
-      x=place(x,w-dw); y=place(y,h-dh);
-      x+= (r2-.5)*randomness*baseW; y+=(r3-.5)*randomness*baseH;
-    } else if(pattern===2){ // Flood: stable random windows drift around the entire screen.
-      x=r1*Math.max(1,w-dw)+(Math.sin(phase*6.283+i)*randomness*baseW)-flow*(.2+r2*.8);
-      y=r2*Math.max(1,h-dh)+(Math.cos(phase*6.283*1.3+i)*randomness*baseH)+flow*(.15+r3*.5);
-      x=place(x,w-dw); y=place(y,h-dh);
-    } else if(pattern===3){ // Desktop-like grid, with rows flowing back to the top.
+      const cycle = n*step;                                             // one full trail rotation
+      const off = modOffset(cycle);
+      const localT = wrap(i*step - off, cycle);                         // slot-space position (always in [0,cycle))
+      let x = (w-dw)*.5 + vx*(localT - cycle*.5);
+      let y = (h-dh)*.5 + vy*(localT - cycle*.5);
+      x = place(x, w-dw); y = place(y, h-dh);
+      x += (r2-.5)*randomness*baseW; y += (r3-.5)*randomness*baseH;
+      cx = x+dw/2; cy = y+dh/2;
+    } else if(pattern===2){                                             // Popup Flood — stable random pos + periodic jiggle
+      const jx = Math.sin(phase*Math.PI*2*Math.max(1,laps) + i*.7) * randomness * baseW;
+      const jy = Math.cos(phase*Math.PI*2*Math.max(1,laps) + i*1.13) * randomness * baseH;
+      let x = r1*Math.max(1,w-dw) + jx;
+      let y = r2*Math.max(1,h-dh) + jy;
+      x = place(x, w-dw); y = place(y, h-dh);
+      cx = x+dw/2; cy = y+dh/2;
+    } else if(pattern===3){                                             // Desktop Grid — rows scroll seamlessly
       const cols=Math.max(1,Math.ceil(Math.sqrt(n*w/Math.max(1,h))));
-      const col=i%cols, row=Math.floor(i/cols), rows=Math.ceil(n/cols);
-      x=place(col*(w-dw)/Math.max(1,cols-1)-dw*.35, w-dw);
-      y=place(row*(h-dh)/Math.max(1,rows-1)-flow, h-dh);
-      x+=(r1-.5)*randomness*baseW; y+=(r2-.5)*randomness*baseH;
-    } else { // Recursive echo: copies shrink toward / away from a central source.
-      const ang=r1*Math.PI*2 + phase*Math.PI*2*speed*.15;
-      const radius=(i+1)*spacing*Math.min(w,h)*.16-flow*.25;
-      x=(w-dw)*.5+Math.cos(ang)*radius+(r2-.5)*randomness*baseW;
-      y=(h-dh)*.5+Math.sin(ang)*radius+(r3-.5)*randomness*baseH;
-      x=place(x,w-dw); y=place(y,h-dh);
+      const rows=Math.max(1,Math.ceil(n/cols));
+      const col=i%cols, row=Math.floor(i/cols);
+      const rowStep = (h-dh) / rows;                                    // one row height in grid units
+      const cycle = rows * rowStep;
+      const off = modOffset(cycle);
+      const y = wrap(row*rowStep - off, cycle);
+      const x = place(col*(w-dw)/Math.max(1,cols-1), w-dw);
+      const jx = (r1-.5)*randomness*baseW, jy = (r2-.5)*randomness*baseH;
+      cx = x+dw/2 + jx; cy = y+dh/2 + jy;
+    } else {                                                            // Recursive Echo — ring rotates + breathes
+      const ang = r1*Math.PI*2 + phase*Math.PI*2*Math.max(0,laps);
+      const baseR = (i+1)*spacing*Math.min(w,h)*.16;
+      const breatheAmp = randomness * Math.min(w,h) * .12;
+      const radius = baseR + breatheAmp*Math.sin(phase*Math.PI*2*Math.max(1,laps) + i);
+      cx = w*.5 + Math.cos(ang)*radius + (r2-.5)*randomness*baseW*.4;
+      cy = h*.5 + Math.sin(ang)*radius + (r3-.5)*randomness*baseH*.4;
     }
 
     let sx=(w-baseW)*.5, sy=(h-baseH)*.5;
     const source=s.source|0;
     if(source===1){ sx=r1*Math.max(0,w-baseW); sy=r2*Math.max(0,h-baseH); }
-    else if(source===2){ const q=(i/(Math.max(1,n-1))+.17*phase)%1; sx=q*Math.max(0,w-baseW); sy=(1-q)*Math.max(0,h-baseH); }
+    else if(source===2){ const q=(i/(Math.max(1,n-1)))%1; sx=q*Math.max(0,w-baseW); sy=(1-q)*Math.max(0,h-baseH); }
+    // Per-copy tilt — deterministic seed on i so tilt stays put across frames (rotates only if
+    // the underlying position moves). Range −rotDeg..+rotDeg.
+    const ang = rotDeg>0 ? (r4-.5)*2 * rotDeg * Math.PI/180 : 0;
     const a=Math.max(0,Math.min(1,amount*opacity*(1-i/n*.35)));
-    drawCopy(sx,sy,baseW,baseH,x,y,a);
+    drawCopy(sx,sy,baseW,baseH,cx,cy,ang,a);
   }
   ctx.globalAlpha=1; ctx.filter='none';
 }
