@@ -815,6 +815,10 @@ function applyPopupCascade(w,h,phase){
       tctx.fillRect(0,0,ww,hh);
       ctx.drawImage(tmp, 0,0,ww,hh, dx+ox,dy+oy,ww,hh);
     }
+    // CRITICAL: reset tctx composite before returning — drawBaseFrame reuses `tctx` next frame
+    // with an implicit source-over assumption; leaving source-in here nukes the base image.
+    tctx.globalCompositeOperation = 'source-over';
+    tctx.globalAlpha = 1;
     ctx.restore();
   };
 
@@ -893,11 +897,11 @@ function applyPopupCascade(w,h,phase){
       const cols=Math.max(1,Math.ceil(Math.sqrt(n*w/Math.max(1,h))));
       const rows=Math.max(1,Math.ceil(n/cols));
       const col=i%cols, row=Math.floor(i/cols);
-      const rowStep = (h-dh) / rows;                                    // one row height in grid units
-      const cycle = rows * rowStep;
+      const rowStep = Math.max(1,(h-dh)) / rows;                        // guard: h-dh could be 0 if window ≥ frame
+      const cycle = Math.max(1, rows * rowStep);
       const off = modOffset(cycle);
       const y = wrap(row*rowStep - off, cycle);
-      const x = place(col*(w-dw)/Math.max(1,cols-1), w-dw);
+      const x = cols>1 ? place(col*(w-dw)/(cols-1), w-dw) : (w-dw)*.5;
       const jx = (r1-.5)*randomness*baseW, jy = (r2-.5)*randomness*baseH;
       cx = x+dw/2 + jx; cy = y+dh/2 + jy;
     } else {                                                            // Recursive Echo — ring rotates + breathes
